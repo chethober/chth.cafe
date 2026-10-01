@@ -1,0 +1,38 @@
+{
+  "name": "chth-cafe-manager",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "check": "tsc --noEmit",
+    "db:seed": "wrangler d1 execute chth-cafe-db --local --file=./schema.sql",
+    "db:seed:remote": "wrangler d1 execute chth-cafe-db --remote --file=./schema.sql",
+    "db:migrate:local": "wrangler d1 execute chth-cafe-db --local --file=./backup.sql",
+    "db:migrate:remote": "wrangler d1 execute chth-cafe-db --remote --file=./backup.sql",
+    "deploy": "npm run build && wrangler deploy"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "drizzle-orm": "^0.38.3",
+    "hono": "^4.6.16",
+    "lucide-react": "^0.471.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250109.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.10.7",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "drizzle-kit": "^0.30.1",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.7",
+    "wrangler": "^3.101.0"
+  }
+}

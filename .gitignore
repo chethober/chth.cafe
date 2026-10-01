@@ -1,0 +1,19 @@
+# Environment files
+.env
+.env.*
+
+# Build output
+dist/
+.wrangler/
+
+# Database / Backup files
+backup.sql
+*.csv
+merge_sales_*.sql
+
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db

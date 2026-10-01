@@ -1,0 +1,49 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "chth-cafe-manager",
+  "main": "src/server.ts",
+  "compatibility_date": "2025-01-01",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+  "routes": [
+    {
+      "pattern": "chth.cafe",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.chth.cafe",
+      "custom_domain": true
+    },
+    {
+      "pattern": "admin.chth.cafe",
+      "custom_domain": true
+    },
+    {
+      "pattern": "panel.chth.cafe",
+      "custom_domain": true
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "chth-cafe-db",
+      "database_id": "<YOUR_D1_DATABASE_ID>"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "<YOUR_KV_NAMESPACE_ID>"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "0 0 * * *"
+    ]
+  }
+}

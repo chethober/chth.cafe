@@ -1,0 +1,95 @@
+name: Issue Automation
+
+on:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  issues: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto Triage & Label Issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const title = (issue.title || '').toLowerCase();
+            const body = (issue.body || '').toLowerCase();
+            const currentLabels = (issue.labels || []).map(l => (typeof l === 'string' ? l : l.name));
+            const toAdd = [];
+
+            if (title.includes('bug') || body.includes('bug') || body.includes('reproduce') || body.includes('error') || body.includes('crash')) {
+              toAdd.push('bug');
+            }
+            if (title.includes('feat') || title.includes('enhancement') || body.includes('feature') || body.includes('request')) {
+              toAdd.push('enhancement');
+            }
+            if (title.includes('doc') || body.includes('documentation') || body.includes('readme')) {
+              toAdd.push('documentation');
+            }
+            if (toAdd.length === 0 && currentLabels.length === 0) {
+              toAdd.push('triage');
+            }
+
+            const labelConfigs = {
+              bug: { color: 'd73a4a', description: "Something isn't working" },
+              enhancement: { color: 'a2eeef', description: 'New feature or request' },
+              documentation: { color: '0075ca', description: 'Improvements or additions to documentation' },
+              triage: { color: 'ededed', description: 'Needs triage' }
+            };
+
+            for (const name of toAdd) {
+              if (currentLabels.includes(name)) continue;
+              try {
+                await github.rest.issues.getLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name
+                });
+              } catch (e) {
+                if (e.status === 404 && labelConfigs[name]) {
+                  try {
+                    await github.rest.issues.createLabel({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      name,
+                      color: labelConfigs[name].color,
+                      description: labelConfigs[name].description
+                    });
+                  } catch (err) {
+                    console.log(`Could not create label ${name}:`, err.message);
+                  }
+                }
+              }
+            }
+
+            const finalLabelsToAdd = toAdd.filter(l => !currentLabels.includes(l));
+            if (finalLabelsToAdd.length > 0) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: finalLabelsToAdd
+                });
+              } catch (err) {
+                console.log('Error adding labels:', err.message);
+              }
+            }
+
+            try {
+              const applied = finalLabelsToAdd.length > 0
+                ? finalLabelsToAdd.map(l => `\`${l}\``).join(', ')
+                : '`triage`';
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `👋 Thanks for opening this issue! We've automatically tagged it with ${applied} and our team will review it shortly.`
+              });
+            } catch (err) {
+              console.log('Error adding comment:', err.message);
+            }
