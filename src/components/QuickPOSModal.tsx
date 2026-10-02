@@ -37,6 +37,8 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({
   settings,
   onOrderCreated
 }) => {
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [orderSaveError, setOrderSaveError] = useState('');
   const [orderDate, setOrderDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [customerName, setCustomerName] = useState('Walk-in');
   const [orderType, setOrderType] = useState<'dine_in' | 'takeout' | 'pickup'>('dine_in');
@@ -107,8 +109,10 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({
   const taxAmount = (rawSubtotal * settings.taxRate) / 100;
   const totalAmount = rawSubtotal + taxAmount;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (savingOrder) return;
+    setOrderSaveError('');
     if (cart.length === 0) return;
 
     const todayStr = new Date().toISOString().split('T')[0];
@@ -117,7 +121,9 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({
         ? new Date().toISOString()
         : new Date(`${orderDate}T12:00:00`).toISOString();
 
-    store.createOrder({
+    setSavingOrder(true);
+    try {
+      await store.createOrder({
       customerName: customerName.trim() || 'Walk-in',
       orderType,
       paymentMethod,
@@ -131,6 +137,8 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({
         variants: []
       }))
     });
+    } catch (error) { setOrderSaveError(error instanceof Error ? error.message : 'Order could not be saved.'); return; }
+    finally { setSavingOrder(false); }
 
     onOrderCreated();
     onClose();
@@ -147,7 +155,9 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({
         </div>
       }
     >
-      <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+      <form aria-busy={savingOrder} onSubmit={handleSubmit} className="space-y-4 text-xs">
+        {orderSaveError && <p role="alert" className="p-3 rounded-xl border border-rose-500/40 text-rose-400">{orderSaveError}</p>}
+
         {/* Date & Order Meta Row */}
         <div className="grid grid-cols-2 gap-2">
           <div>
@@ -358,7 +368,7 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({
 
         <button
           type="submit"
-          disabled={cart.length === 0}
+          disabled={savingOrder || cart.length === 0}
           className="w-full py-3 rounded-xl btn-brand text-zinc-950 font-black uppercase tracking-wider shadow-lg cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           <CheckCircle2 className="w-4 h-4" /> Record POS Sale ({settings.currency}{totalAmount.toFixed(2)})

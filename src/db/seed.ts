@@ -1,3 +1,4 @@
+import { DEFAULT_APPEARANCE } from '../utils/appearance';
 import {
   SettingsSelect,
   CategorySelect,
@@ -15,10 +16,12 @@ import {
 
 export const initialSettings: SettingsSelect = {
   id: 'cafe_config',
+  timeZone: 'Asia/Tehran',
   cafeName: 'CHTH',
   logoUrl: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=300&q=80',
   brandPrimary: '#059669', // Emerald Tea Green
   brandSecondary: '#064e3b', // Forest Dark
+  appearance: JSON.stringify(DEFAULT_APPEARANCE),
   currency: '₹',
   taxRate: 8.5,
   openHours: JSON.stringify({
@@ -380,7 +383,7 @@ export const initialStaff: StaffSelect[] = [
     id: 'staff-demo-1',
     name: 'Alex',
     role: 'Manager',
-    pin: '1234',
+    pin: '',
     hourlyRate: 25.00,
     status: 'active',
     createdAt: '2026-01-01T08:00:00.000Z'
@@ -389,7 +392,7 @@ export const initialStaff: StaffSelect[] = [
     id: 'staff-demo-2',
     name: 'Jordan',
     role: 'Barista',
-    pin: '5678',
+    pin: '',
     hourlyRate: 18.50,
     status: 'active',
     createdAt: '2026-01-01T08:00:00.000Z'
@@ -398,7 +401,7 @@ export const initialStaff: StaffSelect[] = [
     id: 'staff-demo-3',
     name: 'Taylor',
     role: 'Barista',
-    pin: '9012',
+    pin: '',
     hourlyRate: 18.50,
     status: 'active',
     createdAt: '2026-01-01T08:00:00.000Z'

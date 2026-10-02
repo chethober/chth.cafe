@@ -83,7 +83,9 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
   onStateChange
 }) => {
   // Orders State
-  const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [orderSaveError, setOrderSaveError] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>('active');
   const [orderTypeFilter, setOrderTypeFilter] = useState<string>('all');
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [panelSelectedOrderDetails, setPanelSelectedOrderDetails] = useState<OrderSelect | null>(null);
@@ -111,10 +113,10 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('chth_panel_last_tab');
       if (saved && ['pos', 'orders', 'tasks', 'shifts'].includes(saved)) {
-        return saved as any;
+        return saved as 'pos' | 'orders' | 'tasks' | 'shifts';
       }
     }
-    return 'pos';
+    return 'orders';
   });
 
   useEffect(() => {
@@ -237,13 +239,15 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
     }
   };
 
-  const handleUpdateOrderStatus = (orderId: string, status: 'pending' | 'preparing' | 'completed' | 'cancelled') => {
+  const handleUpdateOrderStatus = (orderId: string, status: 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled') => {
     store.updateOrderStatus(orderId, status);
     onStateChange();
   };
 
-  const handleCreatePOSOrder = (e: React.FormEvent) => {
+  const handleCreatePOSOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (savingOrder) return;
+    setOrderSaveError('');
     if (posCart.length === 0) return;
 
     const rawSubtotal = posCart.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
@@ -261,7 +265,9 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
         ? new Date().toISOString()
         : new Date(`${posDate}T12:00:00`).toISOString();
 
-    store.createOrder({
+    setSavingOrder(true);
+    try {
+      await store.createOrder({
       customerName: posCustomer.trim() || 'Walk-in',
       orderType: posOrderType,
       paymentMethod: posPayment,
@@ -276,6 +282,8 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
         variants: []
       }))
     });
+    } catch (error) { setOrderSaveError(error instanceof Error ? error.message : 'Order could not be saved.'); return; }
+    finally { setSavingOrder(false); }
 
     setPosCart([]);
     setPosCustomer('');
@@ -316,7 +324,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
 
   // Filtered lists
   const filteredOrders = orders.filter((o) => {
-    const matchesStatus = orderStatusFilter === 'all' || o.status === orderStatusFilter;
+    const matchesStatus = orderStatusFilter === 'all' || (orderStatusFilter === 'active' ? ['pending', 'preparing', 'ready'].includes(o.status) : o.status === orderStatusFilter);
     const matchesType = orderTypeFilter === 'all' || o.orderType === orderTypeFilter;
     const matchesSearch =
       o.orderNumber.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
@@ -333,6 +341,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
   const activeShifts = shifts.filter((s) => !s.clockOut);
   const pendingOrdersCount = orders.filter((o) => o.status === 'pending').length;
   const preparingOrdersCount = orders.filter((o) => o.status === 'preparing').length;
+  const readyOrdersCount = orders.filter(o=>o.status === 'ready').length;
   const completedOrdersCount = orders.filter((o) => o.status === 'completed').length;
   const totalOrdersCount = orders.length || 1;
 
@@ -349,66 +358,51 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
           </div>
           <div>
             <h1 className="text-lg font-black text-zinc-100 tracking-tight">
-              CHTH Management
+              Café daily panel
             </h1>
-            <p className="text-xs text-zinc-400 font-medium">Store management, POS order register & employee shifts</p>
+            <p className="text-xs text-zinc-400 font-medium">Take orders, prepare drinks, and keep the shift running.</p>
           </div>
         </div>
       </div>
 
-      {/* Mobile Section View Switcher Bar (<lg) */}
-      <div className="lg:hidden grid grid-cols-4 gap-1 p-1 bg-zinc-900/90 backdrop-blur-md rounded-2xl border border-zinc-800 sticky top-16 z-30 shadow-lg">
-        <button
-          onClick={() => setPanelMobileTab('pos')}
-          className={`py-2 px-1 rounded-xl font-bold text-[11px] text-center flex flex-col items-center gap-1 transition-all cursor-pointer ${
-            panelMobileTab === 'pos' ? 'btn-brand text-zinc-950 shadow-md' : 'text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          <Zap className="w-4 h-4" />
-          <span>POS</span>
-        </button>
-        <button
-          onClick={() => setPanelMobileTab('orders')}
-          className={`py-2 px-1 rounded-xl font-bold text-[11px] text-center flex flex-col items-center gap-1 transition-all cursor-pointer relative ${
-            panelMobileTab === 'orders' ? 'btn-brand text-zinc-950 shadow-md' : 'text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          <ShoppingBag className="w-4 h-4" />
-          <span>Orders</span>
-          {pendingOrdersCount > 0 && (
-            <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-          )}
-        </button>
-        <button
-          onClick={() => setPanelMobileTab('tasks')}
-          className={`py-2 px-1 rounded-xl font-bold text-[11px] text-center flex flex-col items-center gap-1 transition-all cursor-pointer ${
-            panelMobileTab === 'tasks' ? 'btn-brand text-zinc-950 shadow-md' : 'text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          <CheckSquare className="w-4 h-4" />
-          <span>Tasks</span>
-        </button>
-        <button
-          onClick={() => setPanelMobileTab('shifts')}
-          className={`py-2 px-1 rounded-xl font-bold text-[11px] text-center flex flex-col items-center gap-1 transition-all cursor-pointer ${
-            panelMobileTab === 'shifts' ? 'btn-brand text-zinc-950 shadow-md' : 'text-zinc-400 hover:text-zinc-200'
-          }`}
-        >
-          <Clock className="w-4 h-4" />
-          <span>Shifts</span>
-        </button>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-label="Shift overview">
+        {[
+          { label: 'Waiting to start', count: pendingOrdersCount, tab: 'orders', filter: 'pending' },
+          { label: 'Being prepared', count: preparingOrdersCount, tab: 'orders', filter: 'preparing' },
+          { label: 'Ready to serve', count: readyOrdersCount, tab: 'orders', filter: 'ready' },
+          { label: 'Staff on shift', count: activeShifts.length, tab: 'shifts', filter: 'active' }
+        ].map(({ label, count, tab, filter }) => (
+          <button key={label} type="button" onClick={() => { setPanelMobileTab(tab as 'orders' | 'shifts'); setOrderStatusFilter(filter); }} className="glass-panel rounded-2xl p-4 text-left hover:border-amber-400 transition-colors">
+            <span className="block text-2xl font-black text-zinc-100">{count}</span>
+            <span className="text-xs text-zinc-400">{label}</span>
+          </button>
+        ))}
       </div>
+
+      <nav aria-label="Daily panel sections" className="panel-navigation grid grid-cols-4 gap-1 p-1 rounded-2xl border border-zinc-800 sticky top-16 z-30 shadow-lg">
+        {[
+          { id: 'orders', label: 'Orders', icon: ShoppingBag },
+          { id: 'pos', label: 'New order', icon: Plus },
+          { id: 'tasks', label: 'Tasks', icon: CheckSquare },
+          { id: 'shifts', label: 'Clock in / out', icon: Clock }
+        ].map(({ id, label, icon: Icon }) => (
+          <button key={id} type="button" aria-current={panelMobileTab === id ? 'page' : undefined} aria-controls={`panel-${id}`} onClick={() => setPanelMobileTab(id as typeof panelMobileTab)} className={`min-h-14 px-2 py-3 rounded-xl font-bold text-xs flex flex-col sm:flex-row items-center justify-center gap-2 transition-colors ${panelMobileTab === id ? 'btn-brand text-zinc-950' : 'text-zinc-400 hover:text-zinc-200'}`}>
+            <Icon className="w-4 h-4" /><span>{label}</span>
+            {id === 'pos' && posCart.length > 0 && <span>({posCart.reduce((sum, item) => sum + item.quantity, 0)})</span>}
+          </button>
+        ))}
+      </nav>
 
       {/* ========================================================================= */}
       {/* UNIFIED POS & STOCK COMMAND CENTER (MULTI-ITEM POS ORDERING)              */}
       {/* ========================================================================= */}
-      <div className={`glass-panel p-5 rounded-3xl border border-zinc-800/80 space-y-4 shadow-lg ${panelMobileTab === 'pos' ? 'block' : 'hidden lg:block'}`}>
+      <div id="panel-pos" className={`glass-panel p-5 rounded-3xl border border-zinc-800/80 space-y-4 shadow-lg ${panelMobileTab === 'pos' ? 'block' : 'hidden'}`}>
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
           <div className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-amber-400" />
             <div>
-              <h2 className="font-black text-zinc-100 text-sm tracking-tight">Store Menu, Stock & POS Terminal</h2>
+              <h2 className="font-black text-zinc-100 text-sm tracking-tight">New order & menu availability</h2>
               <p className="text-[11px] text-zinc-400">Toggle item availability or add multiple items into one POS order</p>
             </div>
           </div>
@@ -576,7 +570,9 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
         </div>
 
         {/* Multi-Item Order Checkout Form & Basket */}
-        <form onSubmit={handleCreatePOSOrder} className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-3">
+        <form aria-busy={savingOrder} onSubmit={handleCreatePOSOrder} className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-3">
+        {orderSaveError && <p role="alert" className="p-3 rounded-xl border border-rose-500/40 text-rose-400">{orderSaveError}</p>}
+
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-zinc-800 pb-2.5 gap-2">
             <span className="text-xs font-black text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
               <ShoppingBag className="w-4 h-4 text-amber-400" /> Current Order Basket ({posCart.reduce((sum, i) => sum + i.quantity, 0)} Items)
@@ -776,7 +772,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
 
             <button
               type="submit"
-              disabled={posCart.length === 0}
+              disabled={savingOrder || posCart.length === 0}
               className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-black uppercase tracking-wider text-xs shadow-lg cursor-pointer flex-shrink-0 ${
                 posCart.length > 0
                   ? 'btn-brand text-zinc-950'
@@ -794,11 +790,11 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
       {/* ========================================================================= */}
       {/* ONE-ROW THREE-COLUMN ERGONOMIC LAYOUT: SHIFTS | TASKS | ORDERS            */}
       {/* ========================================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 gap-6 items-start">
         {/* ========================================================================= */}
         {/* COLUMN 1: EMPLOYEE TIME TRACKER (CHTH.STORE STYLE)                       */}
         {/* ========================================================================= */}
-        <div className={`space-y-4 ${panelMobileTab === 'shifts' ? 'block' : 'hidden lg:block'}`}>
+        <div id="panel-shifts" className={`space-y-4 ${panelMobileTab === 'shifts' ? 'block' : 'hidden'}`}>
           <div className="glass-panel p-5 rounded-3xl border border-zinc-800/80 space-y-5 shadow-lg">
             {/* Header & Digital Clock */}
             <div className="text-center space-y-1 border-b border-zinc-800 pb-4">
@@ -877,7 +873,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
         {/* ========================================================================= */}
         {/* COLUMN 2: SHIFT OPERATIONS TASKS                                          */}
         {/* ========================================================================= */}
-        <div className={`space-y-4 ${panelMobileTab === 'tasks' ? 'block' : 'hidden lg:block'}`}>
+        <div id="panel-tasks" className={`space-y-4 ${panelMobileTab === 'tasks' ? 'block' : 'hidden'}`}>
           <div className="glass-panel p-5 rounded-3xl border border-zinc-800/80 space-y-3 shadow-md">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -970,17 +966,18 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
         {/* ========================================================================= */}
         {/* COLUMN 3: LIVE KITCHEN & CUSTOMER ORDERS                                  */}
         {/* ========================================================================= */}
-        <div className={`space-y-4 ${panelMobileTab === 'orders' ? 'block' : 'hidden lg:block'}`}>
+        <div id="panel-orders" className={`space-y-4 ${panelMobileTab === 'orders' ? 'block' : 'hidden'}`}>
           <div className="glass-panel p-5 rounded-3xl border border-zinc-800/80 space-y-4 shadow-lg">
             {/* Header & Filter Controls */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <ShoppingBag className="w-4 h-4 text-emerald-400" />
-                <h2 className="font-black text-zinc-100 text-sm tracking-tight">Active Customer Orders</h2>
+                <h2 className="font-black text-zinc-100 text-sm tracking-tight">Customer orders</h2>
               </div>
 
               {/* Status Filter Buttons */}
-              <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
+              <div className="flex flex-wrap items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
+                <button type="button" onClick={() => setOrderStatusFilter('active')} aria-pressed={orderStatusFilter === 'active'} className={`px-3 py-2 rounded-lg text-xs font-bold ${orderStatusFilter === 'active' ? 'btn-brand text-zinc-950' : 'text-zinc-400'}`}>Active ({pendingOrdersCount + preparingOrdersCount + readyOrdersCount})</button>
                 <button
                   onClick={() => setOrderStatusFilter('all')}
                   className={`px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer ${
@@ -997,6 +994,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                 >
                   Pending ({pendingOrdersCount})
                 </button>
+                <button type="button" onClick={()=>setOrderStatusFilter('ready')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black ${orderStatusFilter === 'ready' ? 'bg-emerald-500 text-zinc-950' : 'text-zinc-400'}`}>Ready ({readyOrdersCount})</button>
                 <button
                   onClick={() => setOrderStatusFilter('preparing')}
                   className={`px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer ${
@@ -1111,11 +1109,13 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                             </button>
                           )}
 
+                          {['pending','preparing','ready'].includes(order.status) && <button type="button" onClick={e=> { e.stopPropagation(); if (window.confirm(order.status === 'pending' ? 'Cancel this order and return reserved ingredients to stock?' : 'Cancel this order? Prepared ingredients remain deducted from stock.')) handleUpdateOrderStatus(order.id, 'cancelled'); }} className="px-3 py-2 rounded-xl border border-rose-500/40 text-rose-400">Cancel order</button>}
+                          {order.status === 'ready' && <button type="button" onClick={e => { e.stopPropagation(); handleUpdateOrderStatus(order.id, 'completed'); }} className="px-3 py-2 rounded-xl btn-brand text-zinc-950 font-semibold">Mark collected / paid</button>}
                           {order.status === 'preparing' && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleUpdateOrderStatus(order.id, 'completed');
+                                handleUpdateOrderStatus(order.id, 'ready');
                               }}
                               className="px-2.5 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black cursor-pointer shadow-md"
                             >

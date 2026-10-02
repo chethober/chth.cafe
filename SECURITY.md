@@ -30,7 +30,7 @@ We will acknowledge your report within 48 hours and work with you to understand 
 
 When deploying CHTH Cafe:
 
-- **Change the default admin password** — Set a strong `VITE_ADMIN_PASSWORD` environment variable
+- **Use strong server passwords** — Local startup generates fresh passwords; configure distinct `ADMIN_PASSWORD` and `PANEL_PASSWORD` Worker secrets for deployment
 - **Use strong staff PINs** — Avoid simple PINs like `12345`
 - **Keep secrets secret** — Never commit `.env` files or real credentials to the repository
 - **Use HTTPS** — Always deploy with TLS enabled

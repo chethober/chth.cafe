@@ -1,0 +1,3 @@
+ADMIN_PASSWORD=replace-with-a-unique-admin-password
+SESSION_SECRET=replace-with-a-random-secret-of-at-least-32-characters
+PANEL_PASSWORD=replace-with-a-different-panel-password

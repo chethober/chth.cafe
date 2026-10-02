@@ -17,6 +17,8 @@ import {
   Boxes
 } from 'lucide-react';
 import { store } from './db/store';
+import { api } from './services/api';
+import { applyAppearance } from './utils/appearance';
 import { PublicMenu } from './components/PublicMenu';
 import { SettingsPanel } from './components/SettingsPanel';
 import { TimeTracker } from './components/TimeTracker';
@@ -29,23 +31,16 @@ import { StockManagement } from './components/StockManagement';
 type AdminTab = 'financials' | 'tasks' | 'menu_admin' | 'stock' | 'staff' | 'settings';
 
 export const App: React.FC = () => {
-  // Client-side routing state
-  const [currentPath, setCurrentPath] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return window.location.pathname;
-    }
-    return '/';
-  });
-
-  // Hostname subdomain detection (chth.cafe & subdomains)
+  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
+  // Each SPA is selected only by its subdomain, including local development.
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-  const isDomainAdmin = hostname === 'admin.chth.cafe' || hostname.startsWith('admin.');
-  const isDomainPanel = hostname === 'panel.chth.cafe' || hostname.startsWith('panel.');
+  const isAdminView = hostname.startsWith('admin.');
+  const isPanelView = hostname.startsWith('panel.');
 
   const [adminTab, setAdminTab] = useState<AdminTab>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('chth_admin_last_tab');
-      if (saved && ['financials', 'tasks', 'menu_admin', 'staff', 'settings'].includes(saved)) {
+      if (saved && ['financials', 'tasks', 'menu_admin', 'stock', 'staff', 'settings'].includes(saved)) {
         return saved as AdminTab;
       }
     }
@@ -90,12 +85,13 @@ export const App: React.FC = () => {
   const [, setStateVersion] = useState(0);
 
   // Admin authentication state
-  const [isAdminAuthed, setIsAdminAuthed] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      return sessionStorage.getItem('chth_admin_authed') === 'true';
-    }
-    return false;
-  });
+  const [isAdminAuthed, setIsAdminAuthed] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+  useEffect(() => {
+    fetch('/api/auth/session').then(res => res.json()).then(data => setIsAdminAuthed((data as { authenticated?: boolean }).authenticated === true)).catch(() => {}).finally(() => setAuthLoading(false));
+    const timer = window.setInterval(() => { void store.syncFromAPI(); fetch('/api/auth/session').then(res => res.json()).then(data => setIsAdminAuthed((data as { authenticated?: boolean }).authenticated === true)).catch(() => {}); }, 15000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -109,44 +105,21 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  // Listen to browser forward/back navigation
-  useEffect(() => {
-    const handlePopState = () => {
-      setCurrentPath(window.location.pathname);
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
-
-  const navigateTo = (path: string, tab?: AdminTab) => {
-    if (typeof window !== 'undefined') {
-      window.history.pushState({}, '', path);
-      setCurrentPath(path);
-      if (tab) {
-        setAdminTab(tab);
-      }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault(); setAuthLoading(true); setAuthError(null);
+    try {
+      const result = await api<{ success?: boolean }>('/api/auth/login', { password: passwordInput });
+      if (result.success !== true) throw new Error('The sign-in response was invalid. Check the café API.');
+      setIsAdminAuthed(true); setPasswordInput(''); await store.syncFromAPI();
+    } catch (error) { setAuthError(error instanceof Error ? error.message : 'Sign-in failed.'); }
+    finally { setAuthLoading(false); }
   };
-
-  const handleAdminLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const expectedPass = import.meta.env.VITE_ADMIN_PASSWORD || 'chth2026';
-    const input = passwordInput.trim();
-    if (input === expectedPass) {
-      sessionStorage.setItem('chth_admin_authed', 'true');
-      setIsAdminAuthed(true);
-      setAuthError(null);
-      setPasswordInput('');
-    } else {
-      setAuthError('Incorrect Admin Password. Access Denied.');
-    }
-  };
-
-  const handleAdminLogout = () => {
-    sessionStorage.removeItem('chth_admin_authed');
-    setIsAdminAuthed(false);
-    navigateTo('/');
+  const handleAdminLogout = async () => {
+    try {
+      const response = await fetch('/api/auth/logout', { method: 'POST' });
+      if (!response.ok) throw new Error('Sign-out failed. Please try again.');
+      setIsAdminAuthed(false); store.clearPrivateData(); window.history.replaceState({}, '', '/');
+    } catch (error) { setAuthError(error instanceof Error ? error.message : 'Sign-out failed.'); }
   };
 
   const settings = store.getSettings();
@@ -171,12 +144,7 @@ export const App: React.FC = () => {
     }
   }, [settings.brandPrimary, settings.brandSecondary]);
 
-  // Determine active view context:
-  // 1) panel.chth.cafe OR /panel => Daily Manager Panel View (CHTH Management)
-  // 2) admin.chth.cafe OR /admin => Admin Workspace View (CHTH Admin)
-  // 3) chth.cafe / default => Public Customer View (CHTH Cafe)
-  const isPanelView = isDomainPanel || currentPath === '/panel' || currentPath.startsWith('/panel');
-  const isAdminView = !isPanelView && (isDomainAdmin || currentPath === '/admin' || currentPath.startsWith('/admin'));
+  useEffect(() => { applyAppearance(settings.appearance); }, [settings.appearance]);
 
   // Update Website Document Titles dynamically
   useEffect(() => {
@@ -190,16 +158,17 @@ export const App: React.FC = () => {
   }, [isAdminView, isPanelView]);
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-between selection:bg-amber-500 selection:text-zinc-950 font-sans antialiased">
+    <div className={`app-shell ${isAdminView || isPanelView ? 'app-workspace' : 'app-menu'} min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-between selection:bg-amber-500 selection:text-zinc-950 font-sans antialiased`}>
       {/* Header Navbar */}
       <header className="sticky top-0 z-40 bg-zinc-950/80 backdrop-blur-2xl border-b border-zinc-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           {/* Logo & Brand Title */}
           <div className="flex items-center gap-3">
-            {settings.logoUrl ? (
+            {settings.logoUrl && failedLogoUrl !== settings.logoUrl ? (
               <img
                 src={settings.logoUrl}
                 alt={settings.cafeName}
+                onError={() => setFailedLogoUrl(settings.logoUrl)}
                 className="w-9 h-9 rounded-xl object-cover ring-2 ring-amber-500/30 shadow-md"
               />
             ) : (
@@ -214,23 +183,23 @@ export const App: React.FC = () => {
                 <span className="font-black text-sm sm:text-base text-zinc-100 block leading-tight tracking-tight">
                   {settings.cafeName}
                 </span>
-                {isDomainAdmin && (
-                  <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
+                {isAdminView && (
+                  <span className="app-view-stamp px-2 py-0.5 rounded-md text-[9px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
                     Admin
                   </span>
                 )}
-                {isDomainPanel && (
-                  <span className="px-2 py-0.5 rounded-md text-[9px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">
+                {isPanelView && (
+                  <span className="app-view-stamp px-2 py-0.5 rounded-md text-[9px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">
                     Panel
                   </span>
                 )}
               </div>
               <span className="text-[10px] text-zinc-400 font-medium block">
                 {isAdminView
-                  ? 'Executive Portal'
+                  ? 'The café ledger'
                   : isPanelView
-                  ? 'Daily Operations Command'
-                  : 'Artisan Tea & Specialty Store'}
+                  ? 'Behind the counter'
+                  : 'A little pause.'}
               </span>
             </div>
           </div>
@@ -240,7 +209,7 @@ export const App: React.FC = () => {
             {/* Navigation Actions for Admin View */}
             {isAdminView && isAdminAuthed && (
               <>
-                <div className="hidden md:flex items-center gap-1 bg-zinc-900/90 p-1 rounded-xl border border-zinc-800">
+                <div className="hidden xl:flex items-center gap-1 bg-zinc-900/90 p-1 rounded-xl border border-zinc-800">
                   <button
                     onClick={() => setAdminTab('financials')}
                     className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
@@ -317,7 +286,7 @@ export const App: React.FC = () => {
                 {/* Mobile Top Header Settings Button */}
                 <button
                   onClick={() => setAdminTab('settings')}
-                  className={`md:hidden px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 border cursor-pointer ${
+                  className={`xl:hidden px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 border cursor-pointer ${
                     adminTab === 'settings'
                       ? 'btn-brand text-zinc-950 shadow-md border-amber-500'
                       : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:text-white'
@@ -328,21 +297,17 @@ export const App: React.FC = () => {
                   <span className="text-[11px]">Settings</span>
                 </button>
 
-                <button
-                  onClick={handleAdminLogout}
-                  className="px-3 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 font-bold text-xs flex items-center gap-1 border border-rose-800/40 cursor-pointer transition-colors"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                  Exit
-                </button>
               </>
             )}
 
-            {/* Public Customer View Header Notification & Bag Trigger */}
-            {!isAdminView && !isPanelView && (
-              <span className="text-xs text-zinc-400 font-medium hidden sm:inline">
-                {orders.length} Active Orders
-              </span>
+            {(isAdminView || isPanelView) && isAdminAuthed && (
+              <button
+                onClick={handleAdminLogout}
+                className="px-3 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 font-bold text-xs flex items-center gap-1 border border-rose-800/40 cursor-pointer transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                Exit
+              </button>
             )}
 
             {/* Universal Light/Dark Mode Toggle for All 3 Websites */}
@@ -355,12 +320,12 @@ export const App: React.FC = () => {
               {theme === 'dark' ? (
                 <>
                   <Sun className="w-4 h-4 text-amber-400" />
-                  <span className="text-[11px] font-bold text-zinc-300 hidden md:inline">Light</span>
+                  <span className="text-[11px] font-bold text-zinc-300 hidden xl:inline">Light</span>
                 </>
               ) : (
                 <>
                   <Moon className="w-4 h-4 text-indigo-400" />
-                  <span className="text-[11px] font-bold text-zinc-300 hidden md:inline">Dark</span>
+                  <span className="text-[11px] font-bold text-zinc-300 hidden xl:inline">Dark</span>
                 </>
               )}
             </button>
@@ -370,8 +335,10 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 w-full">
-        {isPanelView ? (
-          /* Daily Manager Operational Panel (panel.chth.cafe or /panel) */
+        {store.pendingSaves > 0 && <p role="status" className="mb-4 rounded-xl border border-amber-500/30 p-3 text-amber-400">Saving {store.pendingSaves} change(s)…</p>}
+        {store.saveError && <div role="alert" className="mb-4 rounded-xl border border-rose-500/40 p-4 text-rose-300">{store.saveError}<button type="button" onClick={() => store.dismissSaveError()} className="ml-4 underline">Dismiss</button></div>}
+        {isPanelView && isAdminAuthed ? (
+          /* Daily Manager Operational Panel (panel.chth.cafe) */
           <PanelManager
             settings={settings}
             orders={orders}
@@ -384,7 +351,7 @@ export const App: React.FC = () => {
             menuVariants={menuVariants}
             onStateChange={() => setStateVersion((v) => v + 1)}
           />
-        ) : !isAdminView ? (
+        ) : !isAdminView && !isPanelView ? (
           /* Public Customer Page (chth.cafe) - Menu & Ordering */
           <PublicMenu
             settings={settings}
@@ -401,9 +368,9 @@ export const App: React.FC = () => {
                 <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center mx-auto mb-3 shadow-lg brand-glow">
                   <Lock className="w-7 h-7" />
                 </div>
-                <h2 className="text-2xl font-black text-zinc-100">{settings.cafeName} Portal</h2>
+                <h2 className="text-2xl font-black text-zinc-100">{settings.cafeName} {isPanelView ? 'Daily Panel' : 'Admin'}</h2>
                 <p className="text-zinc-400 text-xs max-w-xs mx-auto">
-                  Protected executive management space. Enter your administrator key to continue.
+                  {isPanelView ? 'Enter your panel password to manage orders, tasks, and shifts.' : 'Enter your admin password to manage finances, menu, stock, staff, and settings.'}
                 </p>
               </div>
 
@@ -414,12 +381,14 @@ export const App: React.FC = () => {
                 </div>
               )}
 
-              <form onSubmit={handleAdminLogin} className="space-y-4">
+              <form aria-busy={authLoading} onSubmit={handleAdminLogin} className="space-y-4">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                    Admin Security Key
+                  <label htmlFor="admin-password" className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
+                    {isPanelView ? 'Panel Password' : 'Admin Password'}
                   </label>
                   <input
+                    id="admin-password"
+                    autoComplete="current-password"
                     type="password"
                     placeholder="••••••••••••"
                     value={passwordInput}
@@ -432,18 +401,19 @@ export const App: React.FC = () => {
 
                 <button
                   type="submit"
+                  disabled={authLoading}
                   className="w-full py-3 rounded-2xl btn-brand font-extrabold text-zinc-950 text-xs uppercase tracking-wider shadow-xl cursor-pointer"
                 >
-                  Unlock Workspace
+                  {authLoading ? 'Checking access…' : 'Unlock Workspace'}
                 </button>
               </form>
             </div>
           </div>
         ) : (
           /* Admin Dashboard Workspace Views (Authenticated) */
-          <div className="pb-20 md:pb-0">
+          <div className="pb-20 xl:pb-0">
             {/* Fixed Mobile Admin Navigation Bar (Bottom Docked) */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800/80 p-1.5 shadow-2xl grid grid-cols-5 gap-1">
+            <div className="xl:hidden fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800/80 p-1.5 shadow-2xl grid grid-cols-6 gap-1">
               <button
                 onClick={() => setAdminTab('financials')}
                 className={`py-2 px-1 rounded-xl font-bold text-[10px] text-center flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
@@ -550,12 +520,12 @@ export const App: React.FC = () => {
       <footer className="bg-zinc-950 border-t border-zinc-900 py-5 text-center text-xs text-zinc-500 mt-8">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p>© {new Date().getFullYear()} {settings.cafeName}. All rights reserved.</p>
-          <div className="flex items-center gap-4 text-zinc-500 text-[11px]">
+          {!isAdminView && !isPanelView ? <span className="cafe-footer-note">See you at the café.</span> : <div className="flex items-center gap-4 text-zinc-500 text-[11px]">
             <span className="flex items-center gap-1 text-emerald-400 font-semibold">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Live System Active
             </span>
             <span>Cloudflare Workers & D1</span>
-          </div>
+          </div>}
         </div>
       </footer>
     </div>

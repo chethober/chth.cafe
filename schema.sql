@@ -1,17 +1,19 @@
--- Cloudflare D1 Initial Migration & Seed SQL Schema for Hastea Cafe
+-- Cloudflare D1 Initial Migration & Seed SQL Schema for CHTH Cafe
 -- Created from backup.sql database snapshot
 
 CREATE TABLE IF NOT EXISTS settings (
   id TEXT PRIMARY KEY,
-  cafe_name TEXT NOT NULL DEFAULT 'Hastea',
+  cafe_name TEXT NOT NULL DEFAULT 'CHTH',
   logo_url TEXT DEFAULT '',
   brand_primary TEXT NOT NULL DEFAULT '#059669',
   brand_secondary TEXT NOT NULL DEFAULT '#064e3b',
+  appearance TEXT NOT NULL DEFAULT '{}',
+  time_zone TEXT NOT NULL DEFAULT 'Asia/Tehran',
   currency TEXT NOT NULL DEFAULT '₹',
   tax_rate REAL NOT NULL DEFAULT 8.5,
   open_hours TEXT NOT NULL,
   contact_phone TEXT DEFAULT '+1 (555) 382-9104',
-  address TEXT DEFAULT '108 Hastea Way, Botanical District',
+  address TEXT DEFAULT '108 CHTH Way, Botanical District',
   telegram_bot_token TEXT DEFAULT '',
   telegram_chat_id TEXT DEFAULT '',
   notify_sales INTEGER NOT NULL DEFAULT 1,
@@ -59,6 +61,8 @@ CREATE TABLE IF NOT EXISTS menu_items (
   is_in_stock INTEGER NOT NULL DEFAULT 1,
   image_url TEXT DEFAULT '',
   badge TEXT DEFAULT '',
+  allergens TEXT NOT NULL DEFAULT '',
+  dietary_labels TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );
 
@@ -153,7 +157,7 @@ CREATE TABLE IF NOT EXISTS logs (
 
 -- Settings
 INSERT OR IGNORE INTO settings (id, cafe_name, logo_url, brand_primary, brand_secondary, currency, tax_rate, open_hours, contact_phone, address, updated_at)
-VALUES ('cafe_config', 'Hastea', 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=300&q=80', '#059669', '#064e3b', '₹', 8.5, '{"Monday":{"open":"07:00","close":"19:00","closed":false},"Tuesday":{"open":"07:00","close":"19:00","closed":false},"Wednesday":{"open":"07:00","close":"19:00","closed":false},"Thursday":{"open":"07:00","close":"19:00","closed":false},"Friday":{"open":"07:00","close":"21:00","closed":false},"Saturday":{"open":"08:00","close":"21:00","closed":false},"Sunday":{"open":"08:00","close":"18:00","closed":false}}', '+1 (555) 382-9104', '108 Hastea Way, Botanical District', '2026-07-24T00:00:00.000Z');
+VALUES ('cafe_config', 'CHTH', 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?auto=format&fit=crop&w=300&q=80', '#059669', '#064e3b', '₹', 8.5, '{"Monday":{"open":"07:00","close":"19:00","closed":false},"Tuesday":{"open":"07:00","close":"19:00","closed":false},"Wednesday":{"open":"07:00","close":"19:00","closed":false},"Thursday":{"open":"07:00","close":"19:00","closed":false},"Friday":{"open":"07:00","close":"21:00","closed":false},"Saturday":{"open":"08:00","close":"21:00","closed":false},"Sunday":{"open":"08:00","close":"18:00","closed":false}}', '+1 (555) 382-9104', '108 CHTH Way, Botanical District', '2026-07-24T00:00:00.000Z');
 
 -- Categories
 INSERT OR IGNORE INTO categories (id, name, display_order, icon) VALUES
@@ -209,11 +213,11 @@ INSERT OR IGNORE INTO menu_variants (id, menu_item_id, group_name, name, price_m
 
 -- Staff (Migrated from backup.sql employees)
 INSERT OR IGNORE INTO staff (id, name, role, pin, hourly_rate, status, created_at) VALUES
-('staff-hasti', 'Hasti', 'Manager', '123456789', 25.00, 'active', '2026-06-17T15:00:00.000Z'),
-('staff-rakshanda', 'Rakshanda', 'Head Barista', 'hastity', 20.00, 'active', '2026-06-18T06:00:00.000Z'),
-('staff-rehan', 'Rehan', 'Barista', 'birthday', 18.50, 'active', '2026-06-18T14:00:00.000Z'),
-('staff-nilesh', 'Nilesh', 'Barista', '12345', 18.50, 'active', '2026-06-20T12:00:00.000Z'),
-('staff-omid', 'omid', 'Barista', '9999', 18.50, 'active', '2026-06-30T16:00:00.000Z');
+('staff-hasti', 'Hasti', 'Manager', lower(hex(randomblob(16))), 25.00, 'active', '2026-06-17T15:00:00.000Z'),
+('staff-rakshanda', 'Rakshanda', 'Head Barista', lower(hex(randomblob(16))), 20.00, 'active', '2026-06-18T06:00:00.000Z'),
+('staff-rehan', 'Rehan', 'Barista', lower(hex(randomblob(16))), 18.50, 'active', '2026-06-18T14:00:00.000Z'),
+('staff-nilesh', 'Nilesh', 'Barista', lower(hex(randomblob(16))), 18.50, 'active', '2026-06-20T12:00:00.000Z'),
+('staff-omid', 'omid', 'Barista', lower(hex(randomblob(16))), 18.50, 'active', '2026-06-30T16:00:00.000Z');
 
 -- Actual Tasks (Migrated from tasks & cleaning_tasks in backup.sql)
 INSERT OR IGNORE INTO tasks (id, title, description, category, priority, status, assigned_staff_id, due_date, completed_at, created_at) VALUES
@@ -273,3 +277,46 @@ INSERT OR IGNORE INTO recipes (id, menu_item_id, stock_item_id, quantity_require
 ('rcp-5', 'item-honey-latte', 'stock-4', 0.020),
 ('rcp-6', 'item-avocado-toast', 'stock-6', 1.0),
 ('rcp-7', 'item-avocado-toast', 'stock-7', 0.5);
+
+CREATE TABLE IF NOT EXISTS inventory_movements (
+  id TEXT PRIMARY KEY,
+  stock_item_id TEXT NOT NULL REFERENCES stock_items(id),
+  kind TEXT NOT NULL CHECK(kind IN ('purchase','consumption','waste','adjustment','return')),
+  quantity REAL NOT NULL CHECK(quantity != 0),
+  notes TEXT NOT NULL DEFAULT '',
+  order_id TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS reconciliations (
+  date TEXT PRIMARY KEY,
+  opening_cash REAL NOT NULL,
+  expected_cash REAL NOT NULL,
+  expected_card REAL NOT NULL,
+  actual_cash REAL NOT NULL,
+  actual_card REAL NOT NULL,
+  notes TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS movement_validate BEFORE INSERT ON inventory_movements BEGIN
+  SELECT CASE WHEN NOT EXISTS (SELECT 1 FROM stock_items WHERE id = NEW.stock_item_id) THEN RAISE(ABORT, 'Stock item missing') END;
+  SELECT CASE WHEN (SELECT quantity FROM stock_items WHERE id = NEW.stock_item_id) + NEW.quantity < -0.000001 THEN RAISE(ABORT, 'Insufficient stock') END;
+END;
+CREATE TRIGGER IF NOT EXISTS movement_apply AFTER INSERT ON inventory_movements BEGIN
+  UPDATE stock_items SET quantity = MAX(0, quantity + NEW.quantity), total_price = MAX(0, quantity + NEW.quantity) * unit_cost, updated_at = NEW.created_at WHERE id = NEW.stock_item_id;
+END;
+CREATE TRIGGER IF NOT EXISTS order_cancel_restore AFTER UPDATE OF status ON orders WHEN NEW.status = 'cancelled' AND OLD.status = 'pending' BEGIN
+  INSERT INTO inventory_movements (id,stock_item_id,kind,quantity,notes,order_id,created_at)
+  SELECT 'return-' || id, stock_item_id, 'return', -quantity, 'Cancelled before preparation', order_id, strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM inventory_movements WHERE order_id = NEW.id AND kind = 'consumption';
+END;
+CREATE TRIGGER IF NOT EXISTS order_status_validate BEFORE UPDATE OF status ON orders WHEN NEW.status != OLD.status BEGIN
+  SELECT CASE WHEN NOT (
+    (OLD.status = 'pending' AND NEW.status IN ('preparing','cancelled')) OR
+    (OLD.status = 'preparing' AND NEW.status IN ('ready','cancelled')) OR
+    (OLD.status = 'ready' AND NEW.status IN ('completed','cancelled'))
+  ) THEN RAISE(ABORT, 'Invalid order status transition') END;
+END;
+
+CREATE TABLE IF NOT EXISTS order_requests (
+  id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+  fingerprint TEXT NOT NULL
+);

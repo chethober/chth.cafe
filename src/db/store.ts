@@ -16,15 +16,7 @@ import {
   initialSettings,
   initialCategories,
   initialMenuItems,
-  initialMenuVariants,
-  initialStaff,
-  initialShifts,
-  initialOrders,
-  initialOrderItems,
-  initialExpenses,
-  initialTasks,
-  initialStockItems,
-  initialRecipes
+  initialMenuVariants
 } from './seed';
 
 const STORAGE_KEY = 'chth_cafe_settings_v1';
@@ -56,56 +48,26 @@ export interface CafeState {
 
 class CafeStore {
   private state: CafeState;
+  private confirmedState: CafeState;
+  public saveError = '';
+  public pendingSaves = 0;
+  private orderAttempts = new Map<string,string>();
+  private mutationQueue: Promise<unknown> = Promise.resolve();
   private listeners: Set<() => void> = new Set();
 
   constructor() {
     this.state = this.loadFromStorage();
+    this.confirmedState = structuredClone(this.state);
     this.refreshKVCache();
 
     if (typeof window !== 'undefined') {
       window.addEventListener('storage', (e) => {
         if (e.key === STORAGE_KEY) {
-          this.syncFromStorage();
+          void this.syncFromAPI();
         }
       });
 
-      if (SYNC_CHANNEL) {
-        SYNC_CHANNEL.onmessage = (e) => {
-          if (e.data?.type === 'STORE_UPDATED') {
-            if (e.data?.state) {
-              this.syncFromStorage(e.data.state);
-            } else {
-              this.syncFromStorage();
-            }
-          }
-        };
-      }
-
-      window.addEventListener('message', (e) => {
-        if (e.data?.type === 'CHTH_STORE_UPDATED' && e.data?.state) {
-          this.syncFromStorage(e.data.state);
-        } else if (e.data?.type === 'CHTH_REQUEST_SYNC') {
-          if (e.source && 'postMessage' in e.source) {
-            try {
-              (e.source as Window).postMessage(
-                { type: 'CHTH_STORE_UPDATED', state: this.state },
-                '*'
-              );
-            } catch (err) {}
-          }
-        }
-      });
-
-      // Send a sync request to any opener/parent window upon load
-      try {
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage({ type: 'CHTH_REQUEST_SYNC' }, '*');
-        }
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage({ type: 'CHTH_REQUEST_SYNC' }, '*');
-        }
-      } catch (err) {}
-
+      if (SYNC_CHANNEL) SYNC_CHANNEL.onmessage = () => { void this.syncFromAPI(); };
       // Asynchronously fetch latest records from backend D1 database API
       this.syncFromAPI();
     }
@@ -124,20 +86,58 @@ class CafeStore {
     return null;
   }
 
+  public clearPrivateData() {
+    this.state.staff = []; this.state.shifts = []; this.state.orders = [];
+    this.state.orderItems = []; this.state.expenses = []; this.state.tasks = [];
+    this.state.stockItems = []; this.state.recipes = [];
+    this.state.settings.telegramBotToken = ''; this.state.settings.telegramChatId = '';
+    this.confirmedState.staff=[]; this.confirmedState.shifts=[]; this.confirmedState.orders=[]; this.confirmedState.orderItems=[]; this.confirmedState.expenses=[]; this.confirmedState.tasks=[]; this.confirmedState.stockItems=[]; this.confirmedState.recipes=[];
+    this.confirmedState.settings.telegramBotToken=''; this.confirmedState.settings.telegramChatId='';
+    this.notify();
+  }
+  public dismissSaveError() { this.saveError = ''; this.notify(); }
+  private mutationFetch(url: string, options: RequestInit): Promise<Response> {
+    this.pendingSaves++; this.notify();
+    const request = this.mutationQueue.then(async () => {
+      try {
+        const response = await fetch(url, options);
+        const result = await response.clone().json().catch(() => null) as { success?: boolean; message?: string } | null;
+        if (!response.ok || result?.success === false) throw new Error(result?.message || 'The server did not save this change.');
+        if (SYNC_CHANNEL) SYNC_CHANNEL.postMessage({ type: 'STORE_UPDATED' });
+        return response;
+      } catch (error) {
+        this.state = structuredClone(this.confirmedState);
+        this.saveToStorage();
+        this.saveError = `${error instanceof Error ? error.message : 'Network unavailable.'} Changes may not be saved. Review the refreshed data before retrying.`;
+        throw error;
+      } finally {
+        this.pendingSaves--; this.notify();
+        if (!this.pendingSaves) await this.syncFromAPI();
+      }
+    });
+    this.mutationQueue = request.catch(() => {});
+    return request;
+  }
+
   public async syncFromAPI() {
     if (typeof window === 'undefined') return;
     try {
+      const session = await this.safeFetchJSON('/api/auth/session');
+      const managementView = /^(admin|panel)\./.test(window.location.hostname) || /^\/(admin|panel)(\/|$)/.test(window.location.pathname);
+      const adminAccess = session?.authenticated && window.location.hostname.startsWith('admin.');
+      const privateFetch = (url: string) => session?.authenticated && managementView ? this.safeFetchJSON(url) : Promise.resolve(null);
+      if (!session?.authenticated || !managementView) this.clearPrivateData();
       const [ordersData, orderItemsData, tasksData, staffData, shiftsData, expensesData, settingsData, menuData, stockData, recipesData] = await Promise.all([
-        this.safeFetchJSON('/api/orders'),
-        this.safeFetchJSON('/api/order-items'),
-        this.safeFetchJSON('/api/tasks'),
-        this.safeFetchJSON('/api/staff'),
-        this.safeFetchJSON('/api/staff/shifts'),
-        this.safeFetchJSON('/api/expenses'),
-        this.safeFetchJSON('/api/settings'),
-        this.safeFetchJSON('/api/menu'),
-        this.safeFetchJSON('/api/stock'),
-        this.safeFetchJSON('/api/recipes')
+        privateFetch('/api/orders'),
+        privateFetch('/api/order-items'),
+        privateFetch('/api/tasks'),
+        privateFetch('/api/staff'),
+        privateFetch('/api/staff/shifts'),
+        adminAccess ? privateFetch('/api/expenses') : Promise.resolve(null),
+        this.safeFetchJSON(adminAccess ? '/api/admin/settings' : '/api/settings'),
+        this.safeFetchJSON(adminAccess ? '/api/admin/menu' : '/api/menu'),
+        privateFetch('/api/stock'),
+        privateFetch('/api/recipes')
       ]);
 
       let hasChanges = false;
@@ -202,6 +202,7 @@ class CafeStore {
       }
 
       if (hasChanges) {
+        this.confirmedState = structuredClone(this.state);
         this.saveToStorage();
         this.notify();
       }
@@ -231,8 +232,10 @@ class CafeStore {
         const parsedSettings = JSON.parse(savedSettings);
         initialState.settings = {
           ...initialState.settings,
-          ...parsedSettings
+          ...parsedSettings,
+          telegramBotToken: '', telegramChatId: ''
         };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...initialState.settings, telegramBotToken: '', telegramChatId: '' }));
         if (!initialState.settings.cafeName || initialState.settings.cafeName.includes('Velvet')) {
           initialState.settings.cafeName = 'CHTH';
         }
@@ -249,14 +252,14 @@ class CafeStore {
       categories: [...initialCategories],
       menuItems: [...initialMenuItems],
       menuVariants: [...initialMenuVariants],
-      staff: [...initialStaff],
-      shifts: [...initialShifts],
-      orders: [...initialOrders],
-      orderItems: [...initialOrderItems],
-      expenses: [...initialExpenses],
-      tasks: [...initialTasks],
-      stockItems: [...initialStockItems],
-      recipes: [...initialRecipes],
+      staff: [],
+      shifts: [],
+      orders: [],
+      orderItems: [],
+      expenses: [],
+      tasks: [],
+      stockItems: [],
+      recipes: [],
       kvCache: {}
     };
   }
@@ -270,17 +273,7 @@ class CafeStore {
   private saveToStorage() {
     if (typeof window !== 'undefined') {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(this.state.settings));
-        if (SYNC_CHANNEL) {
-          SYNC_CHANNEL.postMessage({ type: 'STORE_UPDATED', state: this.state });
-        }
-        const msg = { type: 'CHTH_STORE_UPDATED', state: this.state };
-        if (window.opener && !window.opener.closed) {
-          try { window.opener.postMessage(msg, '*'); } catch (e) {}
-        }
-        if (window.parent && window.parent !== window) {
-          try { window.parent.postMessage(msg, '*'); } catch (e) {}
-        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...this.state.settings, telegramBotToken: '', telegramChatId: '' }));
       } catch (e) {
         console.error('Error saving settings state:', e);
       }
@@ -310,7 +303,7 @@ class CafeStore {
     }));
 
     this.state.kvCache = {
-      cafe_settings_cache: JSON.stringify(this.state.settings),
+      cafe_settings_cache: JSON.stringify({ ...this.state.settings, telegramBotToken: '', telegramChatId: '' }),
       public_menu_cache: JSON.stringify(publicMenuData),
       last_invalidated: new Date().toISOString()
     };
@@ -339,13 +332,30 @@ class CafeStore {
     this.saveToStorage();
 
     if (typeof window !== 'undefined') {
-      fetch('/api/settings', {
+      this.mutationFetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(this.state.settings)
       }).catch((err) => console.warn('API Update Settings Error:', err));
     }
 
+    return this.state.settings;
+  }
+
+  public async saveSettings(settings: SettingsSelect): Promise<SettingsSelect> {
+    const response = await this.mutationFetch('/api/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+    const result = await response.json().catch(() => null) as {
+      success?: boolean; message?: string; data?: SettingsSelect;
+    } | null;
+    if (!response.ok || !result?.success || result.data?.id !== settings.id) {
+      throw new Error(result?.message || 'Settings could not be saved. Please try again.');
+    }
+    this.state.settings = result.data;
+    this.refreshKVCache();
+    this.saveToStorage();
     return this.state.settings;
   }
 
@@ -374,7 +384,7 @@ class CafeStore {
       this.saveToStorage();
 
       if (typeof window !== 'undefined') {
-        fetch(`/api/menu/items/${itemId}/stock`, {
+        this.mutationFetch(`/api/menu/items/${itemId}/stock`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ isInStock: newStockStatus })
@@ -398,7 +408,7 @@ class CafeStore {
     this.saveToStorage();
 
     if (typeof window !== 'undefined') {
-      fetch('/api/menu/categories', {
+      this.mutationFetch('/api/menu/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newCat)
@@ -416,7 +426,7 @@ class CafeStore {
       this.saveToStorage();
 
       if (typeof window !== 'undefined') {
-        fetch(`/api/menu/categories/${catId}`, {
+        this.mutationFetch(`/api/menu/categories/${catId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(partial)
@@ -443,7 +453,7 @@ class CafeStore {
       this.saveToStorage();
 
       if (typeof window !== 'undefined') {
-        fetch(`/api/menu/categories/${catId}`, { method: 'DELETE' }).catch((err) =>
+        this.mutationFetch(`/api/menu/categories/${catId}`, { method: 'DELETE' }).catch((err) =>
           console.warn('API Delete Category Error:', err)
         );
       }
@@ -478,7 +488,7 @@ class CafeStore {
     this.saveToStorage();
 
     if (typeof window !== 'undefined') {
-      fetch('/api/menu/items', {
+      this.mutationFetch('/api/menu/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ item: newItem, variants: newVariants })
@@ -496,7 +506,7 @@ class CafeStore {
       this.saveToStorage();
 
       if (typeof window !== 'undefined') {
-        fetch(`/api/menu/items/${itemId}`, {
+        this.mutationFetch(`/api/menu/items/${itemId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(partial)
@@ -517,7 +527,7 @@ class CafeStore {
       this.saveToStorage();
 
       if (typeof window !== 'undefined') {
-        fetch(`/api/menu/items/${itemId}`, { method: 'DELETE' }).catch((err) =>
+        this.mutationFetch(`/api/menu/items/${itemId}`, { method: 'DELETE' }).catch((err) =>
           console.warn('API Delete Menu Item Error:', err)
         );
       }
@@ -542,7 +552,7 @@ class CafeStore {
     this.saveToStorage();
 
     if (typeof window !== 'undefined') {
-      fetch('/api/staff', {
+      this.mutationFetch('/api/staff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newMember)
@@ -559,7 +569,7 @@ class CafeStore {
       this.saveToStorage();
 
       if (typeof window !== 'undefined') {
-        fetch(`/api/staff/${staffId}`, {
+        this.mutationFetch(`/api/staff/${staffId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(partial)
@@ -578,7 +588,7 @@ class CafeStore {
       this.saveToStorage();
 
       if (typeof window !== 'undefined') {
-        fetch(`/api/staff/${staffId}`, { method: 'DELETE' }).catch((err) =>
+        this.mutationFetch(`/api/staff/${staffId}`, { method: 'DELETE' }).catch((err) =>
           console.warn('API Delete Staff Error:', err)
         );
       }
@@ -633,7 +643,7 @@ class CafeStore {
 
     // Persist to D1 via API
     if (typeof window !== 'undefined') {
-      fetch('/api/staff/clock-in', {
+      this.mutationFetch('/api/staff/clock-in', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin, notes, staffId: staffMember.id, shift: newShift })
@@ -671,7 +681,7 @@ class CafeStore {
 
     // Persist to D1 via API
     if (typeof window !== 'undefined') {
-      fetch('/api/staff/clock-out', {
+      this.mutationFetch('/api/staff/clock-out', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pin, notes, staffId: staffMember.id, shift: activeShift })
@@ -703,7 +713,7 @@ class CafeStore {
       this.saveToStorage();
 
       if (typeof window !== 'undefined') {
-        fetch(`/api/staff/shifts/${shiftId}`, {
+        this.mutationFetch(`/api/staff/shifts/${shiftId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(partial)
@@ -749,7 +759,7 @@ class CafeStore {
     this.saveToStorage();
 
     if (typeof window !== 'undefined') {
-      fetch('/api/staff/shifts', {
+      this.mutationFetch('/api/staff/shifts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(shiftInput)
@@ -766,7 +776,7 @@ class CafeStore {
       this.saveToStorage();
 
       if (typeof window !== 'undefined') {
-        fetch(`/api/staff/shifts/${shiftId}`, { method: 'DELETE' }).catch((err) =>
+        this.mutationFetch(`/api/staff/shifts/${shiftId}`, { method: 'DELETE' }).catch((err) =>
           console.warn('API Delete Shift Error:', err)
         );
       }
@@ -788,6 +798,53 @@ class CafeStore {
     return this.state.orders;
   }
 
+  /** Public checkout only commits local state after the server accepts the order. */
+  public async submitPublicOrder(
+    input: Parameters<CafeStore['createOrder']>[0],
+    submissionId: string
+  ): Promise<OrderSelect & { trackingToken?: string }> {
+    const subtotal = Number(input.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toFixed(2));
+    const taxAmount = Number((subtotal * this.state.settings.taxRate / 100).toFixed(2));
+    const payload = {
+      ...input,
+      id: submissionId,
+      orderNumber: `#${submissionId.replace(/^public-/, '').slice(0, 8).toUpperCase()}`,
+      customerName: input.customerName?.trim() || 'Guest Customer',
+      subtotal, taxAmount, discountAmount: 0,
+      totalAmount: Number((subtotal + taxAmount).toFixed(2)),
+      status: 'pending', createdAt: new Date().toISOString()
+    };
+    const response = await this.mutationFetch('/api/orders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json().catch(() => null) as {
+      success?: boolean; message?: string; data?: OrderSelect & { trackingToken?: string };
+    } | null;
+    if (!response.ok || result?.success !== true || result?.data?.id !== submissionId) {
+      throw new Error(result?.message || 'We couldn’t confirm your order. Please try again.');
+    }
+    const order = result.data;
+    // Public receipts are kept separately; do not copy management records into the public store.
+    return order;
+  }
+
+  public recordConfirmedOrder(order: OrderSelect, items: Parameters<CafeStore['createOrder']>[0]['items']): void {
+    this.state.orders = [order, ...this.state.orders.filter(existing => existing.id !== order.id)];
+    this.state.orderItems = [
+      ...items.map((item, index) => ({
+        id: `${order.id}-item-${index}`, orderId: order.id,
+        menuItemId: item.menuItemId, itemName: item.itemName,
+        quantity: item.quantity, unitPrice: item.unitPrice,
+        variantsJson: JSON.stringify(item.variants),
+        itemTotal: Number((item.quantity * item.unitPrice).toFixed(2))
+      })),
+      ...this.state.orderItems.filter(item => item.orderId !== order.id)
+    ];
+    this.saveToStorage();
+    this.notify();
+  }
+
   public getOrderItems(orderId?: string): OrderItemSelect[] {
     if (orderId) {
       return this.state.orderItems.filter((item) => item.orderId === orderId);
@@ -795,7 +852,7 @@ class CafeStore {
     return this.state.orderItems;
   }
 
-  public createOrder(orderInput: {
+  public async createOrder(orderInput: {
     customerName?: string;
     orderType: 'dine_in' | 'takeout' | 'pickup';
     paymentMethod: 'cash' | 'card' | 'google_pay' | 'online';
@@ -809,8 +866,10 @@ class CafeStore {
       unitPrice: number;
       variants: string[];
     }>;
-  }): OrderSelect {
-    const orderId = `ord-${Date.now()}`;
+  }): Promise<OrderSelect> {
+    const signature = JSON.stringify({ ...orderInput, createdAt: undefined });
+    const orderId = this.orderAttempts.get(signature) || `ord-${crypto.randomUUID()}`;
+    this.orderAttempts.set(signature, orderId);
     const orderNumber = `#${1000 + this.state.orders.length + 1}`;
     const subtotal = Number(
       orderInput.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toFixed(2)
@@ -835,30 +894,16 @@ class CafeStore {
       createdAt: now
     };
 
-    const newOrderItems: OrderItemSelect[] = orderInput.items.map((item, idx) => ({
-      id: `item-ord-${Date.now()}-${idx}`,
-      orderId,
-      menuItemId: item.menuItemId,
-      itemName: item.itemName,
-      quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      variantsJson: JSON.stringify(item.variants),
-      itemTotal: Number((item.unitPrice * item.quantity).toFixed(2))
-    }));
-
-    this.state.orders.unshift(newOrder);
-    this.state.orderItems.unshift(...newOrderItems);
-    this.saveToStorage();
-
-    if (typeof window !== 'undefined') {
-      fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...newOrder, items: orderInput.items })
-      }).catch((err) => console.warn('API Post Order Error:', err));
+    if (typeof window === 'undefined') {
+      this.recordConfirmedOrder(newOrder, orderInput.items); return newOrder;
     }
-
-    return newOrder;
+    const response = await this.mutationFetch('/api/orders', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...newOrder, items: orderInput.items })
+    });
+    const result = await response.json() as { data: OrderSelect };
+    this.orderAttempts.delete(signature);
+    return result.data;
   }
 
   public deleteOrder(orderId: string): boolean {
@@ -869,7 +914,7 @@ class CafeStore {
       this.saveToStorage();
 
       if (typeof window !== 'undefined') {
-        fetch(`/api/orders/${orderId}`, { method: 'DELETE' }).catch((err) =>
+        this.mutationFetch(`/api/orders/${orderId}`, { method: 'DELETE' }).catch((err) =>
           console.warn('API Delete Order Error:', err)
         );
       }
@@ -881,7 +926,7 @@ class CafeStore {
 
   public updateOrderStatus(
     orderId: string,
-    status: 'pending' | 'preparing' | 'completed' | 'cancelled'
+    status: 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled'
   ): OrderSelect | undefined {
     const order = this.state.orders.find((o) => o.id === orderId);
     if (order) {
@@ -889,7 +934,7 @@ class CafeStore {
       this.saveToStorage();
 
       if (typeof window !== 'undefined') {
-        fetch(`/api/orders/${orderId}/status`, {
+        this.mutationFetch(`/api/orders/${orderId}/status`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status })
@@ -918,7 +963,7 @@ class CafeStore {
 
     // Persist to D1 via API
     if (typeof window !== 'undefined') {
-      fetch('/api/expenses', {
+      this.mutationFetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newExp)
@@ -936,7 +981,7 @@ class CafeStore {
 
       // Persist to D1 via API
       if (typeof window !== 'undefined') {
-        fetch(`/api/expenses/${expenseId}`, { method: 'DELETE' }).catch((err) =>
+        this.mutationFetch(`/api/expenses/${expenseId}`, { method: 'DELETE' }).catch((err) =>
           console.warn('API Delete Expense Error:', err)
         );
       }
@@ -948,7 +993,7 @@ class CafeStore {
 
   public getFinancialAnalytics() {
     const totalSalesRevenue = Number(
-      this.state.orders.reduce((acc, order) => acc + order.totalAmount, 0).toFixed(2)
+      this.state.orders.filter(order => order.status === 'completed').reduce((acc, order) => acc + order.totalAmount, 0).toFixed(2)
     );
 
     const totalManualExpenses = Number(
@@ -979,8 +1024,8 @@ class CafeStore {
       netProfit,
       profitMargin,
       categoryTotals,
-      totalOrdersCount: this.state.orders.length,
-      averageOrderValue: this.state.orders.length > 0 ? Number((totalSalesRevenue / this.state.orders.length).toFixed(2)) : 0
+      totalOrdersCount: this.state.orders.filter(order => order.status === 'completed').length,
+      averageOrderValue: this.state.orders.some(order => order.status === 'completed') ? Number((totalSalesRevenue / this.state.orders.filter(order => order.status === 'completed').length).toFixed(2)) : 0
     };
   }
 
@@ -1001,7 +1046,7 @@ class CafeStore {
 
     // Persist to D1 via API
     if (typeof window !== 'undefined') {
-      fetch('/api/tasks', {
+      this.mutationFetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newTask)
@@ -1024,7 +1069,7 @@ class CafeStore {
 
       // Persist to D1 via API
       if (typeof window !== 'undefined') {
-        fetch(`/api/tasks/${taskId}/status`, {
+        this.mutationFetch(`/api/tasks/${taskId}/status`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status })
@@ -1044,7 +1089,7 @@ class CafeStore {
 
       // Persist to D1 via API
       if (typeof window !== 'undefined') {
-        fetch(`/api/tasks/${taskId}`, { method: 'DELETE' }).catch((err) =>
+        this.mutationFetch(`/api/tasks/${taskId}`, { method: 'DELETE' }).catch((err) =>
           console.warn('API Delete Task Error:', err)
         );
       }
@@ -1080,7 +1125,7 @@ class CafeStore {
     this.saveToStorage();
 
     if (typeof window !== 'undefined') {
-      fetch('/api/stock', {
+      this.mutationFetch('/api/stock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newItem)
@@ -1111,7 +1156,7 @@ class CafeStore {
       this.saveToStorage();
 
       if (typeof window !== 'undefined') {
-        fetch(`/api/stock/${id}`, {
+        this.mutationFetch(`/api/stock/${id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updated)
@@ -1142,7 +1187,7 @@ class CafeStore {
       this.saveToStorage();
 
       if (typeof window !== 'undefined') {
-        fetch(`/api/stock/${id}`, { method: 'DELETE' }).catch((err) =>
+        this.mutationFetch(`/api/stock/${id}`, { method: 'DELETE' }).catch((err) =>
           console.warn('API Delete Stock Item Error:', err)
         );
       }
@@ -1179,7 +1224,7 @@ class CafeStore {
     this.saveToStorage();
 
     if (typeof window !== 'undefined') {
-      fetch(`/api/menu/${menuItemId}/recipe`, {
+      this.mutationFetch(`/api/menu/${menuItemId}/recipe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ingredients })

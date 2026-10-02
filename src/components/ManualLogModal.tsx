@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   TrendingUp,
   ArrowDownRight,
@@ -46,6 +46,9 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
   settings,
   onFinancialsUpdated
 }) => {
+  const manualIncomeItemId = useRef(`manual-inc-${crypto.randomUUID()}`);
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [orderSaveError, setOrderSaveError] = useState('');
   const [logType, setLogType] = useState<'income' | 'expense'>(initialType);
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [category, setCategory] = useState<string>('');
@@ -74,8 +77,10 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
     setPaymentMethod(type === 'income' ? 'card' : 'bank_transfer');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (savingOrder) return;
+    setOrderSaveError('');
     if (!title.trim() || !amount) return;
 
     const numericAmount = parseFloat(amount) || 0;
@@ -86,7 +91,9 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
         : new Date(`${date}T12:00:00`).toISOString();
 
     if (logType === 'income') {
-      store.createOrder({
+    setSavingOrder(true);
+    try {
+      await store.createOrder({
         customerName: payer.trim() || 'Manual Income Entry',
         orderType: 'takeout',
         paymentMethod: paymentMethod as any,
@@ -94,7 +101,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
         createdAt: createdAtTimestamp,
         items: [
           {
-            menuItemId: `manual-inc-${Date.now()}`,
+            menuItemId: manualIncomeItemId.current,
             itemName: `[${category}] ${title.trim()}`,
             quantity: 1,
             unitPrice: numericAmount,
@@ -102,6 +109,8 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
           }
         ]
       });
+    } catch (error) { setOrderSaveError(error instanceof Error ? error.message : 'Order could not be saved.'); return; }
+    finally { setSavingOrder(false); }
     } else {
       store.createExpense({
         category,
@@ -158,7 +167,9 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+        <form aria-busy={savingOrder} onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+        {orderSaveError && <p role="alert" className="p-3 rounded-xl border border-rose-500/40 text-rose-400">{orderSaveError}</p>}
+
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1 flex items-center gap-1">
@@ -270,7 +281,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
           </div>
 
           <button
-            type="submit"
+            type="submit" disabled={savingOrder}
             className={`w-full py-3 rounded-xl font-black uppercase tracking-wider shadow-lg cursor-pointer transition-all flex items-center justify-center gap-2 ${
               logType === 'income'
                 ? 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950'

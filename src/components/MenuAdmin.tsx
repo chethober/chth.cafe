@@ -1,3 +1,4 @@
+import { ImageUpload } from './ImageUpload';
 import React, { useState, useMemo } from 'react';
 import {
   UtensilsCrossed,
@@ -105,10 +106,15 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
   // Add Item State
   const [itemName, setItemName] = useState('');
   const [itemCatId, setItemCatId] = useState(categories[0]?.id || '');
+  const [itemAllergens, setItemAllergens] = useState('');
+  const [itemDietaryLabels, setItemDietaryLabels] = useState('');
+  const [editAllergens, setEditAllergens] = useState('');
+  const [editDietaryLabels, setEditDietaryLabels] = useState('');
   const [itemDesc, setItemDesc] = useState('');
   const [itemPrice, setItemPrice] = useState('');
   const [itemProfitMargin, setItemProfitMargin] = useState('');
   const [itemBadge, setItemBadge] = useState('');
+  const [itemImageUrl, setItemImageUrl] = useState('');
 
   // Export Modal & Filter States
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -138,6 +144,7 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
   const [editItemPrice, setEditItemPrice] = useState('');
   const [editItemProfitMargin, setEditItemProfitMargin] = useState('');
   const [editItemBadge, setEditItemBadge] = useState('');
+  const [editItemImageUrl, setEditItemImageUrl] = useState('');
 
   // Edit Category State
   const [editingCategory, setEditingCategory] = useState<CategorySelect | null>(null);
@@ -255,21 +262,22 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
       {
         categoryId: targetCatId,
         name: itemName.trim(),
-        description: itemDesc.trim(),
+        description: itemDesc.trim(), allergens: itemAllergens.trim(), dietaryLabels: itemDietaryLabels.trim(),
         basePrice: parseFloat(itemPrice) || 0,
         profitMargin: parseFloat(itemProfitMargin) || 0,
         isInStock: true,
         badge: itemBadge.trim(),
-        imageUrl: ''
+        imageUrl: itemImageUrl.trim()
       },
       []
     );
 
     setItemName('');
-    setItemDesc('');
+    setItemDesc(''); setItemAllergens(''); setItemDietaryLabels('');
     setItemPrice('');
     setItemProfitMargin('');
     setItemBadge('');
+    setItemImageUrl('');
     setFormError('');
     setAddItemOpen(false);
     onMenuUpdated();
@@ -280,9 +288,11 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
     setEditItemName(item.name);
     setEditItemCatId(item.categoryId);
     setEditItemDesc(item.description || '');
+    setEditAllergens(item.allergens || ''); setEditDietaryLabels(item.dietaryLabels || '');
     setEditItemPrice(item.basePrice ? item.basePrice.toString() : '0');
     setEditItemProfitMargin((item.profitMargin ?? 0).toString());
     setEditItemBadge(item.badge || '');
+    setEditItemImageUrl(item.imageUrl || '');
   };
 
   const handleUpdateItem = (e: React.FormEvent) => {
@@ -292,10 +302,11 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
     store.updateMenuItem(editingItem.id, {
       name: editItemName.trim(),
       categoryId: editItemCatId,
-      description: editItemDesc.trim(),
+      description: editItemDesc.trim(), allergens: editAllergens.trim(), dietaryLabels: editDietaryLabels.trim(),
       basePrice: parseFloat(editItemPrice) || 0,
       profitMargin: parseFloat(editItemProfitMargin) || 0,
-      badge: editItemBadge.trim()
+      badge: editItemBadge.trim(),
+      imageUrl: editItemImageUrl.trim()
     });
 
     setEditingItem(null);
@@ -958,6 +969,10 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
             />
           </div>
 
+          <label className="block text-sm">Allergens (comma separated)<input value={itemAllergens} onChange={e=>setItemAllergens(e.target.value)} placeholder="milk, nuts, gluten, egg, soy — or none if confirmed" maxLength={500} className="mt-2 w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3" /></label>
+          <label className="block text-sm">Dietary labels (comma separated)<input value={itemDietaryLabels} onChange={e=>setItemDietaryLabels(e.target.value)} placeholder="vegan, vegetarian, gluten-free, decaf, caffeine-free" maxLength={500} className="mt-2 w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3" /></label>
+          <ImageUpload label="Product photo" value={itemImageUrl} onChange={setItemImageUrl} />
+
           <div>
             <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
               Description
@@ -1079,6 +1094,10 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
               className="w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100"
             />
           </div>
+
+          <label className="block text-sm">Allergens (comma separated)<input value={editAllergens} onChange={e=>setEditAllergens(e.target.value)} placeholder="milk, nuts, gluten, egg, soy — or none if confirmed" maxLength={500} className="mt-2 w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3" /></label>
+          <label className="block text-sm">Dietary labels (comma separated)<input value={editDietaryLabels} onChange={e=>setEditDietaryLabels(e.target.value)} placeholder="vegan, vegetarian, gluten-free, decaf, caffeine-free" maxLength={500} className="mt-2 w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3" /></label>
+          <ImageUpload label="Product photo" value={editItemImageUrl} onChange={setEditItemImageUrl} />
 
           <div>
             <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">

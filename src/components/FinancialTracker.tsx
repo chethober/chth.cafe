@@ -1,3 +1,4 @@
+import { Reconciliation } from './Reconciliation';
 import React, { useState, useMemo } from 'react';
 import {
   TrendingUp,
@@ -150,10 +151,10 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
   };
 
   // Payment Breakdown Calculations for 4 Channels
-  const cashOrders = orders.filter((o) => o.paymentMethod === 'cash');
-  const cardOrders = orders.filter((o) => o.paymentMethod === 'card');
-  const gpayOrders = orders.filter((o) => o.paymentMethod === 'google_pay');
-  const onlineOrders = orders.filter((o) => o.paymentMethod === 'online');
+  const cashOrders = orders.filter((o) => o.status === 'completed' && o.paymentMethod === 'cash');
+  const cardOrders = orders.filter((o) => o.status === 'completed' && o.paymentMethod === 'card');
+  const gpayOrders = orders.filter((o) => o.status === 'completed' && o.paymentMethod === 'google_pay');
+  const onlineOrders = orders.filter((o) => o.status === 'completed' && o.paymentMethod === 'online');
 
   const cashRevenue = cashOrders.reduce((sum, o) => sum + o.totalAmount, 0);
   const cardRevenue = cardOrders.reduce((sum, o) => sum + o.totalAmount, 0);
@@ -197,7 +198,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
         const dateStr = d.toISOString().split('T')[0];
         const dayLabel = d.toLocaleDateString([], { weekday: 'short' });
 
-        const dayOrders = orders.filter((o) => o.createdAt.startsWith(dateStr));
+        const dayOrders = orders.filter((o) => o.status === 'completed' && o.createdAt.startsWith(dateStr));
         const dayExpenses = expenses.filter((e) => e.date.startsWith(dateStr));
 
         const revenue = dayOrders.reduce((sum, o) => sum + o.totalAmount, 0);
@@ -223,7 +224,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
         const mLabel = monthNames[mDate.getMonth()];
         const yStr = mDate.toISOString().slice(0, 7);
 
-        const mOrders = orders.filter((o) => o.createdAt.startsWith(yStr));
+        const mOrders = orders.filter((o) => o.status === 'completed' && o.createdAt.startsWith(yStr));
         const mExpenses = expenses.filter((e) => e.date.startsWith(yStr));
 
         const rev = mOrders.reduce((sum, o) => sum + o.totalAmount, 0);
@@ -528,6 +529,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans">
+      <Reconciliation settings={settings} />
       {/* Header Banner */}
       <div className="glass-panel-classy p-5 rounded-3xl border border-zinc-800 flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3.5">

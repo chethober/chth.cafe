@@ -1,3 +1,4 @@
+import { InventoryMovements } from './InventoryMovements';
 import React, { useState, useMemo } from 'react';
 import {
   Boxes,
@@ -390,6 +391,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({
 
   return (
     <div className="space-y-6">
+      <InventoryMovements items={stockItems} />
       {/* Top Banner & Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900/90 p-5 sm:p-6 rounded-2xl border border-zinc-800 shadow-xl backdrop-blur-xl">
         <div className="flex items-center gap-4">

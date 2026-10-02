@@ -7,6 +7,8 @@ export const settings = sqliteTable('settings', {
   logoUrl: text('logo_url').default(''),
   brandPrimary: text('brand_primary').notNull().default('#059669'), // Tea Emerald Green
   brandSecondary: text('brand_secondary').notNull().default('#064e3b'), // Deep Forest
+  appearance: text('appearance').notNull().default('{}'),
+  timeZone: text('time_zone').notNull().default('Asia/Tehran'),
   currency: text('currency').notNull().default('$'),
   taxRate: real('tax_rate').notNull().default(8.5), // Percentage (8.5%)
   openHours: text('open_hours').notNull().default(JSON.stringify({
@@ -48,6 +50,8 @@ export const menuItems = sqliteTable('menu_items', {
   profitMargin: real('profit_margin').notNull().default(0.0),
   isInStock: integer('is_in_stock', { mode: 'boolean' }).notNull().default(true),
   imageUrl: text('image_url').default(''),
+  allergens: text('allergens').notNull().default(''),
+  dietaryLabels: text('dietary_labels').notNull().default(''),
   badge: text('badge').default(''), // e.g. "Popular", "New", "Organic"
   createdAt: text('created_at').notNull()
 });
@@ -160,9 +164,9 @@ export const recipes = sqliteTable('recipes', {
 });
 
 // Types exported for frontend & backend consumption
-export type SettingsSelect = typeof settings.$inferSelect;
+export type SettingsSelect = Omit<typeof settings.$inferSelect, 'timeZone'> & { timeZone?: string };
 export type CategorySelect = typeof categories.$inferSelect;
-export type MenuItemSelect = typeof menuItems.$inferSelect;
+export type MenuItemSelect = Omit<typeof menuItems.$inferSelect, 'allergens' | 'dietaryLabels'> & { allergens?: string; dietaryLabels?: string };
 export type MenuVariantSelect = typeof menuVariants.$inferSelect;
 export type StaffSelect = typeof staff.$inferSelect;
 export type ShiftSelect = typeof shifts.$inferSelect;
