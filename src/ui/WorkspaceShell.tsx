@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { AlertCircle, CheckCircle2, Coffee, LogOut, Moon, RefreshCw, Sun } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { AlertCircle, CheckCircle2, Coffee, LogOut, Moon, PanelLeftClose, PanelLeftOpen, RefreshCw, Sun } from 'lucide-react';
 import { IconButton, Notice, Button } from './primitives';
 
 export interface NavItem<T extends string> {
@@ -63,19 +63,33 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
   }, {});
   const tabs = nav.filter(item => item.tab !== false);
   const ThemeIcon = theme === 'dark' ? Sun : Moon;
+  const storageKey = `chth_sidebar_collapsed_${kind.toLowerCase()}`;
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(storageKey) === '1'; } catch { return false; }
+  });
+  useEffect(() => { try { localStorage.setItem(storageKey, collapsed ? '1' : '0'); } catch { /* storage unavailable */ } }, [collapsed, storageKey]);
+  // ⌘B / Ctrl+B toggles the sidebar, as in most desktop editors.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') { e.preventDefault(); setCollapsed(c => !c); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  const SidebarIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
 
   return (
-    <div className="ws ws-shell" data-kind={kind.toLowerCase()}>
-      <aside className="ws-sidebar" aria-label={`${kind} navigation`}>
+    <div className="ws ws-shell" data-kind={kind.toLowerCase()} data-collapsed={collapsed || undefined}>
+      <aside id="ws-sidebar" className="ws-sidebar" aria-label={`${kind} navigation`}>
         <div className="ws-sidebar-brand"><Brand cafeName={cafeName} logoUrl={logoUrl} kind={kind} /></div>
         <nav>
           {Object.entries(groups).map(([group, items]) => (
             <div key={group || 'main'} className="ws-nav-group">
               {group && <div className="ws-nav-label">{group}</div>}
               {items.map(({ id, label, icon: Icon, badge }) => (
-                <button key={id} type="button" className="ws-nav-item" aria-current={active === id ? 'page' : undefined} onClick={() => onNavigate(id)}>
+                <button key={id} type="button" className="ws-nav-item" aria-current={active === id ? 'page' : undefined} onClick={() => onNavigate(id)} title={collapsed ? label : undefined} aria-label={collapsed ? `${label}${badge ? `, ${badge}` : ''}` : undefined}>
                   <Icon />
-                  <span>{label}</span>
+                  <span className="ws-nav-text">{label}</span>
                   {!!badge && <span className="ws-nav-count">{badge}</span>}
                 </button>
               ))}
@@ -83,15 +97,18 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
           ))}
         </nav>
         <div className="ws-sidebar-footer">
-          <span className="ws-live"><span className="ws-live-dot" aria-hidden="true" />Live · syncs every 15s</span>
-          <button type="button" className="ws-nav-item" onClick={onToggleTheme}><ThemeIcon /><span>{theme === 'dark' ? 'Light appearance' : 'Dark appearance'}</span></button>
-          <button type="button" className="ws-nav-item" onClick={onSignOut}><LogOut /><span>Sign out</span></button>
+          <span className="ws-live" title="Live · syncs every 15s"><span className="ws-live-dot" aria-hidden="true" /><span className="ws-nav-text">Live · syncs every 15s</span></span>
+          <button type="button" className="ws-nav-item" onClick={onToggleTheme} title={collapsed ? (theme === 'dark' ? 'Light appearance' : 'Dark appearance') : undefined}><ThemeIcon /><span className="ws-nav-text">{theme === 'dark' ? 'Light appearance' : 'Dark appearance'}</span></button>
+          <button type="button" className="ws-nav-item" onClick={onSignOut} title={collapsed ? 'Sign out' : undefined}><LogOut /><span className="ws-nav-text">Sign out</span></button>
         </div>
       </aside>
 
       <div className="ws-main">
         <header className="ws-topbar">
           <span className="ws-hide-desktop"><Brand cafeName={cafeName} logoUrl={logoUrl} kind={kind} /></span>
+          <span className="ws-hide-mobile">
+            <IconButton label={collapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar (Ctrl+B)'} aria-expanded={!collapsed} aria-controls="ws-sidebar" onClick={() => setCollapsed(c => !c)}><SidebarIcon /></IconButton>
+          </span>
           <div className="ws-topbar-title ws-hide-mobile">
             <strong>{current?.label}</strong>
             <span>{cafeName} · {kind}</span>

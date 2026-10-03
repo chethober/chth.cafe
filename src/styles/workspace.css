@@ -646,3 +646,23 @@ html[data-motion='reduced'] .ws *, html[data-motion='reduced'] .ws *::before, ht
 @media (prefers-contrast: more) {
   .ws { --ws-rule: var(--menu-rule); --ws-muted: var(--menu-ink); }
 }
+
+/* ------------------------------------------------- Collapsible sidebar */
+@media (min-width: 1024px) {
+  .ws-shell { transition: grid-template-columns 280ms var(--ws-ease); }
+  .ws-shell[data-collapsed] { --ws-sidebar: 72px; }
+  .ws-sidebar { overflow-x: hidden; }
+  .ws-nav-text { white-space: nowrap; transition: opacity 160ms ease; }
+  .ws-shell[data-collapsed] .ws-sidebar { padding-left: 12px; padding-right: 12px; }
+  .ws-shell[data-collapsed] :is(.ws-nav-text, .ws-brand-text) { opacity: 0; width: 0; overflow: hidden; pointer-events: none; }
+  .ws-shell[data-collapsed] .ws-sidebar-brand { padding: 0 0 12px; display: flex; justify-content: center; }
+  .ws-shell[data-collapsed] .ws-nav-item { justify-content: center; padding: 0; gap: 0; position: relative; }
+  .ws-shell[data-collapsed] .ws-nav-item > span:first-of-type { flex: 0; }
+  .ws-shell[data-collapsed] .ws-nav-label { font-size: 0; padding: 12px 8px 8px; }
+  .ws-shell[data-collapsed] .ws-nav-label::after { content: ''; display: block; height: 1px; background: var(--ws-rule); }
+  .ws-shell[data-collapsed] .ws-nav-count {
+    position: absolute; top: 4px; right: 6px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+    background: var(--ws-accent); color: var(--ws-accent-ink); font-size: 10px; font-weight: 700; display: grid; place-items: center;
+  }
+  .ws-shell[data-collapsed] .ws-live { justify-content: center; padding: 8px 0; gap: 0; }
+}
