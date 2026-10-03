@@ -391,7 +391,6 @@ export const StockManagement: React.FC<StockManagementProps> = ({
 
   return (
     <div className="space-y-6">
-      <InventoryMovements items={stockItems} />
       {/* Top Banner & Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-zinc-900/90 p-5 sm:p-6 rounded-2xl border border-zinc-800 shadow-xl backdrop-blur-xl">
         <div className="flex items-center gap-4">
@@ -420,7 +419,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({
           </button>
           <button
             onClick={openAddModal}
-            className="btn-brand px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-zinc-950 flex items-center justify-center gap-2 shadow-lg hover:shadow-amber-500/20 transition-all cursor-pointer"
+            className="btn-brand px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-zinc-950 flex items-center justify-center gap-2 shadow-lg hover:shadow-amber-500/20 transition cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             Add Raw Material
@@ -530,7 +529,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
             <button
               onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition whitespace-nowrap cursor-pointer ${
                 statusFilter === 'all'
                   ? 'bg-zinc-800 text-zinc-100 border border-zinc-700'
                   : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
@@ -540,7 +539,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({
             </button>
             <button
               onClick={() => setStatusFilter('in_stock')}
-              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
                 statusFilter === 'in_stock'
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                   : 'text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800/40'
@@ -551,7 +550,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({
             </button>
             <button
               onClick={() => setStatusFilter('low_stock')}
-              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
                 statusFilter === 'low_stock'
                   ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                   : 'text-zinc-400 hover:text-amber-400 hover:bg-zinc-800/40'
@@ -562,7 +561,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({
             </button>
             <button
               onClick={() => setStatusFilter('out_of_stock')}
-              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
                 statusFilter === 'out_of_stock'
                   ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                   : 'text-zinc-400 hover:text-rose-400 hover:bg-zinc-800/40'
@@ -583,7 +582,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all shrink-0 cursor-pointer ${
+              className={`px-3 py-1 rounded-lg text-xs font-semibold transition shrink-0 cursor-pointer ${
                 selectedCategory === cat
                   ? 'btn-brand text-zinc-950 shadow-sm'
                   : 'bg-zinc-950/60 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
@@ -622,7 +621,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({
             return (
               <div
                 key={item.id}
-                className={`bg-zinc-900/90 rounded-2xl border p-5 transition-all flex flex-col justify-between gap-4 shadow-lg hover:border-zinc-700 ${
+                className={`bg-zinc-900/90 rounded-2xl border p-5 transition flex flex-col justify-between gap-4 shadow-lg hover:border-zinc-700 ${
                   isOutOfStock
                     ? 'border-rose-900/50 bg-gradient-to-b from-zinc-900 to-rose-950/20'
                     : isLowStock
@@ -689,7 +688,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({
                   <div className="mt-3 space-y-1">
                     <div className="w-full h-2 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
                       <div
-                        className={`h-full transition-all ${
+                        className={`h-full transition ${
                           isOutOfStock
                             ? 'bg-rose-500'
                             : isLowStock
@@ -761,6 +760,8 @@ export const StockManagement: React.FC<StockManagementProps> = ({
           })}
         </div>
       )}
+
+      <InventoryMovements items={stockItems} />
 
       {/* Add / Edit Raw Material Modal */}
       {(isAddOpen || editingItem) && (
@@ -835,7 +836,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({
                   Quantity *
                 </label>
                 <input
-                  type="number"
+                  type="number" inputMode="decimal"
                   step="any"
                   placeholder="0.0"
                   value={formQuantity}
@@ -850,7 +851,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({
                   Unit Cost ({currency}) *
                 </label>
                 <input
-                  type="number"
+                  type="number" inputMode="decimal"
                   step="any"
                   placeholder="0.00"
                   value={formUnitCost}
@@ -865,7 +866,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({
                   Min Threshold *
                 </label>
                 <input
-                  type="number"
+                  type="number" inputMode="decimal"
                   step="any"
                   placeholder="5.0"
                   value={formMinThreshold}
@@ -976,7 +977,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({
                     key={s.id}
                     type="button"
                     onClick={() => setExportStatus(s.id as any)}
-                    className={`py-1.5 px-1 rounded-lg text-[10px] font-extrabold uppercase transition-all cursor-pointer text-center ${
+                    className={`py-1.5 px-1 rounded-lg text-[10px] font-extrabold uppercase transition cursor-pointer text-center ${
                       exportStatus === s.id
                         ? 'bg-emerald-500 text-zinc-950 shadow-sm'
                         : 'text-zinc-400 hover:text-zinc-200'

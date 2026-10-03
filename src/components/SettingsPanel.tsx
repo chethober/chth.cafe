@@ -289,7 +289,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <div className="col-span-4">
                   <label className="text-zinc-400 font-bold block mb-1 text-[11px] truncate">Tax Rate (%)</label>
                   <input
-                    type="number"
+                    type="number" inputMode="decimal"
                     step="0.1"
                     value={formData.taxRate}
                     onChange={(e) => editFormData({ ...formData, taxRate: parseFloat(e.target.value) || 0 })}
@@ -326,7 +326,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         key={color.hex}
                         type="button"
                         onClick={() => editFormData({ ...formData, brandPrimary: color.hex })}
-                        className={`p-2.5 rounded-xl font-bold border flex items-center gap-2 cursor-pointer transition-all ${
+                        className={`p-2.5 rounded-xl font-bold border flex items-center gap-2 cursor-pointer transition ${
                           formData.brandPrimary === color.hex
                             ? 'bg-zinc-900 border-amber-500 text-zinc-100'
                             : 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-zinc-200'
