@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, Coffee, LogOut, Moon, PanelLeftClose, PanelLeftOpen, RefreshCw, Sun } from 'lucide-react';
-import { IconButton, Notice, Button } from './primitives';
+import { IconButton, Notice, Button, PageContext } from './primitives';
 
 export interface NavItem<T extends string> {
   id: T;
@@ -77,6 +77,11 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   const SidebarIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
+  // Admin pages are labelled by their nav group; the daily panel by the day it is running.
+  const page = current && {
+    icon: current.icon,
+    eyebrow: current.group || new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
+  };
 
   return (
     <div className="ws ws-shell" data-kind={kind.toLowerCase()} data-collapsed={collapsed || undefined}>
@@ -130,7 +135,7 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
               <Notice tone="danger" action={<Button size="sm" variant="ghost" onClick={onDismissError}>Dismiss</Button>}>{saveError}</Notice>
             </div>
           )}
-          {children}
+          <PageContext.Provider value={page || null}>{children}</PageContext.Provider>
         </main>
       </div>
 

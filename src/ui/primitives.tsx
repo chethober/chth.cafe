@@ -55,10 +55,15 @@ export function Page({ children }: { children: React.ReactNode }) {
   return <div className="ws-page">{children}</div>;
 }
 
+/** The shell's current section, so page headers can carry the menu-style eyebrow without each page passing it. */
+export const PageContext = React.createContext<{ icon: React.ComponentType<{ className?: string }>; eyebrow: string } | null>(null);
+
 export function PageHeader({ title, description, actions }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode }) {
+  const page = React.useContext(PageContext);
   return (
     <header className="ws-page-header">
       <div>
+        {page && <span className="ws-eyebrow"><span aria-hidden="true" style={{ display: 'contents' }}><page.icon /></span>{page.eyebrow}</span>}
         <h1>{title}</h1>
         {description && <p>{description}</p>}
       </div>
