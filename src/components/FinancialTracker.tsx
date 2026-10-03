@@ -5,10 +5,7 @@ import {
   DollarSign,
   Receipt,
   Plus,
-  PieChart,
   ShoppingBag,
-  ArrowUpRight,
-  ArrowDownRight,
   Wallet,
   Trash2,
   X,
@@ -41,6 +38,7 @@ import { Modal } from './Modal';
 import { ConfirmModal } from './ConfirmModal';
 import { ManualLogModal } from './ManualLogModal';
 import { QuickPOSModal } from './QuickPOSModal';
+import { FinancialDashboard } from './FinancialDashboard';
 import {
   downloadStyledExcel,
   downloadCSV,
@@ -79,15 +77,6 @@ const INCOME_CATEGORIES = [
   'General Manual Revenue'
 ];
 
-const CATEGORY_COLORS: Record<string, string> = {
-  'Tea & Coffee Supplies': 'bg-emerald-500',
-  'Packaging & Cups': 'bg-teal-400',
-  'Utilities & Power': 'bg-amber-400',
-  'Equipment & Repairs': 'bg-rose-400',
-  'Rent & Lease': 'bg-purple-400',
-  'Labor Wages (Staff)': 'bg-blue-500',
-  'Marketing & Other': 'bg-indigo-400'
-};
 
 export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
   settings,
@@ -101,9 +90,6 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
 
   // Quick POS Modal State
   const [quickPOSOpen, setQuickPOSOpen] = useState(false);
-
-  // Trend Chart Time Filter State ('7d' | '30d' | '12m')
-  const [trendFilter, setTrendFilter] = useState<'7d' | '30d' | '12m'>('7d');
 
   // Selected Order Details Modal State
   const [viewOrderModal, setViewOrderModal] = useState<OrderSelect | null>(null);
@@ -122,8 +108,6 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
   const [exportIncludePaymentMethod, setExportIncludePaymentMethod] = useState(true);
   const [showPreviewTable, setShowPreviewTable] = useState(true);
   const [copiedFeedback, setCopiedFeedback] = useState(false);
-
-  const analytics = store.getFinancialAnalytics();
 
   const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{
     type: 'order' | 'expense';
@@ -149,101 +133,6 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
     setDeleteConfirmTarget(null);
     onFinancialsUpdated();
   };
-
-  // Payment Breakdown Calculations for 4 Channels
-  const cashOrders = orders.filter((o) => o.status === 'completed' && o.paymentMethod === 'cash');
-  const cardOrders = orders.filter((o) => o.status === 'completed' && o.paymentMethod === 'card');
-  const gpayOrders = orders.filter((o) => o.status === 'completed' && o.paymentMethod === 'google_pay');
-  const onlineOrders = orders.filter((o) => o.status === 'completed' && o.paymentMethod === 'online');
-
-  const cashRevenue = cashOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-  const cardRevenue = cardOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-  const gpayRevenue = gpayOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-  const onlineRevenue = onlineOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-
-  const totalRevForCalc = analytics.totalSalesRevenue || 1;
-  const cashPct = Math.round((cashRevenue / totalRevForCalc) * 100);
-  const cardPct = Math.round((cardRevenue / totalRevForCalc) * 100);
-  const gpayPct = Math.round((gpayRevenue / totalRevForCalc) * 100);
-  const onlinePct = Math.round((onlineRevenue / totalRevForCalc) * 100);
-
-  // Sales by Product Breakdown
-  const allOrderItems = store.getOrderItems();
-  const productSalesMap: Record<string, { name: string; revenue: number; qty: number }> = {};
-  allOrderItems.forEach((item) => {
-    const key = item.itemName || 'Item';
-    if (!productSalesMap[key]) {
-      productSalesMap[key] = { name: key, revenue: 0, qty: 0 };
-    }
-    productSalesMap[key].revenue += item.quantity * item.unitPrice;
-    productSalesMap[key].qty += item.quantity;
-  });
-
-  const productSalesList = Object.values(productSalesMap)
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 5);
-
-  const totalTopProductRev = productSalesList.reduce((sum, p) => sum + p.revenue, 1);
-  const PRODUCT_COLORS = ['#10B981', '#F59E0B', '#6366F1', '#EC4899', '#3B82F6'];
-
-  // Time-Series Aggregation for 3 Line Charts (Revenue, Expense, Net Profit)
-  const getTimeSeriesData = () => {
-    const points: Array<{ label: string; revenue: number; expense: number; profit: number }> = [];
-    const now = new Date();
-
-    if (trendFilter === '7d') {
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
-        const dayLabel = d.toLocaleDateString([], { weekday: 'short' });
-
-        const dayOrders = orders.filter((o) => o.status === 'completed' && o.createdAt.startsWith(dateStr));
-        const dayExpenses = expenses.filter((e) => e.date.startsWith(dateStr));
-
-        const revenue = dayOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-        const expense = dayExpenses.reduce((sum, e) => sum + e.amount, 0);
-        const profit = revenue - expense;
-
-        points.push({ label: dayLabel, revenue, expense, profit });
-      }
-    } else if (trendFilter === '30d') {
-      for (let i = 4; i >= 0; i--) {
-        const label = `W${5 - i}`;
-        const startDay = i * 6;
-        const endDay = (i + 1) * 6;
-
-        const rev = orders.slice(startDay, endDay).reduce((sum, o) => sum + o.totalAmount, 0);
-        const exp = expenses.slice(startDay, endDay).reduce((sum, e) => sum + e.amount, 0);
-        points.push({ label, revenue: rev, expense: exp, profit: rev - exp });
-      }
-    } else {
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      for (let i = 5; i >= 0; i--) {
-        const mDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const mLabel = monthNames[mDate.getMonth()];
-        const yStr = mDate.toISOString().slice(0, 7);
-
-        const mOrders = orders.filter((o) => o.status === 'completed' && o.createdAt.startsWith(yStr));
-        const mExpenses = expenses.filter((e) => e.date.startsWith(yStr));
-
-        const rev = mOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-        const exp = mExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-        points.push({ label: mLabel, revenue: rev, expense: exp, profit: rev - exp });
-      }
-    }
-
-    // Ensure non-zero visual curves for smooth line rendering
-    const maxVal = Math.max(
-      ...points.flatMap((p) => [p.revenue, p.expense, Math.abs(p.profit)]),
-      100
-    );
-
-    return { points, maxVal };
-  };
-
-  const trendData = getTimeSeriesData();
 
   // Date range bounds calculation
   const getDateRangeBounds = (preset: DatePreset, customStart: string, customEnd: string) => {
@@ -566,370 +455,15 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
         </div>
       </div>
 
-      {/* EXECUTIVE FINANCIAL KPI METRIC SUMMARY */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="glass-panel p-4 rounded-3xl border border-zinc-800/80 space-y-1.5 shadow-md">
-          <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider block">Gross Sales Revenue</span>
-          <span className="text-xl sm:text-2xl font-black text-zinc-100 font-mono block">
-            {settings.currency}{analytics.totalSalesRevenue.toFixed(2)}
-          </span>
-          <div className="flex items-center gap-1 text-[11px] text-emerald-400 font-bold">
-            <ArrowUpRight className="w-3.5 h-3.5" />
-            <span>{analytics.totalOrdersCount} Completed Sales</span>
-          </div>
-        </div>
-
-        <div className="glass-panel p-4 rounded-3xl border border-zinc-800/80 space-y-1.5 shadow-md">
-          <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider block">Combined Expenses</span>
-          <span className="text-xl sm:text-2xl font-black text-rose-400 font-mono block">
-            {settings.currency}{analytics.combinedExpenses.toFixed(2)}
-          </span>
-          <div className="flex items-center gap-1 text-[11px] text-rose-400 font-semibold">
-            <ArrowDownRight className="w-3.5 h-3.5" />
-            <span>Inc. {settings.currency}{analytics.totalLaborWages.toFixed(2)} labor</span>
-          </div>
-        </div>
-
-        <div className="glass-panel p-4 rounded-3xl border border-zinc-800/80 space-y-1.5 shadow-md">
-          <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider block">Net Operating Profit</span>
-          <span className={`text-xl sm:text-2xl font-black font-mono block ${analytics.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {settings.currency}{analytics.netProfit.toFixed(2)}
-          </span>
-          <span className="text-[10px] text-zinc-500 font-medium block">After COGS & Staff Wages</span>
-        </div>
-
-        <div className="glass-panel p-4 rounded-3xl border border-zinc-800/80 space-y-1.5 shadow-md">
-          <span className="text-[10px] text-zinc-400 font-extrabold uppercase tracking-wider block">Net Profit Margin</span>
-          <span className="text-xl sm:text-2xl font-black text-indigo-400 font-mono block">
-            {analytics.profitMargin}%
-          </span>
-          <span className="text-[10px] text-zinc-500 font-medium block">
-            Avg Ticket: {settings.currency}{analytics.averageOrderValue.toFixed(2)}
-          </span>
-        </div>
-      </div>
+      <FinancialDashboard
+        settings={settings}
+        orders={orders}
+        orderItems={store.getOrderItems()}
+        expenses={expenses}
+        shifts={store.getShifts()}
+      />
 
       <Reconciliation settings={settings} />
-
-      {/* ========================================================================= */}
-      {/* INFOGRAPHICS SECTION: REVENUE TREND & SIDE-BY-SIDE PIE CHARTS             */}
-      {/* ========================================================================= */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* INFOGRAPHIC 1: 3 LINE CHARTS THROUGH TIME WITH FILTER (6 COLS) */}
-        <div className="lg:col-span-6 glass-panel p-5 sm:p-6 rounded-3xl border border-zinc-800/80 space-y-4 shadow-lg flex flex-col justify-between">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-emerald-400" />
-              <h3 className="font-black text-zinc-100 text-sm tracking-tight">Revenue vs Expense Line Trend</h3>
-            </div>
-            
-            {/* Filter Buttons for 7 Days, 30 Days, 12 Months */}
-            <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-[10px]">
-              <button
-                type="button"
-                onClick={() => setTrendFilter('7d')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
-                  trendFilter === '7d' ? 'btn-brand text-zinc-950 shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                7 Days
-              </button>
-              <button
-                type="button"
-                onClick={() => setTrendFilter('30d')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
-                  trendFilter === '30d' ? 'btn-brand text-zinc-950 shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                30 Days
-              </button>
-              <button
-                type="button"
-                onClick={() => setTrendFilter('12m')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
-                  trendFilter === '12m' ? 'btn-brand text-zinc-950 shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                12 Months
-              </button>
-            </div>
-          </div>
-
-          {/* SVG 3 Line Charts Through Time */}
-          <div className="space-y-3 pt-1">
-            <div className="h-44 bg-zinc-900/80 rounded-2xl border border-zinc-800 p-3 relative flex flex-col justify-between">
-              {/* Background Grid Lines */}
-              <div className="absolute inset-0 flex flex-col justify-between p-3 pointer-events-none opacity-15">
-                <div className="border-b border-zinc-500 w-full" />
-                <div className="border-b border-zinc-500 w-full" />
-                <div className="border-b border-zinc-500 w-full" />
-              </div>
-
-              {/* Line Chart SVG */}
-              <svg className="w-full h-32 overflow-visible relative z-10" viewBox="0 0 300 100" preserveAspectRatio="none">
-                {(() => {
-                  const pts = trendData.points;
-                  const max = trendData.maxVal || 100;
-                  const stepX = 300 / Math.max(pts.length - 1, 1);
-
-                  const revCoords = pts.map((p, i) => `${i * stepX},${100 - (p.revenue / max) * 90}`);
-                  const expCoords = pts.map((p, i) => `${i * stepX},${100 - (p.expense / max) * 90}`);
-                  const prfCoords = pts.map((p, i) => `${i * stepX},${100 - (Math.max(p.profit, 0) / max) * 90}`);
-
-                  return (
-                    <>
-                      {/* Line 1: Sales Revenue (Emerald) */}
-                      <polyline
-                        fill="none"
-                        stroke="#10B981"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        points={revCoords.join(' ')}
-                      />
-                      {/* Line 2: Expenses (Rose) */}
-                      <polyline
-                        fill="none"
-                        stroke="#F43F5E"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        points={expCoords.join(' ')}
-                      />
-                      {/* Line 3: Net Profit (Indigo) */}
-                      <polyline
-                        fill="none"
-                        stroke="#6366F1"
-                        strokeWidth="3"
-                        strokeDasharray="4 3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        points={prfCoords.join(' ')}
-                      />
-
-                      {/* Data Dots */}
-                      {pts.map((p, i) => {
-                        const cx = i * stepX;
-                        const cyRev = 100 - (p.revenue / max) * 90;
-                        const cyExp = 100 - (p.expense / max) * 90;
-                        const cyPrf = 100 - (Math.max(p.profit, 0) / max) * 90;
-                        return (
-                          <g key={i}>
-                            <circle cx={cx} cy={cyRev} r="3" fill="#10B981" />
-                            <circle cx={cx} cy={cyExp} r="3" fill="#F43F5E" />
-                            <circle cx={cx} cy={cyPrf} r="3" fill="#6366F1" />
-                          </g>
-                        );
-                      })}
-                    </>
-                  );
-                })()}
-              </svg>
-
-              {/* X-Axis Labels */}
-              <div className="flex justify-between text-[10px] font-bold text-zinc-400 px-1 pt-1 z-10">
-                {trendData.points.map((p, idx) => (
-                  <span key={idx}>{p.label}</span>
-                ))}
-              </div>
-            </div>
-
-            {/* Line Legend */}
-            <div className="flex items-center justify-center gap-4 text-xs font-bold pt-1">
-              <span className="flex items-center gap-1.5 text-emerald-400">
-                <span className="w-3 h-1 rounded-full bg-emerald-500" /> Revenue
-              </span>
-              <span className="flex items-center gap-1.5 text-rose-400">
-                <span className="w-3 h-1 rounded-full bg-rose-500" /> Expenses
-              </span>
-              <span className="flex items-center gap-1.5 text-indigo-400">
-                <span className="w-3 h-1 rounded-full bg-indigo-500 border border-dashed border-indigo-400" /> Net Profit
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* INFOGRAPHIC 2: SIDE-BY-SIDE PIE CHARTS (6 COLS) */}
-        <div className="lg:col-span-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* PIE CHART 1: PAYMENT CHANNEL SPLIT */}
-          <div className="glass-panel p-4 sm:p-5 rounded-3xl border border-zinc-800/80 space-y-3 shadow-lg flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <PieChart className="w-4 h-4 text-amber-400" />
-                <h3 className="font-black text-zinc-100 text-xs sm:text-sm tracking-tight">Payment Channel Split</h3>
-              </div>
-
-              {/* SVG Donut / Pie Chart for Payment Channels */}
-              <div className="flex items-center justify-center py-2 relative">
-                <svg className="w-28 h-28 transform -rotate-90" viewBox="0 0 36 36">
-                  {/* Background Circle */}
-                  <path
-                    className="text-zinc-900"
-                    strokeWidth="4"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                  {/* Cash Slice (Amber) */}
-                  <path
-                    className="text-amber-500 transition-[stroke-dasharray] duration-300"
-                    strokeDasharray={`${cashPct}, 100`}
-                    strokeDashoffset="0"
-                    strokeWidth="4.5"
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                  {/* Card Slice (Emerald) */}
-                  <path
-                    className="text-emerald-500 transition-[stroke-dasharray] duration-300"
-                    strokeDasharray={`${cardPct}, 100`}
-                    strokeDashoffset={`-${cashPct}`}
-                    strokeWidth="4.5"
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                  {/* GPay Slice (Indigo) */}
-                  <path
-                    className="text-indigo-500 transition-[stroke-dasharray] duration-300"
-                    strokeDasharray={`${gpayPct}, 100`}
-                    strokeDashoffset={`-${cashPct + cardPct}`}
-                    strokeWidth="4.5"
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                  {/* Online Slice (Rose) */}
-                  <path
-                    className="text-rose-500 transition-[stroke-dasharray] duration-300"
-                    strokeDasharray={`${onlinePct}, 100`}
-                    strokeDashoffset={`-${cashPct + cardPct + gpayPct}`}
-                    strokeWidth="4.5"
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                  <span className="text-xs font-black text-zinc-100 font-mono">
-                    {orders.length}
-                  </span>
-                  <span className="text-[9px] text-zinc-500 font-bold uppercase">Orders</span>
-                </div>
-              </div>
-
-              {/* Payment Legend */}
-              <div className="space-y-1.5 pt-1 text-[11px]">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-zinc-300 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-amber-500" /> Cash
-                  </span>
-                  <span className="font-mono text-amber-400 font-bold">{cashPct}%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-zinc-300 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500" /> Card
-                  </span>
-                  <span className="font-mono text-emerald-400 font-bold">{cardPct}%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-zinc-300 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-indigo-500" /> GPay
-                  </span>
-                  <span className="font-mono text-indigo-400 font-bold">{gpayPct}%</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-zinc-300 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-rose-500" /> Online
-                  </span>
-                  <span className="font-mono text-rose-400 font-bold">{onlinePct}%</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* PIE CHART 2: SALES BY PRODUCT */}
-          <div className="glass-panel p-4 sm:p-5 rounded-3xl border border-zinc-800/80 space-y-3 shadow-lg flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <PieChart className="w-4 h-4 text-emerald-400" />
-                <h3 className="font-black text-zinc-100 text-xs sm:text-sm tracking-tight">Sales by Product</h3>
-              </div>
-
-              {/* SVG Donut / Pie Chart for Top Products */}
-              {productSalesList.length === 0 ? (
-                <div className="h-28 flex items-center justify-center text-xs text-zinc-500 italic">
-                  No sales data yet
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center justify-center py-2 relative">
-                    <svg className="w-28 h-28 transform -rotate-90" viewBox="0 0 36 36">
-                      <path
-                        className="text-zinc-900"
-                        strokeWidth="4"
-                        stroke="currentColor"
-                        fill="none"
-                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                      />
-                      {(() => {
-                        let accumPct = 0;
-                        return productSalesList.map((prod, idx) => {
-                          const pct = Math.round((prod.revenue / totalTopProductRev) * 100);
-                          const strokeColor = PRODUCT_COLORS[idx % PRODUCT_COLORS.length];
-                          const pathEl = (
-                            <path
-                              key={prod.name}
-                              strokeDasharray={`${pct}, 100`}
-                              strokeDashoffset={`-${accumPct}`}
-                              strokeWidth="4.5"
-                              strokeLinecap="round"
-                              stroke={strokeColor}
-                              fill="none"
-                              className="transition-[stroke-dasharray] duration-300"
-                              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                            />
-                          );
-                          accumPct += pct;
-                          return pathEl;
-                        });
-                      })()}
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                      <span className="text-xs font-black text-emerald-400 font-mono">
-                        {productSalesList.reduce((sum, p) => sum + p.qty, 0)}
-                      </span>
-                      <span className="text-[9px] text-zinc-500 font-bold uppercase">Items Sold</span>
-                    </div>
-                  </div>
-
-                  {/* Product Legend */}
-                  <div className="space-y-1.5 pt-1 text-[11px]">
-                    {productSalesList.slice(0, 4).map((prod, idx) => {
-                      const pct = Math.round((prod.revenue / totalTopProductRev) * 100);
-                      const color = PRODUCT_COLORS[idx % PRODUCT_COLORS.length];
-                      return (
-                        <div key={prod.name} className="flex items-center justify-between gap-1">
-                          <span className="flex items-center gap-1.5 text-zinc-300 font-medium truncate max-w-[110px]" title={prod.name}>
-                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                            <span className="truncate">{prod.name}</span>
-                          </span>
-                          <span className="font-mono text-zinc-100 font-bold flex-shrink-0">{pct}%</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* ========================================================================= */}
       {/* EXPENSE LEDGER & RECENT SALES TRANSACTIONS                                 */}

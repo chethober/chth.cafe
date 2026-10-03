@@ -22,3 +22,12 @@ Thumbs.db
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
+
+# Local production deploy config
+wrangler.production.jsonc
+.prod-credentials
+
+# hastea.shop deploy config, credentials, and DB backups
+wrangler.hastea.jsonc
+.hastea-credentials
+backups/
