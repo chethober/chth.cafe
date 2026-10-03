@@ -1,4 +1,6 @@
-import React, { useId, useState } from 'react';
+import React, { useId, useRef, useState } from 'react';
+import { ImagePlus, Trash2 } from 'lucide-react';
+import { Button, Input } from '../ui';
 
 /** Resize uploads before storing them in the existing image URL fields. */
 export async function prepareImage(file: File): Promise<string> {
@@ -26,24 +28,35 @@ export function ImageUpload({ label, value, onChange, disabled = false }: {
   label: string; value: string; onChange: (value: string) => void; disabled?: boolean;
 }) {
   const id = useId();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  return <fieldset disabled={disabled || busy} className="space-y-3 image-upload">
-    <legend className="text-sm font-semibold mb-2">{label}</legend>
-    {value && <div className="flex items-center gap-3"><img src={value} alt={`${label} preview`} className="image-upload-preview" /><button type="button" onClick={() => { onChange(''); setError(''); }} className="appearance-reset">Remove image</button></div>}
-    <label htmlFor={id} className="block text-xs text-zinc-400">Upload JPEG, PNG, or WebP (up to 10 MB)</label>
-    <input id={id} type="file" accept="image/jpeg,image/png,image/webp" className="w-full text-sm" onChange={async event => {
-      const file = event.target.files?.[0];
-      event.target.value = '';
-      if (!file) return;
-      setBusy(true); setError('');
-      try { onChange(await prepareImage(file)); }
-      catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not read this image.'); }
-      finally { setBusy(false); }
-    }} />
-    <label htmlFor={`${id}-url`} className="block text-xs text-zinc-400">Or use an image URL</label>
-    <input id={`${id}-url`} type="url" value={value.startsWith('data:') ? '' : value} placeholder="https://example.com/photo.jpg" onChange={event => onChange(event.target.value)} className="w-full p-3 bg-zinc-900 border border-zinc-800 text-zinc-100" />
-    <p className="text-xs text-zinc-400" role="status">{busy ? 'Preparing image…' : value.startsWith('data:') ? 'Image ready. Save the form to keep it.' : 'Images are resized automatically. Save the form to keep changes.'}</p>
-    {error && <p role="alert" className="text-sm text-rose-400">{error}</p>}
-  </fieldset>;
+  return (
+    <fieldset disabled={disabled || busy} className="ws-fieldset ws-field">
+      <legend className="ws-label" style={{ marginBottom: 6 }}>{label}</legend>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="ws-panel" style={{ width: 88, height: 88, padding: 0, display: 'grid', placeItems: 'center', overflow: 'hidden', flexShrink: 0 }}>
+          {value ? <img src={value} alt={`${label} preview`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <ImagePlus aria-hidden="true" style={{ color: 'var(--ws-muted)' }} />}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Button size="sm" icon={<ImagePlus />} loading={busy} onClick={() => fileRef.current?.click()}>{busy ? 'Preparing…' : value ? 'Replace' : 'Upload'}</Button>
+            {value && <Button size="sm" variant="danger-ghost" icon={<Trash2 />} onClick={() => { onChange(''); setError(''); }}>Remove</Button>}
+          </div>
+          <span className="ws-hint">JPEG, PNG, or WebP up to 10 MB. Resized automatically.</span>
+        </div>
+      </div>
+      <input ref={fileRef} id={id} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" tabIndex={-1} aria-label={`Upload ${label}`} onChange={async event => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        setBusy(true); setError('');
+        try { onChange(await prepareImage(file)); }
+        catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not read this image.'); }
+        finally { setBusy(false); }
+      }} />
+      <Input type="url" aria-label={`${label} URL`} value={value.startsWith('data:') ? '' : value} placeholder="Or paste an image URL" onChange={event => onChange(event.target.value)} style={{ marginTop: 10 }} />
+      {error && <span role="alert" className="ws-error-text">{error}</span>}
+    </fieldset>
+  );
 }

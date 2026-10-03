@@ -15,11 +15,11 @@ Screenshots use the demo data from `schema.sql`.
   <img src="docs/screenshots/menu-mobile.png" alt="Public menu on mobile" width="24%">
 </p>
 
-**Daily panel**: orders, new orders, tasks, and clock actions for staff on shift.
+**Daily panel**: a live order board (waiting, preparing, ready), plus new orders, the checklist, and clock in/out.
 
-![Daily panel with active customer orders](docs/screenshots/panel.png)
+![Daily panel live order board](docs/screenshots/panel.png)
 
-**Admin workspace**: menu pricing and margins, plus raw-material stock with low-stock alerts.
+**Admin workspace**: menu items with cost, margin, and availability, plus raw-material stock with low-stock alerts.
 
 ![Admin menu editor](docs/screenshots/admin-menu.png)
 

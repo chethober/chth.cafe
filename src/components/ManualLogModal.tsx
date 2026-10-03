@@ -1,16 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  TrendingUp,
-  ArrowDownRight,
-  Calendar,
-  Tag,
-  User,
-  DollarSign,
-  Plus
-} from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 import { SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
-import { Modal } from './Modal';
+import { AffixInput, Field, FormDialog, Input, Notice, Segmented, Select, localDateKey, timestampForDay } from '../ui';
 
 export const EXPENSE_CATEGORIES = [
   'Tea & Coffee Supplies',
@@ -31,6 +22,9 @@ export const INCOME_CATEGORIES = [
   'General Manual Revenue'
 ];
 
+const INCOME_METHODS = [['card', 'Card / wire'], ['cash', 'Cash'], ['google_pay', 'Google Pay'], ['online', 'Online / direct transfer']];
+const EXPENSE_METHODS = [['bank_transfer', 'Bank transfer'], ['card', 'Company card'], ['cash', 'Petty cash']];
+
 interface ManualLogModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -39,260 +33,106 @@ interface ManualLogModalProps {
   onFinancialsUpdated: () => void;
 }
 
-export const ManualLogModal: React.FC<ManualLogModalProps> = ({
-  isOpen,
-  onClose,
-  initialType = 'income',
-  settings,
-  onFinancialsUpdated
-}) => {
+export const ManualLogModal: React.FC<ManualLogModalProps> = ({ isOpen, onClose, initialType = 'income', settings, onFinancialsUpdated }) => {
   const manualIncomeItemId = useRef(`manual-inc-${crypto.randomUUID()}`);
-  const [savingOrder, setSavingOrder] = useState(false);
-  const [orderSaveError, setOrderSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [logType, setLogType] = useState<'income' | 'expense'>(initialType);
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [category, setCategory] = useState<string>('');
+  const [date, setDate] = useState(() => localDateKey());
+  const [category, setCategory] = useState('');
   const [title, setTitle] = useState('');
-  const [payer, setPayer] = useState('');
+  const [party, setParty] = useState('');
   const [amount, setAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<string>('card');
+  const [paymentMethod, setPaymentMethod] = useState('card');
 
-  // Reset category when logType or modal visibility changes
-  useEffect(() => {
-    if (isOpen) {
-      setLogType(initialType);
-      setDate(new Date().toISOString().split('T')[0]);
-      setCategory(initialType === 'income' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]);
-      setPaymentMethod(initialType === 'income' ? 'card' : 'bank_transfer');
-      setTitle('');
-      setPayer('');
-      setAmount('');
-    }
-  }, [isOpen, initialType]);
-
-  // Update default category when switching tabs inside modal
-  const handleTypeChange = (type: 'income' | 'expense') => {
+  const applyType = (type: 'income' | 'expense') => {
     setLogType(type);
     setCategory(type === 'income' ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]);
     setPaymentMethod(type === 'income' ? 'card' : 'bank_transfer');
   };
 
+  useEffect(() => {
+    if (!isOpen) return;
+    applyType(initialType);
+    setDate(localDateKey());
+    setTitle('');
+    setParty('');
+    setAmount('');
+    setError('');
+  }, [isOpen, initialType]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (savingOrder) return;
-    setOrderSaveError('');
-    if (!title.trim() || !amount) return;
-
-    const numericAmount = parseFloat(amount) || 0;
-    const todayStr = new Date().toISOString().split('T')[0];
-    const createdAtTimestamp =
-      date === todayStr
-        ? new Date().toISOString()
-        : new Date(`${date}T12:00:00`).toISOString();
-
+    if (saving || !title.trim() || !amount) return;
+    setError('');
+    const value = parseFloat(amount) || 0;
     if (logType === 'income') {
-    setSavingOrder(true);
-    try {
-      await store.createOrder({
-        customerName: payer.trim() || 'Manual Income Entry',
-        orderType: 'takeout',
-        paymentMethod: paymentMethod as any,
-        status: 'completed',
-        createdAt: createdAtTimestamp,
-        items: [
-          {
-            menuItemId: manualIncomeItemId.current,
-            itemName: `[${category}] ${title.trim()}`,
-            quantity: 1,
-            unitPrice: numericAmount,
-            variants: []
-          }
-        ]
-      });
-    } catch (error) { setOrderSaveError(error instanceof Error ? error.message : 'Order could not be saved.'); return; }
-    finally { setSavingOrder(false); }
+      setSaving(true);
+      try {
+        await store.createOrder({
+          customerName: party.trim() || 'Manual Income Entry',
+          orderType: 'takeout',
+          paymentMethod: paymentMethod as 'cash',
+          status: 'completed',
+          createdAt: timestampForDay(date),
+          items: [{ menuItemId: manualIncomeItemId.current, itemName: `[${category}] ${title.trim()}`, quantity: 1, unitPrice: value, variants: [] }]
+        });
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : 'Income could not be saved.');
+        return;
+      } finally {
+        setSaving(false);
+      }
     } else {
       store.createExpense({
         category,
-        description: title.trim() + (payer.trim() ? ` (${payer.trim()})` : ''),
-        amount: numericAmount,
-        date: date || todayStr,
-        paymentMethod: paymentMethod as any,
+        description: title.trim() + (party.trim() ? ` (${party.trim()})` : ''),
+        amount: value,
+        date: date || localDateKey(),
+        paymentMethod: paymentMethod as 'cash',
         loggedByStaffId: 'staff-hasti'
       });
     }
-
     onFinancialsUpdated();
     onClose();
   };
 
+  const income = logType === 'income';
   return (
-    <Modal
-      isOpen={isOpen}
+    <FormDialog
+      open={isOpen}
       onClose={onClose}
-      title={
-        <div className="flex items-center gap-2 font-black text-sm text-zinc-100">
-          <DollarSign className="w-4 h-4 text-amber-400" />
-          <span>Manual Financial Log Entry</span>
-        </div>
-      }
+      busy={saving}
+      title="Log income or expense"
+      description="For money that didn't come through an order, or costs outside wages."
+      submitLabel={income ? 'Record income' : 'Record expense'}
+      submitDisabled={!title.trim() || !amount}
+      onSubmit={handleSubmit}
     >
-      <div className="space-y-4">
-        {/* Income / Expense Tab Switcher */}
-        <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-zinc-900 border border-zinc-800">
-          <button
-            type="button"
-            onClick={() => handleTypeChange('income')}
-            className={`py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
-              logType === 'income'
-                ? 'bg-emerald-500 text-zinc-950 shadow-md'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-            }`}
-          >
-            <TrendingUp className="w-3.5 h-3.5" />
-            Log Income
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleTypeChange('expense')}
-            className={`py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
-              logType === 'expense'
-                ? 'bg-rose-500 text-zinc-950 shadow-md'
-                : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
-            }`}
-          >
-            <ArrowDownRight className="w-3.5 h-3.5" />
-            Log Expense
-          </button>
-        </div>
-
-        <form aria-busy={savingOrder} onSubmit={handleSubmit} className="space-y-3.5 text-xs">
-        {orderSaveError && <p role="alert" className="p-3 rounded-xl border border-rose-500/40 text-rose-400">{orderSaveError}</p>}
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                <Calendar className="w-3 h-3 text-zinc-400" /> Log Date
-              </label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 cursor-pointer focus:outline-none focus:border-amber-500/50"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                <Tag className="w-3 h-3 text-zinc-400" /> Category
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 cursor-pointer focus:outline-none focus:border-amber-500/50"
-              >
-                {(logType === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-              {logType === 'income' ? 'Income Title / Source Description' : 'Expense Description / Vendor'}
-            </label>
-            <input
-              type="text"
-              placeholder={
-                logType === 'income'
-                  ? 'e.g. Corporate Catering Tea Bar Event'
-                  : 'e.g. Organic Matcha Powder Restock'
-              }
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 focus:outline-none focus:border-amber-500/50"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-              <User className="w-3 h-3 text-zinc-400" />{' '}
-              {logType === 'income' ? 'Payer / Client Name (Optional)' : 'Vendor / Paid To (Optional)'}
-            </label>
-            <input
-              type="text"
-              placeholder={logType === 'income' ? 'e.g. Acme Corp or Private Client' : 'e.g. Local Dairy Supplier'}
-              value={payer}
-              onChange={(e) => setPayer(e.target.value)}
-              className="w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 focus:outline-none focus:border-amber-500/50"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                Amount ({settings.currency})
-              </label>
-              <input
-                type="number" inputMode="decimal"
-                step="0.01"
-                min="0.01"
-                placeholder="100.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className={`w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 font-mono font-bold text-sm focus:outline-none ${
-                  logType === 'income' ? 'text-emerald-400 focus:border-emerald-500/50' : 'text-rose-400 focus:border-rose-500/50'
-                }`}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                Payment Method
-              </label>
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 cursor-pointer focus:outline-none focus:border-amber-500/50"
-              >
-                {logType === 'income' ? (
-                  <>
-                    <option value="card">Card / Wire</option>
-                    <option value="cash">Cash</option>
-                    <option value="google_pay">Google Pay</option>
-                    <option value="online">Online / Direct Transfer</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="bank_transfer">Bank Transfer</option>
-                    <option value="card">Company Card</option>
-                    <option value="cash">Petty Cash</option>
-                  </>
-                )}
-              </select>
-            </div>
-          </div>
-
-          <button
-            type="submit" disabled={savingOrder}
-            className={`w-full py-3 rounded-xl font-black uppercase tracking-wider shadow-lg cursor-pointer transition flex items-center justify-center gap-2 ${
-              logType === 'income'
-                ? 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950'
-                : 'bg-rose-500 hover:bg-rose-400 text-zinc-950'
-            }`}
-          >
-            <Plus className="w-4 h-4" />
-            {logType === 'income' ? 'Record Income Entry' : 'Record Expense Entry'}
-          </button>
-        </form>
+      <Segmented block label="Entry type" value={logType} onChange={applyType} options={[{ value: 'income', label: 'Income' }, { value: 'expense', label: 'Expense' }]} />
+      {error && <Notice tone="danger">{error}</Notice>}
+      <Field label={income ? 'What was it for?' : 'What was bought?'}>{id => (
+        <Input id={id} autoFocus required value={title} onChange={e => setTitle(e.target.value)} placeholder={income ? 'e.g. Corporate tea bar event' : 'e.g. Matcha powder restock'} />
+      )}</Field>
+      <div className="ws-form-row cols-2">
+        <Field label="Amount">{id => <AffixInput id={id} affix={settings.currency} type="number" inputMode="decimal" step="0.01" min="0.01" required value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />}</Field>
+        <Field label="Date">{id => <Input id={id} type="date" required value={date} onChange={e => setDate(e.target.value)} />}</Field>
       </div>
-    </Modal>
+      <div className="ws-form-row cols-2">
+        <Field label="Category">{id => (
+          <Select id={id} value={category} onChange={e => setCategory(e.target.value)}>
+            {(income ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
+          </Select>
+        )}</Field>
+        <Field label={income ? 'Received by' : 'Paid with'}>{id => (
+          <Select id={id} value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
+            {(income ? INCOME_METHODS : EXPENSE_METHODS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </Select>
+        )}</Field>
+      </div>
+      <Field label={income ? 'Paid by' : 'Paid to'} optional>{id => (
+        <Input id={id} value={party} onChange={e => setParty(e.target.value)} placeholder={income ? 'e.g. Acme Corp' : 'e.g. Local dairy supplier'} />
+      )}</Field>
+    </FormDialog>
   );
 };

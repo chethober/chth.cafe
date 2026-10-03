@@ -31,3 +31,7 @@ wrangler.production.jsonc
 wrangler.hastea.jsonc
 .hastea-credentials
 backups/
+
+# Local menu/stock data exports
+menu_catalogue_*.json
+stock_inventory_*.json

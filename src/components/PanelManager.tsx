@@ -1,39 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import {
-  ShoppingBag,
-  CheckSquare,
-  Clock,
-  Coffee,
-  CheckCircle2,
-  AlertCircle,
-  Clock3,
-  Check,
-  X,
-  Plus,
-  Search,
-  User,
-  KeyRound,
-  UserCheck,
-  UserX,
-  Tag,
-  DollarSign,
-  Utensils,
-  RotateCcw,
-  Sparkles,
-  ShieldCheck,
-  Circle,
-  PlayCircle,
-  CreditCard,
-  QrCode,
-  Boxes,
-  Sun,
-  Moon,
-  Wrench,
-  ChevronRight,
-  Zap,
-  BarChart3,
-  Trash2
-} from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Boxes, CheckSquare, ChefHat, Clock, History, LayoutGrid, Plus, Receipt, ShoppingBag, Tag, Trash2, Users, UtensilsCrossed } from 'lucide-react';
 import {
   OrderSelect,
   OrderItemSelect,
@@ -46,9 +12,21 @@ import {
   MenuVariantSelect
 } from '../db/schema';
 import { store } from '../db/store';
-import { Modal } from './Modal';
+import {
+  AffixInput, Avatar, Badge, Button, Card, Chips, ConfirmDialog, Dialog, EmptyState, Field, FormDialog, IconButton, Input,
+  KeyValue, List, ListItem, Meter, Notice, Page, PageHeader, SearchInput, Segmented, Select, Stat, StatGrid, Stepper, Switch,
+  ageLabel, formatDate, formatTime, localDateKey, minutesSince, money, orderTypeLabel, paymentLabel, plural, timestampForDay,
+  ORDER_PAYMENT_METHODS, OrderPaymentMethod
+} from '../ui';
+import { OrderDetailsDialog, TaskFormDialog, TaskRow, TASK_CATEGORIES, TASK_CATEGORY_ICONS, nextTaskStatus } from './shared';
+
+export type PanelSection = 'orders' | 'pos' | 'tasks' | 'shifts';
+type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
+type OrderType = 'dine_in' | 'takeout' | 'pickup';
 
 interface PanelManagerProps {
+  section: PanelSection;
+  onNavigate: (section: PanelSection) => void;
   settings: SettingsSelect;
   orders: OrderSelect[];
   orderItems: OrderItemSelect[];
@@ -61,1417 +39,554 @@ interface PanelManagerProps {
   onStateChange: () => void;
 }
 
-const TASK_CATEGORIES = ['Opening', 'Closing', 'Inventory', 'Cleaning', 'Maintenance'];
-const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  Opening: <Sun className="w-3 h-3 text-amber-400" />,
-  Closing: <Moon className="w-3 h-3 text-indigo-400" />,
-  Inventory: <Boxes className="w-3 h-3 text-blue-400" />,
-  Cleaning: <Sparkles className="w-3 h-3 text-emerald-400" />,
-  Maintenance: <Wrench className="w-3 h-3 text-rose-400" />
-};
+interface CartLine { menuItemId: string; itemName: string; quantity: number; unitPrice: number }
+
+const LANES: { status: 'pending' | 'preparing' | 'ready'; label: string; color: string; next: OrderStatus; action: string }[] = [
+  { status: 'pending', label: 'Waiting', color: 'var(--ws-warning)', next: 'preparing', action: 'Start prep' },
+  { status: 'preparing', label: 'Preparing', color: 'var(--ws-info)', next: 'ready', action: 'Mark ready' },
+  { status: 'ready', label: 'Ready', color: 'var(--ws-positive)', next: 'completed', action: 'Collected & paid' }
+];
+const LATE_AFTER_MIN = 15;
 
 export const PanelManager: React.FC<PanelManagerProps> = ({
-  settings,
-  orders,
-  orderItems,
-  tasks,
-  staffList: staff,
-  shifts,
-  menuItems,
-  categories,
-  menuVariants,
-  onStateChange
+  section, onNavigate, settings, orders, orderItems, tasks, staffList: staff, shifts, menuItems, categories, onStateChange
 }) => {
-  // Orders State
-  const [savingOrder, setSavingOrder] = useState(false);
-  const [orderSaveError, setOrderSaveError] = useState('');
-  const [orderStatusFilter, setOrderStatusFilter] = useState<string>('active');
-  const [orderTypeFilter, setOrderTypeFilter] = useState<string>('all');
-  const [orderSearchQuery, setOrderSearchQuery] = useState('');
-  const [panelSelectedOrderDetails, setPanelSelectedOrderDetails] = useState<OrderSelect | null>(null);
+  const currency = settings.currency;
+  const fmt = (v: number) => money(v, currency);
 
-  // POS Multi-Item Order State
-  const [recipeViewItem, setRecipeViewItem] = useState<MenuItemSelect | null>(null);
-  const [posCustomer, setPosCustomer] = useState('');
-  const [posOrderType, setPosOrderType] = useState<'dine_in' | 'takeout' | 'pickup'>('dine_in');
-  const [posPayment, setPosPayment] = useState<'cash' | 'card' | 'google_pay' | 'online'>('card');
-  const [posDate, setPosDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [posDiscount, setPosDiscount] = useState('0');
-  const [posDiscountType, setPosDiscountType] = useState<'percent' | 'fixed'>('percent');
-  const [posCategoryFilter, setPosCategoryFilter] = useState<string>('all');
-  const [posCart, setPosCart] = useState<
-    Array<{
-      menuItemId: string;
-      itemName: string;
-      quantity: number;
-      unitPrice: number;
-    }>
-  >([]);
-
-  // Mobile Panel View Tab State
-  const [panelMobileTab, setPanelMobileTab] = useState<'pos' | 'orders' | 'tasks' | 'shifts'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('chth_panel_last_tab');
-      if (saved && ['pos', 'orders', 'tasks', 'shifts'].includes(saved)) {
-        return saved as 'pos' | 'orders' | 'tasks' | 'shifts';
-      }
-    }
-    return 'orders';
-  });
-
+  // One clock drives order ages and the time clock; it ticks faster only where seconds show.
+  const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('chth_panel_last_tab', panelMobileTab);
-    }
-  }, [panelMobileTab]);
+    const timer = window.setInterval(() => setNow(new Date()), section === 'shifts' ? 1000 : 30000);
+    return () => window.clearInterval(timer);
+  }, [section]);
 
-  // Cart Helper Operations
-  const handleAddItemToPOSCart = (item: MenuItemSelect) => {
-    if (!item.isInStock) return;
-    setPosCart((prev) => {
-      const idx = prev.findIndex((i) => i.menuItemId === item.id);
-      if (idx !== -1) {
-        const updated = [...prev];
-        updated[idx].quantity += 1;
-        return updated;
-      }
-      return [
-        ...prev,
-        {
-          menuItemId: item.id,
-          itemName: item.name,
-          quantity: 1,
-          unitPrice: item.basePrice
-        }
-      ];
-    });
+  const activeShifts = shifts.filter(s => !s.clockOut);
+  const countBy = (status: string) => orders.filter(o => o.status === status).length;
+
+  /* ------------------------------------------------------------- Orders */
+  const [orderView, setOrderView] = useState<'board' | 'history'>('board');
+  const [mobileLane, setMobileLane] = useState<'pending' | 'preparing' | 'ready'>('pending');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [orderType, setOrderType] = useState<'all' | OrderType>('all');
+  const [historyLimit, setHistoryLimit] = useState(30);
+  const [detailsOrder, setDetailsOrder] = useState<OrderSelect | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<OrderSelect | null>(null);
+
+  const itemsByOrder = useMemo(() => {
+    const map = new Map<string, OrderItemSelect[]>();
+    orderItems.forEach(item => { const list = map.get(item.orderId) || []; list.push(item); map.set(item.orderId, list); });
+    return map;
+  }, [orderItems]);
+
+  const matchesOrderFilters = (o: OrderSelect) => {
+    const q = orderSearch.trim().toLowerCase();
+    const matchesSearch = !q || o.orderNumber.toLowerCase().includes(q) || (o.customerName || '').toLowerCase().includes(q);
+    return matchesSearch && (orderType === 'all' || o.orderType === orderType);
   };
+  // Oldest first on the board: the order that has waited longest is served first.
+  const boardOrders = orders.filter(o => ['pending', 'preparing', 'ready'].includes(o.status) && matchesOrderFilters(o))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const historyOrders = orders.filter(o => ['completed', 'cancelled'].includes(o.status) && matchesOrderFilters(o))
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
-  const handleUpdatePOSCartQty = (menuItemId: string, delta: number) => {
-    setPosCart((prev) =>
-      prev
-        .map((i) => {
-          if (i.menuItemId === menuItemId) {
-            const newQty = i.quantity + delta;
-            return newQty > 0 ? { ...i, quantity: newQty } : null;
-          }
-          return i;
-        })
-        .filter(Boolean) as typeof posCart
-    );
-  };
-
-  const handleRemoveItemFromPOSCart = (menuItemId: string) => {
-    setPosCart((prev) => prev.filter((i) => i.menuItemId !== menuItemId));
-  };
-
-  const handleUpdatePOSCartPrice = (menuItemId: string, newPrice: number) => {
-    setPosCart((prev) =>
-      prev.map((i) => (i.menuItemId === menuItemId ? { ...i, unitPrice: Math.max(0, newPrice) } : i))
-    );
-  };
-
-  // Manual Price Inquiry Item State
-  const [showCustomItemModal, setShowCustomItemModal] = useState(false);
-  const [customItemName, setCustomItemName] = useState('');
-  const [customItemPrice, setCustomItemPrice] = useState('');
-
-  const handleAddCustomPriceItem = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customItemName.trim()) return;
-    const price = parseFloat(customItemPrice);
-    if (isNaN(price) || price < 0) return;
-
-    const customId = `custom-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`;
-    setPosCart((prev) => [
-      ...prev,
-      {
-        menuItemId: customId,
-        itemName: customItemName.trim(),
-        quantity: 1,
-        unitPrice: price
-      }
-    ]);
-
-    setCustomItemName('');
-    setCustomItemPrice('');
-    setShowCustomItemModal(false);
-  };
-
-  // Tasks State
-  const [taskStatusFilter, setTaskStatusFilter] = useState<string>('all');
-  const [taskCategoryFilter, setTaskCategoryFilter] = useState<string>('all');
-  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskCategory, setTaskCategory] = useState('Opening');
-  const [taskPriority, setTaskPriority] = useState<'high' | 'medium' | 'low'>('medium');
-
-  // Shifts Employee Tracker State (chth.store style)
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const [clockTargetStaff, setClockTargetStaff] = useState<StaffSelect | null>(null);
-  const [empPasswordInput, setEmpPasswordInput] = useState('');
-  const [clockModalFeedback, setClockModalFeedback] = useState<{ success: boolean; message: string } | null>(null);
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const handleConfirmEmployeeClock = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!clockTargetStaff) return;
-
-    const isCurrentlyIn = shifts.some((s) => s.staffId === clockTargetStaff.id && !s.clockOut);
-    const res = isCurrentlyIn
-      ? store.clockOut(empPasswordInput, '', clockTargetStaff.id)
-      : store.clockIn(empPasswordInput, '', clockTargetStaff.id);
-
-    if (res.success) {
-      setClockModalFeedback({ success: true, message: res.message });
-      setTimeout(() => {
-        setClockTargetStaff(null);
-        setEmpPasswordInput('');
-        setClockModalFeedback(null);
-        onStateChange();
-      }, 700);
-    } else {
-      setClockModalFeedback({ success: false, message: res.message });
-    }
-  };
-
-  const handleUpdateOrderStatus = (orderId: string, status: 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled') => {
+  const updateOrderStatus = (orderId: string, status: OrderStatus) => {
     store.updateOrderStatus(orderId, status);
     onStateChange();
   };
 
-  const handleCreatePOSOrder = async (e: React.FormEvent) => {
+  const showOrders = (lane: 'pending' | 'preparing' | 'ready') => { onNavigate('orders'); setOrderView('board'); setMobileLane(lane); };
+
+  /* ---------------------------------------------------------------- POS */
+  const [cart, setCart] = useState<CartLine[]>([]);
+  const [posCategory, setPosCategory] = useState('all');
+  const [posSearch, setPosSearch] = useState('');
+  const [posCustomer, setPosCustomer] = useState('');
+  const [posOrderType, setPosOrderType] = useState<OrderType>('dine_in');
+  const [posPayment, setPosPayment] = useState<OrderPaymentMethod>('card');
+  const [posDate, setPosDate] = useState(() => localDateKey());
+  const [posDiscount, setPosDiscount] = useState('');
+  const [posDiscountType, setPosDiscountType] = useState<'percent' | 'fixed'>('percent');
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [orderError, setOrderError] = useState('');
+  const [orderPlaced, setOrderPlaced] = useState('');
+  const [recipeItem, setRecipeItem] = useState<MenuItemSelect | null>(null);
+  const [customOpen, setCustomOpen] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [customPrice, setCustomPrice] = useState('');
+  const ticketRef = useRef<HTMLDivElement>(null);
+
+  // Immutable updates: StrictMode double-invokes updaters, so mutating would double-count.
+  const addToCart = (item: MenuItemSelect) => {
+    if (!item.isInStock) return;
+    setOrderPlaced('');
+    setCart(prev => prev.some(l => l.menuItemId === item.id)
+      ? prev.map(l => l.menuItemId === item.id ? { ...l, quantity: l.quantity + 1 } : l)
+      : [...prev, { menuItemId: item.id, itemName: item.name, quantity: 1, unitPrice: item.basePrice }]);
+  };
+  const changeQty = (id: string, delta: number) =>
+    setCart(prev => prev.flatMap(l => l.menuItemId !== id ? [l] : l.quantity + delta > 0 ? [{ ...l, quantity: l.quantity + delta }] : []));
+  const changePrice = (id: string, price: number) =>
+    setCart(prev => prev.map(l => l.menuItemId === id ? { ...l, unitPrice: Math.max(0, price) } : l));
+  const removeLine = (id: string) => setCart(prev => prev.filter(l => l.menuItemId !== id));
+
+  const cartCount = cart.reduce((sum, l) => sum + l.quantity, 0);
+  const subtotal = cart.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
+  const discountValue = parseFloat(posDiscount) || 0;
+  const discount = Math.min(subtotal, Math.max(0, posDiscountType === 'percent' ? (subtotal * discountValue) / 100 : discountValue));
+  const taxable = subtotal - discount;
+  const tax = (taxable * settings.taxRate) / 100;
+  const total = taxable + tax;
+
+  const submitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (savingOrder) return;
-    setOrderSaveError('');
-    if (posCart.length === 0) return;
-
-    const rawSubtotal = posCart.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
-    let discAmount = 0;
-    const dVal = parseFloat(posDiscount) || 0;
-    if (posDiscountType === 'percent') {
-      discAmount = (rawSubtotal * dVal) / 100;
-    } else {
-      discAmount = dVal;
-    }
-
-    const todayStr = new Date().toISOString().split('T')[0];
-    const createdAtTimestamp =
-      posDate === todayStr
-        ? new Date().toISOString()
-        : new Date(`${posDate}T12:00:00`).toISOString();
-
+    if (savingOrder || cart.length === 0) return;
+    setOrderError('');
     setSavingOrder(true);
     try {
       await store.createOrder({
-      customerName: posCustomer.trim() || 'Walk-in',
-      orderType: posOrderType,
-      paymentMethod: posPayment,
-      discountAmount: discAmount,
-      status: 'pending',
-      createdAt: createdAtTimestamp,
-      items: posCart.map((i) => ({
-        menuItemId: i.menuItemId,
-        itemName: i.itemName,
-        quantity: i.quantity,
-        unitPrice: i.unitPrice,
-        variants: []
-      }))
-    });
-    } catch (error) { setOrderSaveError(error instanceof Error ? error.message : 'Order could not be saved.'); return; }
-    finally { setSavingOrder(false); }
-
-    setPosCart([]);
+        customerName: posCustomer.trim() || 'Walk-in',
+        orderType: posOrderType,
+        paymentMethod: posPayment,
+        discountAmount: discount,
+        status: 'pending',
+        createdAt: timestampForDay(posDate),
+        items: cart.map(l => ({ menuItemId: l.menuItemId, itemName: l.itemName, quantity: l.quantity, unitPrice: l.unitPrice, variants: [] }))
+      });
+    } catch (error) {
+      setOrderError(error instanceof Error ? error.message : 'Order could not be saved.');
+      return;
+    } finally {
+      setSavingOrder(false);
+    }
+    setOrderPlaced(`Order for ${posCustomer.trim() || 'walk-in'} sent to the board.`);
+    setCart([]);
     setPosCustomer('');
-    setPosDiscount('0');
-    setPosDate(todayStr);
+    setPosDiscount('');
+    setPosDate(localDateKey());
     onStateChange();
   };
 
-  const handleCreateTask = (e: React.FormEvent) => {
+  const addCustomItem = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!taskTitle.trim()) return;
-    store.createTask({
-      title: taskTitle.trim(),
-      description: '',
-      category: taskCategory,
-      priority: taskPriority,
-      status: 'pending',
-      assignedStaffId: null,
-      dueDate: new Date().toISOString().split('T')[0]
-    });
-    setTaskTitle('');
-    setShowAddTaskModal(false);
-    onStateChange();
+    const price = parseFloat(customPrice);
+    if (!customName.trim() || Number.isNaN(price) || price < 0) return;
+    setCart(prev => [...prev, { menuItemId: `custom-${crypto.randomUUID()}`, itemName: customName.trim(), quantity: 1, unitPrice: price }]);
+    setCustomName('');
+    setCustomPrice('');
+    setCustomOpen(false);
   };
 
-  const handleCycleTaskStatus = (taskId: string, currentStatus: string) => {
-    let nextStatus: 'pending' | 'in_progress' | 'completed' = 'pending';
-    if (currentStatus === 'pending') nextStatus = 'in_progress';
-    else if (currentStatus === 'in_progress') nextStatus = 'completed';
-    store.updateTaskStatus(taskId, nextStatus);
-    onStateChange();
-  };
-
-  const handleToggleStockItem = (itemId: string) => {
-    store.toggleStock(itemId);
-    onStateChange();
-  };
-
-  // Filtered lists
-  const filteredOrders = orders.filter((o) => {
-    const matchesStatus = orderStatusFilter === 'all' || (orderStatusFilter === 'active' ? ['pending', 'preparing', 'ready'].includes(o.status) : o.status === orderStatusFilter);
-    const matchesType = orderTypeFilter === 'all' || o.orderType === orderTypeFilter;
-    const matchesSearch =
-      o.orderNumber.toLowerCase().includes(orderSearchQuery.toLowerCase()) ||
-      (o.customerName && o.customerName.toLowerCase().includes(orderSearchQuery.toLowerCase()));
-    return matchesStatus && matchesType && matchesSearch;
+  const visibleMenu = menuItems.filter(item => {
+    const q = posSearch.trim().toLowerCase();
+    return (posCategory === 'all' || item.categoryId === posCategory) && (!q || item.name.toLowerCase().includes(q));
   });
 
-  const filteredTasks = tasks.filter((t) => {
-    const matchesStatus = taskStatusFilter === 'all' || t.status === taskStatusFilter;
-    const matchesCat = taskCategoryFilter === 'all' || t.category === taskCategoryFilter;
-    return matchesStatus && matchesCat;
-  });
+  /* -------------------------------------------------------------- Tasks */
+  const [taskStatus, setTaskStatus] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
+  const [taskCategory, setTaskCategory] = useState('all');
+  const [taskFormOpen, setTaskFormOpen] = useState(false);
+  const visibleTasks = tasks.filter(t => (taskStatus === 'all' || t.status === taskStatus) && (taskCategory === 'all' || t.category === taskCategory));
+  const doneCount = tasks.filter(t => t.status === 'completed').length;
+  const progressCount = tasks.filter(t => t.status === 'in_progress').length;
 
-  const activeShifts = shifts.filter((s) => !s.clockOut);
-  const pendingOrdersCount = orders.filter((o) => o.status === 'pending').length;
-  const preparingOrdersCount = orders.filter((o) => o.status === 'preparing').length;
-  const readyOrdersCount = orders.filter(o=>o.status === 'ready').length;
-  const completedOrdersCount = orders.filter((o) => o.status === 'completed').length;
-  const totalOrdersCount = orders.length || 1;
+  /* ------------------------------------------------------------- Shifts */
+  const [clockTarget, setClockTarget] = useState<StaffSelect | null>(null);
+  const [pin, setPin] = useState('');
+  const [clockFeedback, setClockFeedback] = useState<{ success: boolean; message: string } | null>(null);
+  const clockTimer = useRef<number>();
+  useEffect(() => () => window.clearTimeout(clockTimer.current), []);
+  const targetIsIn = !!clockTarget && activeShifts.some(s => s.staffId === clockTarget.id);
 
-  const completedTasksCount = tasks.filter((t) => t.status === 'completed').length;
-  const taskProgressPct = tasks.length > 0 ? Math.round((completedTasksCount / tasks.length) * 100) : 0;
+  const confirmClock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clockTarget) return;
+    const result = targetIsIn ? store.clockOut(pin, '', clockTarget.id) : store.clockIn(pin, '', clockTarget.id);
+    setClockFeedback({ success: result.success, message: result.message });
+    if (!result.success) return;
+    onStateChange();
+    clockTimer.current = window.setTimeout(() => { setClockTarget(null); setPin(''); setClockFeedback(null); }, 900);
+  };
 
+  /* ------------------------------------------------------------- Render */
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-16 animate-fade-in font-sans">
-      {/* Header Banner */}
-      <div className="glass-panel-classy p-4 rounded-3xl border border-zinc-800 flex flex-wrap items-center justify-between gap-4 shadow-xl">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center brand-glow">
-            <Coffee className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-lg font-black text-zinc-100 tracking-tight">
-              Café daily panel
-            </h1>
-            <p className="text-xs text-zinc-400 font-medium">Take orders, prepare drinks, and keep the shift running.</p>
-          </div>
-        </div>
-      </div>
+    <>
+      {section === 'orders' && (
+        <Page>
+          <PageHeader
+            title="Orders"
+            description="Oldest orders come first. Move each one along as it's made."
+            actions={<Button variant="primary" icon={<Plus />} onClick={() => onNavigate('pos')}>New order</Button>}
+          />
+          <StatGrid>
+            <Stat label="Waiting" value={countBy('pending')} tone={countBy('pending') ? 'warning' : 'neutral'} onClick={() => showOrders('pending')} />
+            <Stat label="Preparing" value={countBy('preparing')} onClick={() => showOrders('preparing')} />
+            <Stat label="Ready to hand over" value={countBy('ready')} tone={countBy('ready') ? 'positive' : 'neutral'} onClick={() => showOrders('ready')} />
+            <Stat label="Team on shift" value={activeShifts.length} icon={<Users />} onClick={() => onNavigate('shifts')} />
+          </StatGrid>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-label="Shift overview">
-        {[
-          { label: 'Waiting to start', count: pendingOrdersCount, tab: 'orders', filter: 'pending' },
-          { label: 'Being prepared', count: preparingOrdersCount, tab: 'orders', filter: 'preparing' },
-          { label: 'Ready to serve', count: readyOrdersCount, tab: 'orders', filter: 'ready' },
-          { label: 'Staff on shift', count: activeShifts.length, tab: 'shifts', filter: 'active' }
-        ].map(({ label, count, tab, filter }) => (
-          <button key={label} type="button" onClick={() => { setPanelMobileTab(tab as 'orders' | 'shifts'); setOrderStatusFilter(filter); }} className="glass-panel rounded-2xl p-4 text-left hover:border-amber-400 transition-colors">
-            <span className="block text-2xl font-black text-zinc-100">{count}</span>
-            <span className="text-xs text-zinc-400">{label}</span>
-          </button>
-        ))}
-      </div>
-
-      <nav aria-label="Daily panel sections" className="panel-navigation grid grid-cols-4 gap-1 p-1 rounded-2xl border border-zinc-800 sticky top-16 z-30 shadow-lg">
-        {[
-          { id: 'orders', label: 'Orders', icon: ShoppingBag },
-          { id: 'pos', label: 'New order', icon: Plus },
-          { id: 'tasks', label: 'Tasks', icon: CheckSquare },
-          { id: 'shifts', label: 'Clock in / out', icon: Clock }
-        ].map(({ id, label, icon: Icon }) => (
-          <button key={id} type="button" aria-current={panelMobileTab === id ? 'page' : undefined} aria-controls={`panel-${id}`} onClick={() => setPanelMobileTab(id as typeof panelMobileTab)} className={`min-h-14 px-2 py-3 rounded-xl font-bold text-xs flex flex-col sm:flex-row items-center justify-center gap-2 transition-colors ${panelMobileTab === id ? 'btn-brand text-zinc-950' : 'text-zinc-400 hover:text-zinc-200'}`}>
-            <Icon className="w-4 h-4" /><span>{label}</span>
-            {id === 'pos' && posCart.length > 0 && <span>({posCart.reduce((sum, item) => sum + item.quantity, 0)})</span>}
-          </button>
-        ))}
-      </nav>
-
-      {/* ========================================================================= */}
-      {/* UNIFIED POS & STOCK COMMAND CENTER (MULTI-ITEM POS ORDERING)              */}
-      {/* ========================================================================= */}
-      <div id="panel-pos" className={`glass-panel p-5 rounded-3xl border border-zinc-800/80 space-y-4 shadow-lg ${panelMobileTab === 'pos' ? 'block' : 'hidden'}`}>
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
-          <div className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-amber-400" />
-            <div>
-              <h2 className="font-black text-zinc-100 text-sm tracking-tight">New order & menu availability</h2>
-              <p className="text-[11px] text-zinc-400">Toggle item availability or add multiple items into one POS order</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-xs font-bold text-zinc-400 font-mono">
-            <span className="text-emerald-400">{menuItems.filter((i) => i.isInStock).length} In Stock</span>
-            <span>/</span>
-            <span className="text-rose-400">{menuItems.filter((i) => !i.isInStock).length} Sold Out</span>
-          </div>
-        </div>
-
-        {/* Category Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-          <button
-            type="button"
-            onClick={() => setPosCategoryFilter('all')}
-            className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap cursor-pointer transition ${
-              posCategoryFilter === 'all'
-                ? 'btn-brand text-zinc-950 shadow-sm'
-                : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
-            }`}
-          >
-            All Categories ({menuItems.length})
-          </button>
-
-          {categories.map((cat) => {
-            const count = menuItems.filter((i) => i.categoryId === cat.id).length;
-            const isSelected = posCategoryFilter === cat.id;
-
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => setPosCategoryFilter(cat.id)}
-                className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 cursor-pointer transition ${
-                  isSelected
-                    ? 'btn-brand text-zinc-950 shadow-sm'
-                    : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
-                }`}
-              >
-                <span>{cat.name}</span>
-                <span
-                  className={`px-1.5 py-0.2 rounded text-[10px] ${
-                    isSelected ? 'bg-zinc-950/20 text-zinc-950 font-black' : 'bg-zinc-800 text-zinc-400'
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Menu Items Grouped by Category */}
-        <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
-          {categories
-            .filter((cat) => posCategoryFilter === 'all' || posCategoryFilter === cat.id)
-            .map((cat) => {
-              const catItems = menuItems.filter((i) => i.categoryId === cat.id);
-              if (catItems.length === 0) return null;
-
-              return (
-                <div key={cat.id} className="space-y-2">
-                  {/* Category Header Banner */}
-                  <div className="flex items-center justify-between border-b border-zinc-800/80 pb-1 pt-1">
-                    <span className="font-extrabold text-xs text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Utensils className="w-3.5 h-3.5 text-amber-400" />
-                      {cat.name}
-                    </span>
-                    <span className="text-[10px] text-zinc-500 font-bold">
-                      {catItems.length} {catItems.length === 1 ? 'Item' : 'Items'}
-                    </span>
-                  </div>
-
-                  {/* Category Product Cards Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {catItems.map((item) => {
-                      const inCartItem = posCart.find((ci) => ci.menuItemId === item.id);
-                      const cartQty = inCartItem ? inCartItem.quantity : 0;
-
-                      return (
-                        <div
-                          key={item.id}
-                          className={`p-3 rounded-2xl border flex flex-col justify-between space-y-2 transition ${
-                            cartQty > 0
-                              ? 'bg-amber-950/30 border-amber-500/60 shadow-md ring-1 ring-amber-500/30'
-                              : 'bg-zinc-900/80 border-zinc-800 hover:border-zinc-700'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <span className="font-extrabold text-xs text-zinc-100 block truncate">{item.name}</span>
-                              <span className="font-mono text-[11px] text-amber-400 font-extrabold">
-                                {settings.currency}{item.basePrice.toFixed(2)}
-                              </span>
-                            </div>
-
-                            {/* Immediate Recipe & Stock Controls */}
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => setRecipeViewItem(item)}
-                                className="px-2 py-0.5 rounded-xl text-[10px] font-bold bg-zinc-800 hover:bg-zinc-700 text-sky-400 border border-zinc-700 cursor-pointer transition-colors flex items-center gap-1"
-                                title="View Recipe Ingredients"
-                              >
-                                <Boxes className="w-3 h-3 text-sky-400" />
-                                Recipe
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() => handleToggleStockItem(item.id)}
-                                className={`px-2 py-0.5 rounded-xl text-[10px] font-black cursor-pointer transition ${
-                                  item.isInStock
-                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
-                                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30'
-                                }`}
-                              >
-                                {item.isInStock ? 'In Stock' : 'Sold Out'}
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Add to Multi-Item Order Steppers / Button */}
-                          {cartQty > 0 ? (
-                            <div className="flex items-center justify-between bg-zinc-950 p-1 rounded-xl border border-amber-500/40">
-                              <button
-                                type="button"
-                                onClick={() => handleUpdatePOSCartQty(item.id, -1)}
-                                className="w-7 h-7 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 font-black text-xs flex items-center justify-center cursor-pointer"
-                              >
-                                -
-                              </button>
-                              <span className="font-mono font-black text-xs text-amber-400">
-                                {cartQty} in order
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleUpdatePOSCartQty(item.id, 1)}
-                                className="w-7 h-7 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-xs flex items-center justify-center cursor-pointer"
-                              >
-                                +
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleAddItemToPOSCart(item)}
-                              disabled={!item.isInStock}
-                              className={`w-full py-1.5 rounded-xl font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer transition ${
-                                item.isInStock
-                                  ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700'
-                                  : 'bg-zinc-900 text-zinc-600 border border-zinc-800 cursor-not-allowed'
-                              }`}
-                            >
-                              {item.isInStock ? '+ Add to Order' : 'Item Sold Out'}
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-        </div>
-
-        {/* Multi-Item Order Checkout Form & Basket */}
-        <form aria-busy={savingOrder} onSubmit={handleCreatePOSOrder} className="p-4 rounded-2xl bg-zinc-950 border border-zinc-800 space-y-3">
-        {orderSaveError && <p role="alert" className="p-3 rounded-xl border border-rose-500/40 text-rose-400">{orderSaveError}</p>}
-
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-zinc-800 pb-2.5 gap-2">
-            <span className="text-xs font-black text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
-              <ShoppingBag className="w-4 h-4 text-amber-400" /> Current Order Basket ({posCart.reduce((sum, i) => sum + i.quantity, 0)} Items)
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowCustomItemModal(true)}
-                className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 border border-amber-500/30 text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <Tag className="w-3 h-3 text-amber-400" />
-                + Custom / Manual Price Item
-              </button>
-              {posCart.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setPosCart([])}
-                  className="text-[10px] font-bold text-rose-400 hover:text-rose-300 underline cursor-pointer"
-                >
-                  Clear All
-                </button>
-              )}
-            </div>
+          <div className="ws-toolbar">
+            <Segmented label="Orders view" value={orderView} onChange={setOrderView} options={[
+              { value: 'board', label: 'Live board', icon: <LayoutGrid />, count: boardOrders.length },
+              { value: 'history', label: 'History', icon: <History /> }
+            ]} />
+            <SearchInput className="ws-grow" value={orderSearch} onChange={setOrderSearch} placeholder="Search order number or customer" label="Search orders" />
+            <Select aria-label="Order type" value={orderType} onChange={e => setOrderType(e.target.value as typeof orderType)} style={{ width: 'auto' }}>
+              <option value="all">All order types</option>
+              <option value="dine_in">Dine-in</option>
+              <option value="takeout">Takeout</option>
+              <option value="pickup">Pickup</option>
+            </Select>
           </div>
 
-          {/* Selected Basket Items Listing */}
-          {posCart.length === 0 ? (
-            <div className="py-4 text-center text-xs text-zinc-500 italic">
-              No items in current order. Click <strong>+ Add to Order</strong> above or <strong>+ Custom / Manual Price Item</strong> to build an order.
-            </div>
-          ) : (
-            <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
-              {posCart.map((ci) => (
-                <div
-                  key={ci.menuItemId}
-                  className="p-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 flex items-center justify-between text-xs gap-2"
-                >
-                  <span className="font-bold text-zinc-200 truncate flex-1">{ci.itemName}</span>
-
-                  <div className="flex items-center gap-2">
-                    {/* Manual Price Override Input */}
-                    <div className="flex items-center gap-1">
-                      <span className="text-[10px] text-zinc-500 font-bold">{settings.currency}</span>
-                      <input
-                        type="number" inputMode="decimal"
-                        step="any"
-                        value={ci.unitPrice}
-                        onChange={(e) => handleUpdatePOSCartPrice(ci.menuItemId, parseFloat(e.target.value) || 0)}
-                        className="w-16 p-1 rounded-lg bg-zinc-950 border border-zinc-800 font-mono text-xs text-amber-400 font-bold text-right focus:outline-none focus:border-amber-500/50"
-                        title="Manual Unit Price Override / Inquiry"
-                      />
-                    </div>
-
-                    {/* Steppers */}
-                    <div className="flex items-center gap-1.5 bg-zinc-950 px-2 py-0.5 rounded-lg border border-zinc-800">
-                      <button
-                        type="button"
-                        onClick={() => handleUpdatePOSCartQty(ci.menuItemId, -1)}
-                        className="text-zinc-400 hover:text-zinc-100 font-black"
-                      >
-                        -
-                      </button>
-                      <span className="font-mono text-zinc-100 font-bold px-1">{ci.quantity}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleUpdatePOSCartQty(ci.menuItemId, 1)}
-                        className="text-amber-400 hover:text-amber-300 font-black"
-                      >
-                        +
-                      </button>
-                    </div>
-
-                    <span className="font-mono font-bold text-emerald-400 w-16 text-right">
-                      {settings.currency}{(ci.unitPrice * ci.quantity).toFixed(2)}
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveItemFromPOSCart(ci.menuItemId)}
-                      className="text-zinc-500 hover:text-rose-400 p-1 cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Customer, Date & Payment Fields */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 text-xs pt-1">
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                Order Date
-              </label>
-              <input
-                type="date"
-                value={posDate}
-                onChange={(e) => setPosDate(e.target.value)}
-                className="w-full p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 cursor-pointer"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                Customer / Table #
-              </label>
-              <input
-                type="text"
-                placeholder="Walk-in or Table #4"
-                value={posCustomer}
-                onChange={(e) => setPosCustomer(e.target.value)}
-                className="w-full p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                Payment Method
-              </label>
-              <select
-                value={posPayment}
-                onChange={(e) => setPosPayment(e.target.value as any)}
-                className="w-full p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 cursor-pointer"
-              >
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-                <option value="google_pay">Google Pay</option>
-                <option value="online">Online (Swiggy / Zomato)</option>
-              </select>
-            </div>
-
-            {/* Discount Section */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                  Discount
-                </label>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setPosDiscountType('percent')}
-                    className={`px-1 py-0.2 text-[9px] font-bold rounded ${posDiscountType === 'percent' ? 'bg-amber-500 text-zinc-950' : 'text-zinc-400'}`}
-                  >
-                    %
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPosDiscountType('fixed')}
-                    className={`px-1 py-0.2 text-[9px] font-bold rounded ${posDiscountType === 'fixed' ? 'bg-amber-500 text-zinc-950' : 'text-zinc-400'}`}
-                  >
-                    {settings.currency}
-                  </button>
-                </div>
+          {orderView === 'board' ? (
+            <>
+              <div className="ws-hide-desktop">
+                <Segmented block label="Board column" value={mobileLane} onChange={setMobileLane} options={LANES.map(l => ({ value: l.status, label: l.label, count: boardOrders.filter(o => o.status === l.status).length }))} />
               </div>
-              <input
-                type="number" inputMode="decimal"
-                step="0.01"
-                min="0"
-                placeholder="0"
-                value={posDiscount}
-                onChange={(e) => setPosDiscount(e.target.value)}
-                className="w-full p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 font-mono text-xs"
-              />
-            </div>
-          </div>
-
-          {/* Price Calculation Summary & Submit Button */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2.5 border-t border-zinc-800/80">
-            {(() => {
-              const rawSubtotal = posCart.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0);
-              const dVal = parseFloat(posDiscount) || 0;
-              const discAmt = posDiscountType === 'percent' ? (rawSubtotal * dVal) / 100 : dVal;
-              const netSubtotal = Math.max(0, rawSubtotal - discAmt);
-              const taxAmt = (netSubtotal * settings.taxRate) / 100;
-              const totalAmt = netSubtotal + taxAmt;
-
-              return (
-                <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
-                  <span className="text-zinc-400">
-                    Subtotal: <strong className="text-zinc-200">{settings.currency}{rawSubtotal.toFixed(2)}</strong>
-                  </span>
-                  {discAmt > 0 && (
-                    <span className="text-emerald-400 font-bold">
-                      Disc: -{settings.currency}{discAmt.toFixed(2)}
-                    </span>
-                  )}
-                  <span className="text-zinc-400">
-                    Tax ({settings.taxRate}%): <strong className="text-zinc-200">{settings.currency}{taxAmt.toFixed(2)}</strong>
-                  </span>
-                  <span className="text-amber-400 font-extrabold text-sm border-l border-zinc-800 pl-2.5">
-                    Total: {settings.currency}{totalAmt.toFixed(2)}
-                  </span>
-                </div>
-              );
-            })()}
-
-            <button
-              type="submit"
-              disabled={savingOrder || posCart.length === 0}
-              className={`w-full sm:w-auto px-6 py-2.5 rounded-xl font-black uppercase tracking-wider text-xs shadow-lg cursor-pointer flex-shrink-0 ${
-                posCart.length > 0
-                  ? 'btn-brand text-zinc-950'
-                  : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-              }`}
-            >
-              Submit Order ({posCart.reduce((sum, i) => sum + i.quantity, 0)} Items)
-            </button>
-          </div>
-        </form>
-      </div>
-
-
-
-      {/* ========================================================================= */}
-      {/* ONE-ROW THREE-COLUMN ERGONOMIC LAYOUT: SHIFTS | TASKS | ORDERS            */}
-      {/* ========================================================================= */}
-      <div className="grid grid-cols-1 gap-6 items-start">
-        {/* ========================================================================= */}
-        {/* COLUMN 1: EMPLOYEE TIME TRACKER (CHTH.STORE STYLE)                       */}
-        {/* ========================================================================= */}
-        <div id="panel-shifts" className={`space-y-4 ${panelMobileTab === 'shifts' ? 'block' : 'hidden'}`}>
-          <div className="glass-panel p-5 rounded-3xl border border-zinc-800/80 space-y-5 shadow-lg">
-            {/* Header & Digital Clock */}
-            <div className="text-center space-y-1 border-b border-zinc-800 pb-4">
-              <div className="flex items-center justify-center gap-1.5 text-zinc-400 text-xs font-bold uppercase tracking-wider mb-1">
-                <Clock className="w-3.5 h-3.5 text-emerald-400" /> Employee Time Tracker
-              </div>
-              <div className="text-3xl sm:text-4xl font-black font-mono text-zinc-100 tracking-tight">
-                {currentTime.toLocaleTimeString('en-US', { hour12: false })}
-              </div>
-              <div className="text-xs text-zinc-400 font-medium">
-                {currentTime.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-              </div>
-            </div>
-
-            {/* Employee Cards Grid */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-[11px] font-bold text-zinc-400 uppercase tracking-wider px-1">
-                <span>Select Employee to Clock</span>
-                <span className="text-emerald-400">{activeShifts.length} Active On Shift</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2.5 max-h-80 overflow-y-auto pr-1">
-                {staff.map((member) => {
-                  const isCheckedIn = activeShifts.some((s) => s.staffId === member.id);
-                  const initial = member.name.charAt(0).toUpperCase();
-
+              <div className="ws-board">
+                {LANES.map(lane => {
+                  const laneOrders = boardOrders.filter(o => o.status === lane.status);
                   return (
-                    <button
-                      key={member.id}
-                      type="button"
-                      onClick={() => {
-                        setClockTargetStaff(member);
-                        setEmpPasswordInput('');
-                        setClockModalFeedback(null);
-                      }}
-                      className={`p-3 rounded-2xl border flex flex-col items-center gap-2 transition cursor-pointer text-center ${
-                        isCheckedIn
-                          ? 'bg-emerald-950/40 border-emerald-500/60 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/30 hover:border-emerald-400'
-                          : 'bg-zinc-900/80 border-zinc-800 hover:border-zinc-700'
-                      }`}
-                    >
-                      {/* Avatar Circle */}
-                      <div
-                        className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-lg transition ${
-                          isCheckedIn
-                            ? 'bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/30'
-                            : 'bg-zinc-800 text-zinc-300'
-                        }`}
-                      >
-                        {initial}
+                    <section key={lane.status} className={`ws-lane ${mobileLane === lane.status ? '' : 'ws-hide-mobile'}`} aria-label={`${lane.label} orders`}>
+                      <div className="ws-lane-head">
+                        <strong><span className="ws-lane-dot" style={{ background: lane.color }} />{lane.label}</strong>
+                        <span className="ws-hint tabular">{laneOrders.length}</span>
                       </div>
-
-                      {/* Employee Name */}
-                      <span className="font-extrabold text-xs text-zinc-100 truncate w-full">
-                        {member.name}
-                      </span>
-
-                      {/* Status Pill */}
-                      <span
-                        className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                          isCheckedIn
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                            : 'text-zinc-500 bg-zinc-950'
-                        }`}
-                      >
-                        {isCheckedIn ? 'Checked In' : 'Checked Out'}
-                      </span>
-                    </button>
+                      {laneOrders.length === 0 ? (
+                        <div className="ws-lane-empty">Nothing {lane.label.toLowerCase()}.</div>
+                      ) : laneOrders.map(order => {
+                        const lines = itemsByOrder.get(order.id) || [];
+                        const age = minutesSince(order.createdAt, now);
+                        return (
+                          <article
+                            key={order.id}
+                            className="ws-ticket"
+                            data-interactive=""
+                            tabIndex={0}
+                            aria-label={`Order ${order.orderNumber} for ${order.customerName || 'walk-in'}`}
+                            onClick={() => setDetailsOrder(order)}
+                            onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) setDetailsOrder(order); }}
+                          >
+                            <div className="ws-ticket-head">
+                              <div style={{ minWidth: 0 }}>
+                                <div className="ws-ticket-num">{order.orderNumber}</div>
+                                <div className="ws-hint ws-truncate">{order.customerName || 'Walk-in'} · {orderTypeLabel(order.orderType)}</div>
+                              </div>
+                              <span className="ws-ticket-age" data-late={lane.status !== 'ready' && age >= LATE_AFTER_MIN ? '' : undefined}>
+                                <Clock width={12} height={12} style={{ display: 'inline', verticalAlign: '-1px', marginRight: 4 }} />{ageLabel(age)}
+                              </span>
+                            </div>
+                            <ul className="ws-ticket-lines">
+                              {lines.map(line => <li key={line.id}><span><strong className="tabular">{line.quantity}×</strong> {line.itemName}</span></li>)}
+                              {lines.length === 0 && <li className="ws-hint">No items recorded</li>}
+                            </ul>
+                            <div className="ws-ticket-foot">
+                              <span className="ws-hint"><strong className="tabular" style={{ color: 'var(--ws-ink)' }}>{fmt(order.totalAmount)}</strong> · {paymentLabel(order.paymentMethod)}</span>
+                            </div>
+                            <div className="ws-ticket-foot" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+                              <Button size="sm" variant="danger-ghost" onClick={() => setCancelTarget(order)}>Cancel</Button>
+                              <Button size="sm" variant={lane.status === 'ready' ? 'accent' : 'primary'} onClick={() => updateOrderStatus(order.id, lane.next)}>{lane.action}</Button>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </section>
                   );
                 })}
               </div>
+            </>
+          ) : (
+            <Card flush title="Order history" description={`${plural(historyOrders.length, 'order')} completed or cancelled`}>
+              {historyOrders.length === 0 ? (
+                <EmptyState icon={<History />} title="No past orders" description="Completed and cancelled orders appear here." />
+              ) : (
+                <>
+                  <List>
+                    {historyOrders.slice(0, historyLimit).map(order => (
+                      <ListItem
+                        key={order.id}
+                        onClick={() => setDetailsOrder(order)}
+                        title={<><span className="mono">{order.orderNumber}</span><span className="ws-truncate">{order.customerName || 'Walk-in'}</span></>}
+                        subtitle={<><span>{formatDate(order.createdAt)} · {formatTime(order.createdAt)}</span><span>{paymentLabel(order.paymentMethod)}</span></>}
+                        trail={<>
+                          <span className="ws-amount">{fmt(order.totalAmount)}</span>
+                          <Badge tone={order.status === 'completed' ? 'positive' : 'danger'}>{order.status === 'completed' ? 'Completed' : 'Cancelled'}</Badge>
+                        </>}
+                      />
+                    ))}
+                  </List>
+                  {historyOrders.length > historyLimit && (
+                    <div style={{ padding: 16, textAlign: 'center' }}><Button size="sm" onClick={() => setHistoryLimit(l => l + 30)}>Show more</Button></div>
+                  )}
+                </>
+              )}
+            </Card>
+          )}
+        </Page>
+      )}
+
+      {section === 'pos' && (
+        <Page>
+          <PageHeader
+            title="New order"
+            description={`${menuItems.filter(i => i.isInStock).length} items available · ${menuItems.filter(i => !i.isInStock).length} sold out`}
+            actions={<Button icon={<Tag />} onClick={() => setCustomOpen(true)}>Custom item</Button>}
+          />
+          <div className="ws-grid ws-grid-pos">
+            <div className="ws-toolbar-stack" style={{ minWidth: 0 }}>
+              <SearchInput value={posSearch} onChange={setPosSearch} placeholder="Find a drink or dish" label="Search menu" />
+              <Chips label="Menu category" value={posCategory} onChange={setPosCategory} options={[
+                { value: 'all', label: 'Everything', count: menuItems.length },
+                ...categories.map(c => ({ value: c.id, label: c.name, count: menuItems.filter(i => i.categoryId === c.id).length }))
+              ]} />
+              {visibleMenu.length === 0 ? (
+                <Card><EmptyState icon={<UtensilsCrossed />} title="Nothing matches" description="Try another category or search term." /></Card>
+              ) : (
+                <div className="ws-tiles">
+                  {visibleMenu.map(item => {
+                    const qty = cart.find(l => l.menuItemId === item.id)?.quantity || 0;
+                    return (
+                      <div key={item.id} className="ws-tile" data-selected={qty > 0 ? '' : undefined} aria-disabled={!item.isInStock}>
+                        {qty > 0 && <span className="ws-tile-qty" aria-hidden="true">{qty}</span>}
+                        <button type="button" className="ws-tile-hit" disabled={!item.isInStock} onClick={() => addToCart(item)} aria-label={item.isInStock ? `Add ${item.name}, ${fmt(item.basePrice)}${qty ? `. ${qty} in order` : ''}` : `${item.name} is sold out`}>
+                          <span className="ws-tile-name">{item.name}</span>
+                          <span className="ws-tile-price">{item.isInStock ? fmt(item.basePrice) : 'Sold out'}</span>
+                        </button>
+                        <div className="ws-tile-foot">
+                          <IconButton label={`Recipe for ${item.name}`} onClick={() => setRecipeItem(item)}><Boxes /></IconButton>
+                          <Switch label={`${item.name} available`} checked={item.isInStock} onChange={() => { store.toggleStock(item.id); onStateChange(); }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div ref={ticketRef} className="ws-sticky-col" style={{ scrollMarginTop: 80 }}>
+              <Card title="Current order" description={cartCount ? plural(cartCount, 'item') : 'Tap menu items to add them'} actions={cart.length > 0 && <Button size="sm" variant="ghost" onClick={() => setCart([])}>Clear</Button>}>
+                <form className="ws-form" onSubmit={submitOrder} aria-busy={savingOrder}>
+                  {orderPlaced && <Notice tone="positive" action={<Button size="sm" variant="ghost" onClick={() => onNavigate('orders')}>View board</Button>}>{orderPlaced}</Notice>}
+                  {orderError && <Notice tone="danger">{orderError}</Notice>}
+                  {cart.length === 0 ? (
+                    <div className="ws-lane-empty"><Receipt width={20} height={20} style={{ margin: '0 auto 8px' }} />The order is empty.</div>
+                  ) : (
+                    <ul className="ws-list" style={{ margin: '0 calc(var(--ws-pad) * -1)' }}>
+                      {cart.map(line => (
+                        <li key={line.menuItemId} className="ws-list-item" style={{ flexWrap: 'wrap', gap: 8 }}>
+                          <div className="ws-list-main" style={{ flexBasis: '100%' }}>
+                            <div className="ws-list-title"><span className="ws-truncate">{line.itemName}</span></div>
+                          </div>
+                          <Stepper label={`${line.itemName} quantity`} value={line.quantity} onDecrement={() => changeQty(line.menuItemId, -1)} onIncrement={() => changeQty(line.menuItemId, 1)} />
+                          <div style={{ width: 104 }}>
+                            <AffixInput affix={currency} aria-label={`${line.itemName} unit price`} type="number" inputMode="decimal" step="any" min="0" value={line.unitPrice} onChange={e => changePrice(line.menuItemId, parseFloat(e.target.value) || 0)} style={{ minHeight: 36, paddingRight: 6 }} />
+                          </div>
+                          <span className="ws-amount" style={{ marginLeft: 'auto' }}>{fmt(line.unitPrice * line.quantity)}</span>
+                          <IconButton label={`Remove ${line.itemName}`} variant="danger-ghost" onClick={() => removeLine(line.menuItemId)}><Trash2 /></IconButton>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  <Segmented block label="Order type" value={posOrderType} onChange={setPosOrderType} options={[
+                    { value: 'dine_in', label: 'Dine-in' }, { value: 'takeout', label: 'Takeout' }, { value: 'pickup', label: 'Pickup' }
+                  ]} />
+                  <div className="ws-form-row cols-2">
+                    <Field label="Customer or table" optional>{id => <Input id={id} value={posCustomer} onChange={e => setPosCustomer(e.target.value)} placeholder="Walk-in" />}</Field>
+                    <Field label="Payment">{id => (
+                      <Select id={id} value={posPayment} onChange={e => setPosPayment(e.target.value as OrderPaymentMethod)}>
+                        {ORDER_PAYMENT_METHODS.map(m => <option key={m} value={m}>{paymentLabel(m)}</option>)}
+                      </Select>
+                    )}</Field>
+                  </div>
+                  <div className="ws-form-row cols-2">
+                    <Field label="Discount" aside={
+                      <Segmented label="Discount type" value={posDiscountType} onChange={setPosDiscountType} options={[{ value: 'percent', label: '%' }, { value: 'fixed', label: currency }]} />
+                    }>{id => <Input id={id} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" value={posDiscount} onChange={e => setPosDiscount(e.target.value)} />}</Field>
+                    <Field label="Order date" hint={posDate !== localDateKey() ? 'Back-dated order' : undefined}>{id => <Input id={id} type="date" value={posDate} max={localDateKey()} onChange={e => setPosDate(e.target.value || localDateKey())} />}</Field>
+                  </div>
+                  <KeyValue
+                    items={[
+                      { label: 'Subtotal', value: fmt(subtotal) },
+                      ...(discount > 0 ? [{ label: 'Discount', value: `−${fmt(discount)}`, tone: 'positive' as const }] : []),
+                      { label: `Tax (${settings.taxRate}%)`, value: fmt(tax) }
+                    ]}
+                    total={{ label: 'Total', value: fmt(total) }}
+                  />
+                  <Button type="submit" variant="primary" size="lg" block loading={savingOrder} disabled={cart.length === 0}>
+                    {savingOrder ? 'Sending…' : `Send to board · ${fmt(total)}`}
+                  </Button>
+                </form>
+              </Card>
             </div>
           </div>
-        </div>
-
-        {/* ========================================================================= */}
-        {/* COLUMN 2: SHIFT OPERATIONS TASKS                                          */}
-        {/* ========================================================================= */}
-        <div id="panel-tasks" className={`space-y-4 ${panelMobileTab === 'tasks' ? 'block' : 'hidden'}`}>
-          <div className="glass-panel p-5 rounded-3xl border border-zinc-800/80 space-y-3 shadow-md">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckSquare className="w-4 h-4 text-blue-400" />
-                <h3 className="font-black text-zinc-100 text-sm">Shift Operations Tasks</h3>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowAddTaskModal(true)}
-                  className="px-2.5 py-1 rounded-xl bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30 font-bold text-[11px] flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Task
-                </button>
-                <span className="text-xs text-blue-400 font-extrabold">{taskProgressPct}% Done</span>
-              </div>
+          {cart.length > 0 && (
+            <div className="ws-mobile-bar">
+              <Button variant="primary" size="lg" block icon={<ShoppingBag />} onClick={() => ticketRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+                Review order · {plural(cartCount, 'item')} · {fmt(total)}
+              </Button>
             </div>
+          )}
+        </Page>
+      )}
 
-            {/* Task Category Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-              <button
-                onClick={() => setTaskCategoryFilter('all')}
-                className={`px-3 py-1 rounded-xl font-bold whitespace-nowrap cursor-pointer transition ${
-                  taskCategoryFilter === 'all'
-                    ? 'btn-brand text-zinc-950 shadow-sm'
-                    : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
-                }`}
-              >
-                All ({tasks.length})
-              </button>
+      {section === 'tasks' && (
+        <Page>
+          <PageHeader
+            title="Checklist"
+            description="Tap a task to move it from to do, to in progress, to done."
+            actions={<Button variant="primary" icon={<Plus />} onClick={() => setTaskFormOpen(true)}>New task</Button>}
+          />
+          <Card>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+              <strong style={{ fontSize: 15 }}>{doneCount} of {tasks.length} done</strong>
+              <span className="ws-hint">{progressCount} in progress · {tasks.length - doneCount - progressCount} to do</span>
+            </div>
+            <Meter size="lg" label={`${doneCount} done, ${progressCount} in progress`} segments={[
+              { value: doneCount, tone: 'positive', label: 'Done' },
+              { value: progressCount, tone: 'accent', label: 'In progress' },
+              { value: tasks.length - doneCount - progressCount, tone: 'muted', label: 'To do' }
+            ]} />
+          </Card>
+          <div className="ws-toolbar-stack">
+            <Segmented label="Task status" value={taskStatus} onChange={setTaskStatus} options={[
+              { value: 'all', label: 'All', count: tasks.length },
+              { value: 'pending', label: 'To do', count: tasks.filter(t => t.status === 'pending').length },
+              { value: 'in_progress', label: 'In progress', count: progressCount },
+              { value: 'completed', label: 'Done', count: doneCount }
+            ]} />
+            <Chips label="Task category" value={taskCategory} onChange={setTaskCategory} options={[
+              { value: 'all', label: 'All categories' },
+              ...TASK_CATEGORIES.map(c => ({ value: c, label: c, icon: TASK_CATEGORY_ICONS[c], count: tasks.filter(t => t.category === c).length }))
+            ]} />
+          </div>
+          <Card flush>
+            {visibleTasks.length === 0 ? (
+              <EmptyState icon={<CheckSquare />} title="No tasks here" description="Nothing matches these filters." />
+            ) : (
+              <List label="Tasks">
+                {visibleTasks.map(task => (
+                  <TaskRow key={task.id} task={task} staffName={staff.find(s => s.id === task.assignedStaffId)?.name}
+                    onCycle={() => { store.updateTaskStatus(task.id, nextTaskStatus(task.status)); onStateChange(); }} />
+                ))}
+              </List>
+            )}
+          </Card>
+        </Page>
+      )}
 
-              {TASK_CATEGORIES.map((cat) => {
-                const count = tasks.filter((t) => t.category === cat).length;
-                const isSelected = taskCategoryFilter === cat;
-
+      {section === 'shifts' && (
+        <Page>
+          <PageHeader title="Clock in / out" description="Choose your name, then enter your PIN." />
+          <Card>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+              <div>
+                <div className="ws-clock" aria-live="off">{now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</div>
+                <div className="ws-hint" style={{ marginTop: 8 }}>{now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+              </div>
+              <Badge tone={activeShifts.length ? 'positive' : 'neutral'} dot>{plural(activeShifts.length, 'person', 'people')} on shift</Badge>
+            </div>
+          </Card>
+          {staff.length === 0 ? (
+            <Card><EmptyState icon={<Users />} title="No team members yet" description="Add staff from the admin workspace." /></Card>
+          ) : (
+            <div className="ws-people">
+              {staff.map(member => {
+                const shift = activeShifts.find(s => s.staffId === member.id);
                 return (
                   <button
-                    key={cat}
-                    onClick={() => setTaskCategoryFilter(cat)}
-                    className={`px-2.5 py-1 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 cursor-pointer transition ${
-                      isSelected
-                        ? 'btn-brand text-zinc-950 shadow-sm'
-                        : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
-                    }`}
+                    key={member.id}
+                    type="button"
+                    className="ws-person"
+                    data-on={shift ? '' : undefined}
+                    onClick={() => { setClockTarget(member); setPin(''); setClockFeedback(null); }}
+                    aria-label={`${member.name}, ${shift ? `on shift since ${formatTime(shift.clockIn)}. Clock out` : 'off shift. Clock in'}`}
                   >
-                    {CATEGORY_ICONS[cat]}
-                    <span>{cat}</span>
-                    <span className={`px-1 rounded text-[10px] ${isSelected ? 'bg-zinc-950/20 text-zinc-950 font-black' : 'bg-zinc-800 text-zinc-400'}`}>
-                      {count}
+                    <Avatar name={member.name} size="lg" tone={shift ? 'positive' : undefined} />
+                    <span>
+                      <strong style={{ display: 'block' }}>{member.name}</strong>
+                      <span className="ws-hint">{member.role}</span>
                     </span>
+                    {shift ? <Badge tone="positive" dot>Since {formatTime(shift.clockIn)}</Badge> : <Badge>Off shift</Badge>}
                   </button>
                 );
               })}
             </div>
-
-            {/* Tasks List */}
-            {filteredTasks.length === 0 ? (
-              <div className="text-center py-6 text-xs text-zinc-500 italic">
-                No tasks in "{taskCategoryFilter}" category.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {filteredTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    onClick={() => handleCycleTaskStatus(task.id, task.status)}
-                    className="p-3 rounded-2xl bg-zinc-900/80 border border-zinc-800 flex items-center justify-between gap-2 cursor-pointer hover:border-amber-500/30 transition text-xs"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      {task.status === 'completed' ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                      ) : task.status === 'in_progress' ? (
-                        <PlayCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                      ) : (
-                        <Circle className="w-4 h-4 text-zinc-500 flex-shrink-0" />
-                      )}
-                      <span className={`font-bold truncate ${task.status === 'completed' ? 'line-through text-zinc-500' : 'text-zinc-200'}`}>
-                        {task.title}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-zinc-400 font-medium flex items-center gap-1">
-                      {CATEGORY_ICONS[task.category]} {task.category}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* ========================================================================= */}
-        {/* COLUMN 3: LIVE KITCHEN & CUSTOMER ORDERS                                  */}
-        {/* ========================================================================= */}
-        <div id="panel-orders" className={`space-y-4 ${panelMobileTab === 'orders' ? 'block' : 'hidden'}`}>
-          <div className="glass-panel p-5 rounded-3xl border border-zinc-800/80 space-y-4 shadow-lg">
-            {/* Header & Filter Controls */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <ShoppingBag className="w-4 h-4 text-emerald-400" />
-                <h2 className="font-black text-zinc-100 text-sm tracking-tight">Customer orders</h2>
-              </div>
-
-              {/* Status Filter Buttons: workflow order, one scrollable row on phones */}
-              <div className="order-filter flex items-center gap-1 overflow-x-auto no-scrollbar bg-zinc-900 p-1 rounded-xl border border-zinc-800 max-w-full">
-                {([
-                  ['active', 'Active', pendingOrdersCount + preparingOrdersCount + readyOrdersCount],
-                  ['pending', 'Pending', pendingOrdersCount],
-                  ['preparing', 'Preparing', preparingOrdersCount],
-                  ['ready', 'Ready', readyOrdersCount],
-                  ['all', 'All', orders.length]
-                ] as const).map(([value, label, count]) => (
-                  <button key={value} type="button" onClick={() => setOrderStatusFilter(value)} aria-pressed={orderStatusFilter === value}
-                    className={`shrink-0 min-h-10 px-3 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${orderStatusFilter === value ? 'btn-brand text-zinc-950' : 'text-zinc-400 hover:text-zinc-200'}`}>
-                    {label} <span className="tabular-nums opacity-70">{count}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search order or customer..."
-                value={orderSearchQuery}
-                onChange={(e) => setOrderSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 rounded-xl bg-zinc-900/90 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-amber-500"
-              />
-            </div>
-
-            {/* Orders Cards List */}
-            {filteredOrders.length === 0 ? (
-              <div className="text-center py-12 space-y-2">
-                <ShoppingBag className="w-10 h-10 text-zinc-600 mx-auto" />
-                <p className="text-xs text-zinc-400 font-medium">No orders matching the current filter.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {filteredOrders.map((order) => {
-                  const itemsForOrder = orderItems.filter((i) => i.orderId === order.id);
-
-                  return (
-                    <div
-                      key={order.id}
-                      onClick={() => setPanelSelectedOrderDetails(order)}
-                      className={`p-4 rounded-2xl border flex flex-col justify-between space-y-3 transition cursor-pointer group ${
-                        order.status === 'pending'
-                          ? 'bg-amber-950/20 border-amber-500/40 shadow-lg hover:border-amber-400'
-                          : order.status === 'preparing'
-                          ? 'bg-indigo-950/20 border-indigo-500/40 hover:border-indigo-400'
-                          : 'bg-zinc-900/60 border-zinc-800 opacity-75 hover:border-zinc-700'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2 border-b border-zinc-800/80 pb-2.5">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-black text-sm text-zinc-100 font-mono group-hover:text-amber-400">{order.orderNumber}</span>
-                            {order.discountAmount > 0 && (
-                              <span className="px-1.5 py-0.5 rounded-md text-[9px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                                -{settings.currency}{order.discountAmount.toFixed(2)}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[11px] text-zinc-400 font-medium block mt-0.5">
-                            Customer: <strong className="text-zinc-200">{order.customerName || 'Walk-in'}</strong>
-                          </span>
-                        </div>
-
-                        <div className="text-right">
-                          <span className="font-black text-sm text-amber-400 font-mono block">
-                            {settings.currency}{order.totalAmount.toFixed(2)}
-                          </span>
-                          <span className="text-[10px] font-bold text-amber-400/90 capitalize">
-                            {order.paymentMethod === 'google_pay'
-                              ? 'Google Pay'
-                              : order.paymentMethod === 'online'
-                              ? 'Swiggy / Zomato'
-                              : order.paymentMethod}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Items Listing */}
-                      <div className="space-y-1 text-xs">
-                        {itemsForOrder.map((item) => (
-                          <div key={item.id} className="flex items-center justify-between text-zinc-300">
-                            <span className="font-semibold truncate">
-                              {item.quantity}x {item.itemName}
-                            </span>
-                            <span className="text-zinc-500 font-mono">{settings.currency}{(item.unitPrice * item.quantity).toFixed(2)}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Status Transition Action Buttons */}
-                      <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80">
-                        <span
-                          className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider ${
-                            order.status === 'pending'
-                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                              : order.status === 'preparing'
-                              ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                              : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                          }`}
-                        >
-                          {order.status}
-                        </span>
-
-                        <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
-                          {['pending','preparing','ready'].includes(order.status) && <button type="button" onClick={e=> { e.stopPropagation(); if (window.confirm(order.status === 'pending' ? 'Cancel this order and return reserved ingredients to stock?' : 'Cancel this order? Prepared ingredients remain deducted from stock.')) handleUpdateOrderStatus(order.id, 'cancelled'); }} className="min-h-10 px-3 rounded-xl border border-rose-500/40 text-rose-400 font-semibold">Cancel</button>}
-                          {order.status === 'pending' && <button type="button" onClick={e => { e.stopPropagation(); handleUpdateOrderStatus(order.id, 'preparing'); }} className="order-primary min-h-10 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold">Start prep</button>}
-                          {order.status === 'preparing' && <button type="button" onClick={e => { e.stopPropagation(); handleUpdateOrderStatus(order.id, 'ready'); }} className="order-primary min-h-10 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold">Mark ready</button>}
-                          {order.status === 'ready' && <button type="button" onClick={e => { e.stopPropagation(); handleUpdateOrderStatus(order.id, 'completed'); }} className="order-primary min-h-10 px-4 rounded-xl btn-brand text-zinc-950 font-bold">Collected &amp; paid</button>}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-
-
-      {/* CLOCK IN/OUT CONFIRMATION MODAL */}
-      <Modal
-        isOpen={!!clockTargetStaff}
-        onClose={() => {
-          setClockTargetStaff(null);
-          setClockModalFeedback(null);
-        }}
-        title={
-          <span className="flex items-center gap-2 font-black text-zinc-100">
-            <Clock className="w-4 h-4 text-emerald-400" />
-            {clockTargetStaff?.name}: Clock {shifts.some((s) => s.staffId === clockTargetStaff?.id && !s.clockOut) ? 'Out' : 'In'}
-          </span>
-        }
-        maxWidth="max-w-sm"
-      >
-        <form onSubmit={handleConfirmEmployeeClock} className="space-y-4 text-xs">
-          <p className="text-zinc-400 text-xs">
-            Enter password / PIN for <strong>{clockTargetStaff?.name}</strong> to confirm clock action.
-          </p>
-
-          <div>
-            <input
-              type="password"
-              placeholder="Enter employee password..."
-              value={empPasswordInput}
-              onChange={(e) => setEmpPasswordInput(e.target.value)}
-              autoFocus
-              required
-              className="w-full p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 text-center font-mono text-lg tracking-widest focus:border-emerald-500"
-            />
-          </div>
-
-          {clockModalFeedback && (
-            <div
-              className={`p-2.5 rounded-xl text-xs font-bold text-center ${
-                clockModalFeedback.success
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-              }`}
-            >
-              {clockModalFeedback.message}
-            </div>
           )}
+        </Page>
+      )}
 
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => {
-                setClockTargetStaff(null);
-                setClockModalFeedback(null);
-              }}
-              className="py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-300 font-bold hover:bg-zinc-800 cursor-pointer"
-            >
-              Cancel
-            </button>
-
-            <button
-              type="submit"
-              className="py-2.5 rounded-xl btn-brand text-zinc-950 font-black uppercase tracking-wider cursor-pointer shadow-lg"
-            >
-              Confirm
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* CREATE TASK MODAL IN PANEL */}
-      <Modal
-        isOpen={showAddTaskModal}
-        onClose={() => setShowAddTaskModal(false)}
-        title="Create Shift Task"
-      >
-        <form onSubmit={handleCreateTask} className="space-y-3.5 text-xs">
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-              Task Title
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. Purge espresso machine steam wands"
-              value={taskTitle}
-              onChange={(e) => setTaskTitle(e.target.value)}
-              className="w-full p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                Category
-              </label>
-              <select
-                value={taskCategory}
-                onChange={(e) => setTaskCategory(e.target.value)}
-                className="w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 cursor-pointer"
-              >
-                {TASK_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">
-                Priority
-              </label>
-              <select
-                value={taskPriority}
-                onChange={(e) => setTaskPriority(e.target.value as any)}
-                className="w-full p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 cursor-pointer"
-              >
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-3 rounded-xl btn-brand text-zinc-950 font-black uppercase tracking-wider shadow-lg cursor-pointer"
-          >
-            Create Task
-          </button>
-        </form>
-      </Modal>
-
-      {/* PANEL ORDER DETAILS INSPECTOR MODAL */}
-      <Modal
-        isOpen={!!panelSelectedOrderDetails}
-        onClose={() => setPanelSelectedOrderDetails(null)}
-        title={`Order Details • ${panelSelectedOrderDetails?.orderNumber || ''}`}
-        maxWidth="max-w-md"
-      >
-        {panelSelectedOrderDetails && (
-          <div className="space-y-4 text-xs">
-            <div className="p-3 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-zinc-400">Customer:</span>
-                <span className="font-extrabold text-zinc-100">{panelSelectedOrderDetails.customerName || 'Walk-in'}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-zinc-400">Order Type:</span>
-                <span className="font-extrabold text-amber-400 uppercase">{panelSelectedOrderDetails.orderType}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-zinc-400">Status:</span>
-                <span className="font-extrabold text-indigo-400 uppercase">{panelSelectedOrderDetails.status}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-zinc-400">Payment Channel:</span>
-                <span className="font-extrabold text-emerald-400 capitalize">
-                  {panelSelectedOrderDetails.paymentMethod === 'google_pay'
-                    ? 'Google Pay'
-                    : panelSelectedOrderDetails.paymentMethod === 'online'
-                    ? 'Swiggy / Zomato'
-                    : panelSelectedOrderDetails.paymentMethod}
-                </span>
-              </div>
-              <div className="flex items-center justify-between pt-1 border-t border-zinc-800">
-                <span className="font-bold text-zinc-400">Order Time:</span>
-                <span className="font-mono text-zinc-300">
-                  {new Date(panelSelectedOrderDetails.createdAt).toLocaleString()}
-                </span>
-              </div>
-            </div>
-
-            {/* Line items list */}
-            <div className="space-y-2">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block">Ordered Line Items</span>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                {orderItems.filter((i) => i.orderId === panelSelectedOrderDetails.id).length === 0 ? (
-                  <p className="text-zinc-500 italic py-2">No line items found.</p>
-                ) : (
-                  orderItems.filter((i) => i.orderId === panelSelectedOrderDetails.id).map((item) => (
-                    <div key={item.id} className="p-2.5 rounded-xl bg-zinc-900/90 border border-zinc-800 flex items-center justify-between">
-                      <div>
-                        <span className="font-extrabold text-zinc-100 block">{item.quantity}x {item.itemName}</span>
-                        <span className="text-[10px] text-zinc-400">Unit Price: {settings.currency}{item.unitPrice.toFixed(2)}</span>
-                      </div>
-                      <span className="font-mono font-black text-emerald-400 text-xs">
-                        {settings.currency}{(item.quantity * item.unitPrice).toFixed(2)}
-                      </span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Price breakdown */}
-            <div className="p-3 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-1 font-mono text-xs">
-              {panelSelectedOrderDetails.discountAmount > 0 && (
-                <div className="flex items-center justify-between text-rose-400">
-                  <span>Discount Applied:</span>
-                  <span>-{settings.currency}{panelSelectedOrderDetails.discountAmount.toFixed(2)}</span>
-                </div>
-              )}
-              <div className="flex items-center justify-between text-zinc-400">
-                <span>Tax ({settings.taxRate}%):</span>
-                <span>{settings.currency}{panelSelectedOrderDetails.taxAmount.toFixed(2)}</span>
-              </div>
-              <div className="flex items-center justify-between text-base font-black text-amber-400 pt-1 border-t border-zinc-800">
-                <span>Total Amount:</span>
-                <span>{settings.currency}{panelSelectedOrderDetails.totalAmount.toFixed(2)}</span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setPanelSelectedOrderDetails(null)}
-              className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 font-bold text-zinc-200 cursor-pointer"
-            >
-              Close Order Details
-            </button>
-          </div>
+      {/* ---------------------------------------------------------- Dialogs */}
+      <OrderDetailsDialog
+        order={detailsOrder}
+        items={detailsOrder ? itemsByOrder.get(detailsOrder.id) || [] : []}
+        currency={currency}
+        taxRate={settings.taxRate}
+        onClose={() => setDetailsOrder(null)}
+        actions={detailsOrder && ['pending', 'preparing', 'ready'].includes(detailsOrder.status) && (
+          <span className="ws-spacer"><Button variant="danger-ghost" onClick={() => { setCancelTarget(detailsOrder); setDetailsOrder(null); }}>Cancel order</Button></span>
         )}
-      </Modal>
+      />
 
-      {/* Recipe Ingredients Modal in Panel Manager */}
-      {recipeViewItem && (
-        <Modal
-          isOpen={!!recipeViewItem}
-          onClose={() => setRecipeViewItem(null)}
-          title={`Recipe & Ingredients: ${recipeViewItem.name}`}
-          maxWidth="max-w-md"
-        >
-          <div className="space-y-4 text-xs">
-            <div className="flex items-center justify-between p-3 rounded-xl bg-zinc-950 border border-zinc-800">
-              <div>
-                <span className="font-extrabold text-zinc-100 block">{recipeViewItem.name}</span>
-                <span className="text-[10px] text-zinc-400">Base Selling Price: {settings.currency}{recipeViewItem.basePrice.toFixed(2)}</span>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                Recipe Breakdown
-              </span>
-            </div>
+      <ConfirmDialog
+        open={!!cancelTarget}
+        onClose={() => setCancelTarget(null)}
+        onConfirm={() => cancelTarget && updateOrderStatus(cancelTarget.id, 'cancelled')}
+        title={`Cancel ${cancelTarget?.orderNumber || 'order'}?`}
+        confirmLabel="Cancel order"
+        description={cancelTarget?.status === 'pending'
+          ? 'Reserved ingredients go back into stock.'
+          : 'Ingredients already used for this order stay deducted from stock.'}
+      />
 
-            {(() => {
-              const recipeList = store.getMenuItemRecipe(recipeViewItem.id);
-              const stockList = store.getStockItems();
+      <FormDialog
+        open={!!clockTarget}
+        onClose={() => { setClockTarget(null); setClockFeedback(null); }}
+        size="sm"
+        title={clockTarget ? `${targetIsIn ? 'Clock out' : 'Clock in'} ${clockTarget.name}` : ''}
+        description="Enter your PIN to confirm."
+        submitLabel={targetIsIn ? 'Clock out' : 'Clock in'}
+        submitDisabled={!pin || clockFeedback?.success}
+        onSubmit={confirmClock}
+      >
+        <Field label="PIN">{id => (
+          <Input id={id} className="ws-pin" type="password" inputMode="numeric" autoComplete="off" autoFocus required value={pin}
+            onChange={e => { setPin(e.target.value); if (clockFeedback && !clockFeedback.success) setClockFeedback(null); }} />
+        )}</Field>
+        {clockFeedback && <Notice tone={clockFeedback.success ? 'positive' : 'danger'}>{clockFeedback.message}</Notice>}
+      </FormDialog>
 
-              if (recipeList.length === 0) {
+      <TaskFormDialog open={taskFormOpen} onClose={() => setTaskFormOpen(false)} onCreated={onStateChange} />
+
+      <FormDialog open={customOpen} onClose={() => setCustomOpen(false)} title="Custom item" description="For catering, specials, or an agreed price." submitLabel="Add to order" submitDisabled={!customName.trim() || customPrice === ''} onSubmit={addCustomItem}>
+        <Field label="Item name">{id => <Input id={id} autoFocus required value={customName} onChange={e => setCustomName(e.target.value)} placeholder="e.g. Event tea blend" />}</Field>
+        <Field label="Unit price">{id => <AffixInput id={id} affix={currency} type="number" inputMode="decimal" step="any" min="0" required value={customPrice} onChange={e => setCustomPrice(e.target.value)} placeholder="0.00" />}</Field>
+      </FormDialog>
+
+      <Dialog open={!!recipeItem} onClose={() => setRecipeItem(null)} title={recipeItem ? `Recipe · ${recipeItem.name}` : ''} description="Raw materials used per portion." footer={<Button variant="primary" onClick={() => setRecipeItem(null)}>Done</Button>}>
+        {recipeItem && (() => {
+          const recipe = store.getMenuItemRecipe(recipeItem.id);
+          const stock = store.getStockItems();
+          if (recipe.length === 0) return <EmptyState icon={<ChefHat />} title="No recipe yet" description="Add ingredients from the admin menu editor." />;
+          return (
+            <ul className="ws-list" style={{ margin: '0 -24px' }}>
+              {recipe.map(ing => {
+                const material = stock.find(s => s.id === ing.stockItemId);
+                const enough = material ? material.quantity >= ing.quantityRequired : false;
                 return (
-                  <div className="p-6 rounded-xl bg-zinc-950 border border-zinc-800 text-center text-zinc-500 space-y-1">
-                    <Boxes className="w-8 h-8 mx-auto text-zinc-600 mb-2" />
-                    <p className="font-bold text-zinc-300 text-xs">No Recipe Ingredients Configured</p>
-                    <p className="text-[11px] text-zinc-500">Configure raw material recipes in CHTH Admin Menu Editor.</p>
-                  </div>
+                  <ListItem
+                    key={ing.id || ing.stockItemId}
+                    title={material?.name || 'Removed material'}
+                    subtitle={<span>{ing.quantityRequired} {material?.unit || 'units'} per portion</span>}
+                    trail={material && <Badge tone={enough ? 'positive' : 'danger'}>{enough ? `${material.quantity} ${material.unit} left` : 'Not enough stock'}</Badge>}
+                  />
                 );
-              }
-
-              return (
-                <div className="space-y-3">
-                  <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider block">
-                    Required Raw Materials Per Portion ({recipeList.length})
-                  </span>
-
-                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                    {recipeList.map((ing) => {
-                      const material = stockList.find((s) => s.id === ing.stockItemId);
-                      const isAvailable = material ? material.quantity >= ing.quantityRequired : false;
-
-                      return (
-                        <div
-                          key={ing.id || ing.stockItemId}
-                          className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-between gap-2"
-                        >
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-extrabold text-zinc-200">
-                                {material ? material.name : ing.stockItemId}
-                              </span>
-                              {material && (
-                                <span
-                                  className={`px-1.5 py-0.2 rounded text-[9px] font-black ${
-                                    isAvailable
-                                      ? 'bg-emerald-500/20 text-emerald-400'
-                                      : 'bg-rose-500/20 text-rose-400'
-                                  }`}
-                                >
-                                  {isAvailable ? `${material.quantity} ${material.unit} in stock` : 'Low Stock'}
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-zinc-400 block mt-0.5">
-                              Consumes: <strong>{ing.quantityRequired} {material?.unit || 'units'}</strong> / portion
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-
-            <div className="flex justify-end pt-2">
-              <button
-                type="button"
-                onClick={() => setRecipeViewItem(null)}
-                className="px-4 py-2 rounded-xl btn-brand text-zinc-950 font-bold text-xs cursor-pointer shadow-md"
-              >
-                Close Recipe
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* Custom / Manual Price Inquiry Item Modal */}
-      {showCustomItemModal && (
-        <Modal
-          isOpen={showCustomItemModal}
-          onClose={() => setShowCustomItemModal(false)}
-          title="Add Custom / Manual Price Item"
-          maxWidth="max-w-md"
-        >
-          <form onSubmit={handleAddCustomPriceItem} className="space-y-4 text-xs">
-            <p className="text-zinc-400">
-              Enter custom item title, catering portion name, or manual price quote to include in this order.
-            </p>
-
-            <div>
-              <label className="block text-xs font-bold text-zinc-300 mb-1">
-                Item Title / Inquiry Description *
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. Custom Event Tea Blend / Special Catering Box"
-                value={customItemName}
-                onChange={(e) => setCustomItemName(e.target.value)}
-                className="w-full p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-amber-500"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-zinc-300 mb-1">
-                Agreed / Manual Unit Price ({settings.currency || '₹'}) *
-              </label>
-              <input
-                type="number" inputMode="decimal"
-                step="any"
-                placeholder="0.00"
-                value={customItemPrice}
-                onChange={(e) => setCustomItemPrice(e.target.value)}
-                className="w-full p-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 font-mono text-xs focus:outline-none focus:border-amber-500"
-                required
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowCustomItemModal(false)}
-                className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-300 font-bold text-xs cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2 rounded-xl btn-brand text-zinc-950 font-bold text-xs shadow-md cursor-pointer"
-              >
-                Add to Order Basket
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-    </div>
+              })}
+            </ul>
+          );
+        })()}
+      </Dialog>
+    </>
   );
 };
