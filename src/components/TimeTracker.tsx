@@ -650,7 +650,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
                   </div>
                   <div className="h-2 rounded-full bg-zinc-900 overflow-hidden border border-zinc-800">
                     <div
-                      className={`h-full transition-all duration-500 ${
+                      className={`h-full transition-[width] duration-300 ${
                         isCurrentlyIn ? 'bg-emerald-500' : 'bg-gradient-to-r from-amber-500 to-amber-400'
                       }`}
                       style={{ width: `${Math.max(pct, 5)}%` }}
@@ -745,7 +745,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
                   <div className="pt-2 border-t border-zinc-800/80 flex items-center gap-2">
                     <span className="text-[10px] font-bold text-zinc-400 uppercase">New Rate ({settings.currency}):</span>
                     <input
-                      type="number"
+                      type="number" inputMode="decimal"
                       step="0.50"
                       placeholder="18.50"
                       value={changeWageInput}
@@ -877,7 +877,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
                 return (
                   <div
                     key={sh.id}
-                    className="p-3 rounded-2xl bg-zinc-900/80 border border-zinc-800 hover:border-zinc-700 flex items-center justify-between gap-2 text-xs transition-all"
+                    className="p-3 rounded-2xl bg-zinc-900/80 border border-zinc-800 hover:border-zinc-700 flex items-center justify-between gap-2 text-xs transition"
                   >
                     <div>
                       <div className="flex items-center gap-1.5">
@@ -994,7 +994,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
               Hourly Wage Rate ({settings.currency})
             </label>
             <input
-              type="number"
+              type="number" inputMode="decimal"
               step="0.50"
               placeholder="18.50"
               value={newStaffRate}
@@ -1217,7 +1217,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
                   key={p.id}
                   type="button"
                   onClick={() => setExportDatePreset(p.id as DatePreset)}
-                  className={`py-1.5 px-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer text-center ${
+                  className={`py-1.5 px-2 rounded-xl text-[11px] font-bold border transition cursor-pointer text-center ${
                     exportDatePreset === p.id
                       ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm'
                       : 'bg-zinc-950/60 text-zinc-400 border-zinc-800 hover:bg-zinc-800 hover:text-zinc-200'
@@ -1305,7 +1305,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
                     key={st}
                     type="button"
                     onClick={() => setExportStatus(st)}
-                    className={`py-1.5 px-1 rounded-lg text-[10px] font-extrabold uppercase transition-all cursor-pointer text-center ${
+                    className={`py-1.5 px-1 rounded-lg text-[10px] font-extrabold uppercase transition cursor-pointer text-center ${
                       exportStatus === st
                         ? 'bg-emerald-500 text-zinc-950 shadow-sm'
                         : 'text-zinc-400 hover:text-zinc-200'

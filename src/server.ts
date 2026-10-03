@@ -140,7 +140,8 @@ app.use('/api/*', async (c, next) => {
   const localProxy = c.env.CAFE_DEV_PROXY === 'true' && requestUrl.protocol === 'http:';
   const browserHost = localProxy ? c.req.header('X-Cafe-Dev-Host') : undefined;
   const requestOrigin = browserHost ? `${requestUrl.protocol}//${browserHost}` : requestUrl.origin;
-  const origin = c.req.header('Origin');
+  const forwardedOrigin = localProxy ? c.req.header('X-Cafe-Dev-Origin') : undefined;
+  const origin = forwardedOrigin ? decodeURIComponent(forwardedOrigin) : c.req.header('Origin');
   if (origin && origin !== requestOrigin) return c.json({ success: false, message: 'Origin not allowed.' }, 403);
   const workspace = new URL(requestOrigin).hostname.startsWith('panel.') ? 'panel' : 'admin';
   c.set('workspace', workspace);

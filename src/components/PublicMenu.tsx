@@ -313,10 +313,10 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
       </div>
 
       {receipt && <OrderTracking receipt={receipt} onDismiss={() => { setReceipt(null); try { localStorage.removeItem('chth_order_receipt'); } catch {} }} />}
-      <div className="flex flex-wrap gap-3 mb-5 text-sm">
-        <label>Dietary preference<select value={dietaryFilter} onChange={e=>setDietaryFilter(e.target.value)} className="ml-2 rounded-xl border border-zinc-700 bg-zinc-900 p-3"><option value="">All items</option>{['vegan','vegetarian','gluten-free','decaf','caffeine-free'].map(v=><option key={v}>{v}</option>)}</select></label>
-        <label>Exclude allergen<select value={excludedAllergen} onChange={e=>setExcludedAllergen(e.target.value)} className="ml-2 rounded-xl border border-zinc-700 bg-zinc-900 p-3"><option value="">No exclusion</option>{['milk','nuts','gluten','egg','soy'].map(v=><option key={v}>{v}</option>)}</select></label>
-        <p className="w-full text-xs text-zinc-400">Labels are supplied by café staff. Ask staff about substitutions and cross-contact. Allergen exclusions hide items with unconfirmed labels.</p>
+      <div className="menu-filters grid grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-3 mb-5 text-sm">
+        <label className="flex flex-col gap-1.5">Dietary preference<select value={dietaryFilter} onChange={e=>setDietaryFilter(e.target.value)} className="w-full sm:w-auto min-h-11 rounded-xl border border-zinc-700 bg-zinc-900 px-3"><option value="">All items</option>{['vegan','vegetarian','gluten-free','decaf','caffeine-free'].map(v=><option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}</select></label>
+        <label className="flex flex-col gap-1.5">Exclude allergen<select value={excludedAllergen} onChange={e=>setExcludedAllergen(e.target.value)} className="w-full sm:w-auto min-h-11 rounded-xl border border-zinc-700 bg-zinc-900 px-3"><option value="">No exclusion</option>{['milk','nuts','gluten','egg','soy'].map(v=><option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}</select></label>
+        <p className="col-span-2 w-full text-xs text-zinc-400">Labels are supplied by café staff. Ask staff about substitutions and cross-contact. Allergen exclusions hide items with unconfirmed labels.</p>
       </div>
       <nav ref={categoryBarRef} aria-label="Menu categories" className="menu-categories sticky top-16 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-zinc-800 bg-zinc-950">
         <div className="flex gap-2 overflow-x-auto no-scrollbar">
@@ -379,7 +379,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
 
       <div className="menu-endnote"><span className="menu-hand-note">Good things take a little pause.</span><button type="button" className="menu-text-button" onClick={() => document.getElementById('menu-top')?.scrollIntoView({ block: 'start', behavior: document.documentElement.dataset.motion === 'reduced' || window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })}>Back to the top<ArrowUp size={16} /></button></div>
 
-      {cartCount > 0 && <div className="menu-cart-bar fixed bottom-4 left-4 right-4 z-40 md:hidden">
+      {cartCount > 0 && <div className="menu-cart-bar fixed left-4 right-4 z-40 md:hidden">
         <button type="button" onClick={() => setIsCartOpen(true)} className="w-full min-h-14 p-4 rounded-2xl btn-brand text-zinc-950 font-semibold flex items-center justify-between gap-3 shadow-lg">
           <span className="flex items-center gap-3"><ShoppingBag size={20} /><span>Your order · {cartCount}</span></span><span className="flex items-center gap-2">{money(total)}<ChevronRight size={18} /></span>
         </button>
