@@ -245,7 +245,7 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({
             </select>
 
             <input
-              type="number"
+              type="number" inputMode="decimal"
               min="1"
               max="99"
               value={selectedQty}
@@ -262,7 +262,7 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({
             <button
               type="button"
               onClick={handleAddToCart}
-              className="px-4 py-2.5 flex-shrink-0 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-md active:scale-95 whitespace-nowrap"
+              className="px-4 py-2.5 flex-shrink-0 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer transition shadow-md active:scale-[0.97] whitespace-nowrap"
             >
               <Plus className="w-4 h-4 stroke-[3]" /> Add
             </button>
@@ -369,7 +369,7 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({
         <button
           type="submit"
           disabled={savingOrder || cart.length === 0}
-          className="w-full py-3 rounded-xl btn-brand text-zinc-950 font-black uppercase tracking-wider shadow-lg cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="w-full py-3 rounded-xl btn-brand text-zinc-950 font-black uppercase tracking-wider shadow-lg cursor-pointer transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           <CheckCircle2 className="w-4 h-4" /> Record POS Sale ({settings.currency}{totalAmount.toFixed(2)})
         </button>

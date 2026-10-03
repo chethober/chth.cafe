@@ -71,7 +71,7 @@ export const Modal: React.FC<ModalProps> = ({
         }
       }}
       className={`${appearance === 'paper' ? 'menu-modal-backdrop' : ''} fixed inset-0 z-[9999] bg-zinc-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-hidden animate-fade-in`}
-      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100dvh' }}
     >
       <div
         ref={dialogRef}
@@ -80,7 +80,7 @@ export const Modal: React.FC<ModalProps> = ({
         aria-labelledby={titleId}
         aria-busy={closeDisabled}
         tabIndex={-1}
-        className={`${appearance === 'paper' ? 'menu-paper-dialog' : 'glass-panel-classy'} p-5 sm:p-6 rounded-3xl ${maxWidth} w-full max-h-[85vh] overflow-y-auto space-y-4 border border-zinc-800/90 animate-scale-up shadow-2xl relative text-xs my-auto`}
+        className={`${appearance === 'paper' ? 'menu-paper-dialog' : 'glass-panel-classy'} p-5 sm:p-6 rounded-3xl ${maxWidth} w-full max-h-[85dvh] overflow-y-auto overscroll-contain space-y-4 border border-zinc-800/90 animate-scale-up shadow-2xl relative text-xs my-auto`}
       >
         <div className="flex justify-between items-center text-sm font-bold text-zinc-100 border-b border-zinc-800 pb-3">
           <div id={titleId} className="flex items-center gap-2 font-black">{title}</div>
