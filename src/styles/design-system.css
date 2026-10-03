@@ -75,7 +75,6 @@ html :is(.app-shell, .menu-paper-dialog) :is(.bg-zinc-900, .bg-zinc-800) { backg
   .menu-zine .menu-card:hover .menu-photo { transform: rotate(0deg); filter: saturate(1); }
   .menu-zine .menu-item-bottom .btn-brand:hover:not(:disabled) { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 var(--menu-rule); }
   html :is(.app-shell, .menu-paper-dialog) .btn-brand:hover:not(:disabled) { box-shadow: 2px 2px 0 var(--menu-rule); }
-  html .app-workspace tr:hover { background: var(--menu-paper) !important; }
   .appearance-theme-card:hover:not(:disabled) { box-shadow: 0 2px 0 var(--menu-rule); }
 }
 .menu-pick-footnote { display: block; font: 10px/1.5 var(--menu-mono); margin-top: 10px; opacity: .8; }
@@ -184,35 +183,16 @@ html :is(.app-shell, .menu-paper-dialog) :is(.glass-panel, .glass-panel-classy, 
   backdrop-filter: none;
 }
 html .app-shell.app-shell > header, html .app-shell.app-shell > footer { background: var(--menu-paper) !important; }
-.app-workspace :is(.glass-panel, .glass-panel-classy) { padding: var(--workspace-panel-padding); }
-.app-workspace main > div > .glass-panel-classy:first-child { background: transparent !important; border: 0 !important; border-top: 2px solid var(--menu-ink) !important; border-bottom: 1px solid var(--menu-rule) !important; padding-left: 0; padding-right: 0; }
-.app-workspace :is(h1, h2, h3) { font-family: var(--menu-serif); font-weight: 400 !important; letter-spacing: -.025em; }
-.app-workspace h1 { font-size: clamp(28px, 3vw, 40px); line-height: 1.1; }
-.app-workspace h2 { font-size: 24px; line-height: 1.2; }
-.app-workspace h3 { font-size: 20px; line-height: 1.25; }
-.app-workspace [class*='shadow-'] { box-shadow: none; }
-.app-workspace .brand-glow { box-shadow: none; }
-.app-workspace :is(.rounded-3xl, .rounded-2xl, .rounded-xl, .rounded-lg) { border-radius: var(--control-radius); }
 html :is(.app-shell, .menu-paper-dialog) .btn-brand { background: var(--button-bg) !important; color: var(--button-fg) !important; border-radius: var(--control-radius); filter: none; box-shadow: none; }
-.app-workspace :is(button, input:not([type='checkbox']):not([type='radio']):not([type='color']), select) { min-height: var(--workspace-control-height); }
-.app-workspace button { font-weight: 600; }
-.app-workspace :is(input, select, textarea) { max-width: 100%; min-width: 0; border-radius: var(--control-radius); }
 html :is(.app-shell, .menu-paper-dialog) :is(input:not([type='checkbox']):not([type='radio']), select, textarea) { background: var(--control-bg) !important; color: var(--control-fg) !important; border-color: var(--menu-rule) !important; }
 html :is(.app-shell, .menu-paper-dialog) :is(input, textarea)::placeholder { color: var(--menu-muted) !important; }
 html :is(.app-shell, .menu-paper-dialog) select option { background: var(--menu-paper) !important; color: var(--menu-ink) !important; }
 html :is(.app-shell, .menu-paper-dialog) :is(input[type='checkbox'], input[type='radio']) { accent-color: var(--menu-accent); }
 :is(.app-shell, .menu-paper-dialog) :is(button, input, select, textarea, a):focus-visible { outline: 2px solid var(--menu-accent); outline-offset: 3px; }
-.app-workspace .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: var(--workspace-gap); }
-.app-workspace .gap-6 { gap: var(--workspace-gap); }
-.app-workspace table { border-collapse: collapse; }
-.app-workspace :is(th, td) { padding-top: var(--workspace-row-padding); padding-bottom: var(--workspace-row-padding); border-color: var(--menu-rule) !important; }
-.app-workspace th { font-family: var(--menu-mono); font-size: 10px; letter-spacing: .06em; }
 html :is(.app-shell, .menu-paper-dialog) :is(.text-amber-400, .text-amber-300, .text-amber-500) { color: var(--menu-accent) !important; }
 html :is(.app-shell, .menu-paper-dialog) :is(.text-emerald-400, .text-emerald-300) { color: var(--status-positive) !important; }
 html :is(.app-shell, .menu-paper-dialog) :is(.text-rose-400, .text-rose-300) { color: var(--status-danger) !important; }
 html :is(.app-shell, .menu-paper-dialog) :is(.text-blue-400, .text-sky-400, .text-indigo-400) { color: var(--status-info) !important; }
-.app-workspace .blur-3xl { display: none; }
-.app-workspace .glass-card:hover { transform: none; }
 html .app-menu .menu-zine .menu-categories { background: var(--menu-paper) !important; }
 html .app-menu .menu-zine .menu-categories button[aria-pressed='true'] { background: var(--menu-sheet) !important; color: var(--menu-ink) !important; }
 html .app-menu .menu-zine .menu-item-bottom .btn-brand { background: transparent !important; color: var(--menu-ink) !important; box-shadow: 2px 2px 0 var(--menu-rule); }
@@ -271,8 +251,6 @@ html[data-motion='reduced'] :is(.app-shell, .menu-paper-dialog), html[data-motio
   .app-shell, .app-shell *, .menu-paper-dialog, .menu-paper-dialog * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 @media (max-width: 539px) {
-  .app-workspace :is(input:not([type='checkbox']):not([type='radio']), select, textarea) { font-size: 16px; }
-  .app-workspace :is(.glass-panel, .glass-panel-classy) { padding: min(var(--workspace-panel-padding), 16px); }
   .appearance-tone { gap: 6px; padding: 8px; }
   .appearance-tone > span { width: 16px; height: 16px; }
 }
@@ -290,8 +268,6 @@ html .menu-zine :is(.menu-photo, .menu-tools > button, .menu-item-bottom > div.f
 html .menu-paper-dialog, html .menu-paper-dialog :is(input, button, label.rounded-xl, div.rounded-xl),
 .appearance-preview-ticket { border-radius: var(--control-radius); }
 
-.panel-navigation { background: var(--menu-paper); }
-#panel-orders button, #panel-tasks button, #panel-shifts button { min-height: 44px; }
 
 /* Category rail: fade the trailing edge so a cut-off chip reads as "scroll for more". */
 .menu-categories > div { padding-right: 40px; mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
@@ -308,5 +284,3 @@ html .menu-paper-dialog, html .menu-paper-dialog :is(input, button, label.rounde
 .order-steps > li[data-done] { border-top-color: var(--accent-emerald); color: var(--menu-ink); }
 .order-steps > li[aria-current='step'] { font-weight: 700; }
 
-/* Admin bottom tab bar clears the home indicator on notched phones. */
-.admin-tabbar { padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }

@@ -5,16 +5,14 @@ import {
   Clock,
   TrendingUp,
   UtensilsCrossed,
-  LogOut,
   Lock,
-  AlertCircle,
   CheckSquare,
-  Sparkles,
-  ShieldCheck,
-  LayoutDashboard,
   Sun,
   Moon,
-  Boxes
+  Boxes,
+  ShoppingBag,
+  Plus,
+  Users
 } from 'lucide-react';
 import { store } from './db/store';
 import { api } from './services/api';
@@ -25,10 +23,25 @@ import { TimeTracker } from './components/TimeTracker';
 import { FinancialTracker } from './components/FinancialTracker';
 import { MenuAdmin } from './components/MenuAdmin';
 import { TaskManager } from './components/TaskManager';
-import { PanelManager } from './components/PanelManager';
+import { PanelManager, PanelSection } from './components/PanelManager';
 import { StockManagement } from './components/StockManagement';
+import { Button, Field, IconButton, Input, Notice, NavItem, WorkspaceShell } from './ui';
 
 type AdminTab = 'financials' | 'tasks' | 'menu_admin' | 'stock' | 'staff' | 'settings';
+const ADMIN_TABS: AdminTab[] = ['financials', 'tasks', 'menu_admin', 'stock', 'staff', 'settings'];
+const PANEL_SECTIONS: PanelSection[] = ['orders', 'pos', 'tasks', 'shifts'];
+
+function usePersistentState<T extends string>(key: string, allowed: readonly T[], fallback: T) {
+  const [value, setValue] = useState<T>(() => {
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved && (allowed as readonly string[]).includes(saved)) return saved as T;
+    } catch { /* storage unavailable */ }
+    return fallback;
+  });
+  useEffect(() => { try { localStorage.setItem(key, value); } catch { /* storage unavailable */ } }, [key, value]);
+  return [value, setValue] as const;
+}
 
 export const App: React.FC = () => {
   const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
@@ -36,73 +49,47 @@ export const App: React.FC = () => {
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const isAdminView = hostname.startsWith('admin.');
   const isPanelView = hostname.startsWith('panel.');
+  const isWorkspace = isAdminView || isPanelView;
 
-  const [adminTab, setAdminTab] = useState<AdminTab>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('chth_admin_last_tab');
-      if (saved && ['financials', 'tasks', 'menu_admin', 'stock', 'staff', 'settings'].includes(saved)) {
-        return saved as AdminTab;
-      }
-    }
-    return 'financials';
-  });
-
-  // Save last opened admin tab to localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('chth_admin_last_tab', adminTab);
-    }
-  }, [adminTab]);
+  const [adminTab, setAdminTab] = usePersistentState<AdminTab>('chth_admin_last_tab', ADMIN_TABS, 'financials');
+  const [panelSection, setPanelSection] = usePersistentState<PanelSection>('chth_panel_last_tab', PANEL_SECTIONS, 'orders');
 
   // Theme (Light/Dark mode) state
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    if (typeof window !== 'undefined') {
+    try {
       const saved = localStorage.getItem('chth_theme');
       if (saved === 'light' || saved === 'dark') return saved;
-    }
+    } catch { /* storage unavailable */ }
     return 'dark';
   });
 
-  // Sync theme class on <html> element
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const root = document.documentElement;
-      if (theme === 'light') {
-        root.classList.add('light');
-        root.classList.remove('dark');
-      } else {
-        root.classList.add('dark');
-        root.classList.remove('light');
-      }
-      localStorage.setItem('chth_theme', theme);
-    }
+    const root = document.documentElement;
+    root.classList.toggle('light', theme === 'light');
+    root.classList.toggle('dark', theme === 'dark');
+    try { localStorage.setItem('chth_theme', theme); } catch { /* storage unavailable */ }
   }, [theme]);
 
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  };
+  const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
 
   const [, setStateVersion] = useState(0);
+  const refresh = () => setStateVersion((v) => v + 1);
 
   // Admin authentication state
   const [isAdminAuthed, setIsAdminAuthed] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   useEffect(() => {
-    fetch('/api/auth/session').then(res => res.json()).then(data => setIsAdminAuthed((data as { authenticated?: boolean }).authenticated === true)).catch(() => {}).finally(() => setAuthLoading(false));
-    const timer = window.setInterval(() => { void store.syncFromAPI(); fetch('/api/auth/session').then(res => res.json()).then(data => setIsAdminAuthed((data as { authenticated?: boolean }).authenticated === true)).catch(() => {}); }, 15000);
+    const checkSession = () => fetch('/api/auth/session').then(res => res.json()).then(data => setIsAdminAuthed((data as { authenticated?: boolean }).authenticated === true)).catch(() => {});
+    void checkSession().finally(() => setAuthLoading(false));
+    const timer = window.setInterval(() => { void store.syncFromAPI(); void checkSession(); }, 15000);
     return () => window.clearInterval(timer);
   }, []);
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // Sync state mutations from store
   useEffect(() => {
-    const unsubscribe = store.subscribe(() => {
-      setStateVersion((v) => v + 1);
-    });
-    return () => {
-      unsubscribe();
-    };
+    const unsubscribe = store.subscribe(refresh);
+    return () => { unsubscribe(); };
   }, []);
 
   const handleAdminLogin = async (e: React.FormEvent) => {
@@ -136,210 +123,63 @@ export const App: React.FC = () => {
 
   // Dynamically update CSS root variables for brand theme
   useEffect(() => {
-    if (settings.brandPrimary) {
-      document.documentElement.style.setProperty('--brand-primary', settings.brandPrimary);
-    }
-    if (settings.brandSecondary) {
-      document.documentElement.style.setProperty('--brand-secondary', settings.brandSecondary);
-    }
+    if (settings.brandPrimary) document.documentElement.style.setProperty('--brand-primary', settings.brandPrimary);
+    if (settings.brandSecondary) document.documentElement.style.setProperty('--brand-secondary', settings.brandSecondary);
   }, [settings.brandPrimary, settings.brandSecondary]);
 
   useEffect(() => { applyAppearance(settings.appearance); }, [settings.appearance]);
 
-  // Update Website Document Titles dynamically
   useEffect(() => {
-    if (isAdminView) {
-      document.title = 'CHTH Admin';
-    } else if (isPanelView) {
-      document.title = 'CHTH Management';
-    } else {
-      document.title = 'CHTH Cafe';
-    }
+    document.title = isAdminView ? 'CHTH Admin' : isPanelView ? 'CHTH Management' : 'CHTH Cafe';
   }, [isAdminView, isPanelView]);
 
-  return (
-    <div className={`app-shell ${isAdminView || isPanelView ? 'app-workspace' : 'app-menu'} min-h-dvh bg-zinc-950 text-zinc-100 flex flex-col justify-between selection:bg-amber-500 selection:text-zinc-950 font-sans antialiased`}>
-      {/* Header Navbar */}
-      <header className="sticky top-0 z-40 bg-zinc-950/80 backdrop-blur-2xl border-b border-zinc-800/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          {/* Logo & Brand Title */}
-          <div className="flex items-center gap-3">
-            {settings.logoUrl && failedLogoUrl !== settings.logoUrl ? (
-              <img
-                src={settings.logoUrl}
-                alt={settings.cafeName}
-                onError={() => setFailedLogoUrl(settings.logoUrl)}
-                className="w-9 h-9 rounded-xl object-cover ring-2 ring-amber-500/30 shadow-md"
-              />
-            ) : (
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center font-extrabold shadow-lg brand-bg"
-              >
-                <Coffee className="w-5 h-5 text-zinc-950" />
-              </div>
-            )}
+  /* ------------------------------------------------------------ Workspace */
+  if (isWorkspace) {
+    if (!isAdminAuthed) {
+      return (
+        <div className="ws ws-auth">
+          <form className="ws-auth-card" aria-busy={authLoading} onSubmit={handleAdminLogin}>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-black text-sm sm:text-base text-zinc-100 block leading-tight tracking-tight">
-                  {settings.cafeName}
-                </span>
-                {isAdminView && (
-                  <span className="app-view-stamp px-2 py-0.5 rounded-md text-[9px] font-black bg-amber-500/20 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
-                    Admin
-                  </span>
-                )}
-                {isPanelView && (
-                  <span className="app-view-stamp px-2 py-0.5 rounded-md text-[9px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">
-                    Panel
-                  </span>
-                )}
-              </div>
-              <span className="text-[10px] text-zinc-400 font-medium block">
-                {isAdminView
-                  ? 'The café ledger'
-                  : isPanelView
-                  ? 'Behind the counter'
-                  : 'A little pause.'}
-              </span>
+              <span className="ws-brand-mark" style={{ width: 48, height: 48, marginBottom: 20 }}><Lock width={22} height={22} /></span>
+              <h1>{settings.cafeName} {isPanelView ? 'daily panel' : 'admin'}</h1>
+              <p>{isPanelView ? 'Sign in to take orders, run the checklist, and clock the team in.' : 'Sign in to manage finances, menu, stock, staff, and settings.'}</p>
             </div>
-          </div>
-
-          {/* Header Action Controls & Theme Toggle */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Navigation Actions for Admin View */}
-            {isAdminView && isAdminAuthed && (
-              <>
-                <div className="hidden xl:flex items-center gap-1 bg-zinc-900/90 p-1 rounded-xl border border-zinc-800">
-                  <button
-                    onClick={() => setAdminTab('financials')}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
-                      adminTab === 'financials'
-                        ? 'btn-brand text-zinc-950 shadow-md'
-                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-                    }`}
-                  >
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    Financials
-                  </button>
-
-                  <button
-                    onClick={() => setAdminTab('tasks')}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
-                      adminTab === 'tasks'
-                        ? 'btn-brand text-zinc-950 shadow-md'
-                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-                    }`}
-                  >
-                    <CheckSquare className="w-3.5 h-3.5" />
-                    Tasks
-                  </button>
-
-                  <button
-                    onClick={() => setAdminTab('menu_admin')}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
-                      adminTab === 'menu_admin'
-                        ? 'btn-brand text-zinc-950 shadow-md'
-                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-                    }`}
-                  >
-                    <UtensilsCrossed className="w-3.5 h-3.5" />
-                    Menu Editor
-                  </button>
-
-                  <button
-                    onClick={() => setAdminTab('stock')}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
-                      adminTab === 'stock'
-                        ? 'btn-brand text-zinc-950 shadow-md'
-                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-                    }`}
-                  >
-                    <Boxes className="w-3.5 h-3.5" />
-                    Stock Inventory
-                  </button>
-
-                  <button
-                    onClick={() => setAdminTab('staff')}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
-                      adminTab === 'staff'
-                        ? 'btn-brand text-zinc-950 shadow-md'
-                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-                    }`}
-                  >
-                    <Clock className="w-3.5 h-3.5" />
-                    Staff Shifting
-                  </button>
-
-                  <button
-                    onClick={() => setAdminTab('settings')}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
-                      adminTab === 'settings'
-                        ? 'btn-brand text-zinc-950 shadow-md'
-                        : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
-                    }`}
-                  >
-                    <Settings className="w-3.5 h-3.5" />
-                    Settings
-                  </button>
-                </div>
-
-                {/* Mobile Top Header Settings Button */}
-                <button
-                  onClick={() => setAdminTab('settings')}
-                  className={`xl:hidden px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 border cursor-pointer ${
-                    adminTab === 'settings'
-                      ? 'btn-brand text-zinc-950 shadow-md border-amber-500'
-                      : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:text-white'
-                  }`}
-                  title="Settings"
-                >
-                  <Settings className="w-3.5 h-3.5" />
-                  <span className="text-[11px]">Settings</span>
-                </button>
-
-              </>
-            )}
-
-            {(isAdminView || isPanelView) && isAdminAuthed && (
-              <button
-                onClick={handleAdminLogout}
-                className="px-3 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 font-bold text-xs flex items-center gap-1 border border-rose-800/40 cursor-pointer transition-colors"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                Exit
-              </button>
-            )}
-
-            {/* Universal Light/Dark Mode Toggle for All 3 Websites */}
-            <button
-              onClick={toggleTheme}
-              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              aria-label="Toggle Theme"
-              className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-amber-400 border border-zinc-800 transition cursor-pointer shadow-sm flex items-center gap-1.5"
-            >
-              {theme === 'dark' ? (
-                <>
-                  <Sun className="w-4 h-4 text-amber-400" />
-                  <span className="text-[11px] font-bold text-zinc-300 hidden xl:inline">Light</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="w-4 h-4 text-indigo-400" />
-                  <span className="text-[11px] font-bold text-zinc-300 hidden xl:inline">Dark</span>
-                </>
-              )}
-            </button>
-          </div>
+            {authError && <Notice tone="danger">{authError}</Notice>}
+            <Field label={isPanelView ? 'Panel password' : 'Admin password'}>{id => (
+              <Input id={id} type="password" autoComplete="current-password" autoFocus required value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} />
+            )}</Field>
+            <Button type="submit" variant="primary" size="lg" block loading={authLoading}>{authLoading ? 'Checking…' : 'Sign in'}</Button>
+            <Button variant="ghost" size="sm" onClick={toggleTheme} icon={theme === 'dark' ? <Sun /> : <Moon />}>{theme === 'dark' ? 'Light appearance' : 'Dark appearance'}</Button>
+          </form>
         </div>
-      </header>
+      );
+    }
 
-      {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 w-full">
-        {store.pendingSaves > 0 && <p role="status" className="mb-4 rounded-xl border border-amber-500/30 p-3 text-amber-400">Saving {store.pendingSaves} change(s)…</p>}
-        {store.saveError && <div role="alert" className="mb-4 rounded-xl border border-rose-500/40 p-4 text-rose-300">{store.saveError}<button type="button" onClick={() => store.dismissSaveError()} className="ml-4 underline">Dismiss</button></div>}
-        {isPanelView && isAdminAuthed ? (
-          /* Daily Manager Operational Panel (panel.chth.cafe) */
+    const shellProps = {
+      cafeName: settings.cafeName,
+      logoUrl: settings.logoUrl,
+      theme,
+      onToggleTheme: toggleTheme,
+      onSignOut: handleAdminLogout,
+      pendingSaves: store.pendingSaves,
+      saveError: store.saveError,
+      onDismissError: () => store.dismissSaveError()
+    };
+
+    if (isPanelView) {
+      const liveOrders = orders.filter(o => ['pending', 'preparing', 'ready'].includes(o.status)).length;
+      const openTasks = tasksList.filter(t => t.status !== 'completed').length;
+      const panelNav: NavItem<PanelSection>[] = [
+        { id: 'orders', label: 'Orders', icon: ShoppingBag, badge: liveOrders },
+        { id: 'pos', label: 'New order', short: 'New', icon: Plus },
+        { id: 'tasks', label: 'Checklist', icon: CheckSquare, badge: openTasks },
+        { id: 'shifts', label: 'Clock in / out', short: 'Clock', icon: Clock }
+      ];
+      return (
+        <WorkspaceShell kind="Panel" nav={panelNav} active={panelSection} onNavigate={setPanelSection} {...shellProps}>
           <PanelManager
+            section={panelSection}
+            onNavigate={setPanelSection}
             settings={settings}
             orders={orders}
             orderItems={orderItems}
@@ -349,193 +189,84 @@ export const App: React.FC = () => {
             menuItems={menuItems}
             categories={categories}
             menuVariants={menuVariants}
-            onStateChange={() => setStateVersion((v) => v + 1)}
+            onStateChange={refresh}
           />
-        ) : !isAdminView && !isPanelView ? (
-          /* Public Customer Page (chth.cafe) - Menu & Ordering */
-          <PublicMenu
-            settings={settings}
-            categories={categories}
-            menuItems={menuItems}
-            menuVariants={menuVariants}
-            onOrderCreated={() => setStateVersion((v) => v + 1)}
-          />
-        ) : !isAdminAuthed ? (
-          /* Admin Password Authentication Gate */
-          <div className="max-w-md mx-auto py-16 animate-scale-up">
-            <div className="glass-panel-classy p-8 rounded-3xl space-y-6">
-              <div className="text-center space-y-2">
-                <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center mx-auto mb-3 shadow-lg brand-glow">
-                  <Lock className="w-7 h-7" />
-                </div>
-                <h2 className="text-2xl font-black text-zinc-100">{settings.cafeName} {isPanelView ? 'Daily Panel' : 'Admin'}</h2>
-                <p className="text-zinc-400 text-xs max-w-xs mx-auto">
-                  {isPanelView ? 'Enter your panel password to manage orders, tasks, and shifts.' : 'Enter your admin password to manage finances, menu, stock, staff, and settings.'}
-                </p>
+        </WorkspaceShell>
+      );
+    }
+
+    const lowStock = stockItems.filter(i => i.quantity <= i.minThreshold).length;
+    const adminNav: NavItem<AdminTab>[] = [
+      { id: 'financials', label: 'Finances', icon: TrendingUp, group: 'Business' },
+      { id: 'menu_admin', label: 'Menu', icon: UtensilsCrossed, group: 'Catalogue' },
+      { id: 'stock', label: 'Stock', icon: Boxes, group: 'Catalogue', badge: lowStock },
+      { id: 'staff', label: 'Staff & shifts', short: 'Staff', icon: Users, group: 'Team' },
+      { id: 'tasks', label: 'Checklist', short: 'Tasks', icon: CheckSquare, group: 'Team' },
+      { id: 'settings', label: 'Settings', icon: Settings, group: 'Café', tab: false }
+    ];
+    return (
+      <WorkspaceShell
+        kind="Admin"
+        nav={adminNav}
+        active={adminTab}
+        onNavigate={setAdminTab}
+        mobileActions={<IconButton label="Settings" variant={adminTab === 'settings' ? 'tonal' : 'ghost'} onClick={() => setAdminTab('settings')}><Settings /></IconButton>}
+        {...shellProps}
+      >
+        {adminTab === 'financials' && <FinancialTracker settings={settings} orders={orders} expenses={expenses} menuItems={menuItems} onFinancialsUpdated={refresh} />}
+        {adminTab === 'tasks' && <TaskManager tasks={tasksList} staffList={staffList} onTasksUpdated={refresh} />}
+        {adminTab === 'menu_admin' && <MenuAdmin settings={settings} categories={categories} menuItems={menuItems} menuVariants={menuVariants} onMenuUpdated={refresh} />}
+        {adminTab === 'stock' && <StockManagement settings={settings} stockItems={stockItems} onStockUpdated={refresh} />}
+        {adminTab === 'staff' && <TimeTracker settings={settings} staffList={staffList} shifts={shifts} onShiftUpdated={refresh} />}
+        {adminTab === 'settings' && <SettingsPanel settings={settings} onSettingsUpdated={refresh} />}
+      </WorkspaceShell>
+    );
+  }
+
+  /* ---------------------------------------------------------- Public menu */
+  return (
+    <div className="app-shell app-menu min-h-dvh bg-zinc-950 text-zinc-100 flex flex-col justify-between selection:bg-amber-500 selection:text-zinc-950 font-sans antialiased">
+      <header className="sticky top-0 z-40 bg-zinc-950/80 backdrop-blur-2xl border-b border-zinc-800/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            {settings.logoUrl && failedLogoUrl !== settings.logoUrl ? (
+              <img
+                src={settings.logoUrl}
+                alt={settings.cafeName}
+                onError={() => setFailedLogoUrl(settings.logoUrl)}
+                className="w-9 h-9 rounded-xl object-cover ring-2 ring-amber-500/30 shadow-md"
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center font-extrabold shadow-lg brand-bg">
+                <Coffee className="w-5 h-5 text-zinc-950" />
               </div>
-
-              {authError && (
-                <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
-                  <span>{authError}</span>
-                </div>
-              )}
-
-              <form aria-busy={authLoading} onSubmit={handleAdminLogin} className="space-y-4">
-                <div>
-                  <label htmlFor="admin-password" className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-                    {isPanelView ? 'Panel Password' : 'Admin Password'}
-                  </label>
-                  <input
-                    id="admin-password"
-                    autoComplete="current-password"
-                    type="password"
-                    placeholder="••••••••••••"
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    className="w-full px-4 py-3 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-zinc-100 text-sm focus:outline-none focus:border-amber-500 transition"
-                    autoFocus
-                    required
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full py-3 rounded-2xl btn-brand font-extrabold text-zinc-950 text-xs uppercase tracking-wider shadow-xl cursor-pointer"
-                >
-                  {authLoading ? 'Checking access…' : 'Unlock Workspace'}
-                </button>
-              </form>
+            )}
+            <div>
+              <span className="font-black text-sm sm:text-base text-zinc-100 block leading-tight tracking-tight">{settings.cafeName}</span>
+              <span className="text-[10px] text-zinc-400 font-medium block">A little pause.</span>
             </div>
           </div>
-        ) : (
-          /* Admin Dashboard Workspace Views (Authenticated) */
-          <div className="pb-20 xl:pb-0">
-            {/* Fixed Mobile Admin Navigation Bar (Bottom Docked) */}
-            <nav aria-label="Admin sections" className="admin-tabbar xl:hidden fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800/80 p-1.5 shadow-2xl grid grid-cols-5 gap-1">
-              <button
-                type="button"
-                aria-current={adminTab === 'financials' ? 'page' : undefined}
-                onClick={() => setAdminTab('financials')}
-                className={`min-h-12 py-2 px-1 rounded-xl font-bold text-[11px] justify-center text-center flex flex-col items-center gap-0.5 cursor-pointer transition ${
-                  adminTab === 'financials' ? 'btn-brand text-zinc-950 shadow-md' : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                <TrendingUp className="w-4 h-4" />
-                Finances
-              </button>
-              <button
-                type="button"
-                aria-current={adminTab === 'tasks' ? 'page' : undefined}
-                onClick={() => setAdminTab('tasks')}
-                className={`min-h-12 py-2 px-1 rounded-xl font-bold text-[11px] justify-center text-center flex flex-col items-center gap-0.5 cursor-pointer transition ${
-                  adminTab === 'tasks' ? 'btn-brand text-zinc-950 shadow-md' : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                <CheckSquare className="w-4 h-4" />
-                Tasks
-              </button>
-              <button
-                type="button"
-                aria-current={adminTab === 'menu_admin' ? 'page' : undefined}
-                onClick={() => setAdminTab('menu_admin')}
-                className={`min-h-12 py-2 px-1 rounded-xl font-bold text-[11px] justify-center text-center flex flex-col items-center gap-0.5 cursor-pointer transition ${
-                  adminTab === 'menu_admin' ? 'btn-brand text-zinc-950 shadow-md' : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                <UtensilsCrossed className="w-4 h-4" />
-                Menu
-              </button>
-              <button
-                type="button"
-                aria-current={adminTab === 'stock' ? 'page' : undefined}
-                onClick={() => setAdminTab('stock')}
-                className={`min-h-12 py-2 px-1 rounded-xl font-bold text-[11px] justify-center text-center flex flex-col items-center gap-0.5 cursor-pointer transition ${
-                  adminTab === 'stock' ? 'btn-brand text-zinc-950 shadow-md' : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                <Boxes className="w-4 h-4" />
-                Stock
-              </button>
-              <button
-                type="button"
-                aria-current={adminTab === 'staff' ? 'page' : undefined}
-                onClick={() => setAdminTab('staff')}
-                className={`min-h-12 py-2 px-1 rounded-xl font-bold text-[11px] justify-center text-center flex flex-col items-center gap-0.5 cursor-pointer transition ${
-                  adminTab === 'staff' ? 'btn-brand text-zinc-950 shadow-md' : 'text-zinc-400 hover:text-zinc-200'
-                }`}
-              >
-                <Clock className="w-4 h-4" />
-                Staff
-              </button>
-            </nav>
+          <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            aria-label="Toggle Theme"
+            className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-amber-400 border border-zinc-800 transition cursor-pointer shadow-sm flex items-center gap-1.5"
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
+          </button>
+        </div>
+      </header>
 
-            {adminTab === 'financials' && (
-              <FinancialTracker
-                settings={settings}
-                orders={orders}
-                expenses={expenses}
-                menuItems={menuItems}
-                onFinancialsUpdated={() => setStateVersion((v) => v + 1)}
-              />
-            )}
-
-            {adminTab === 'tasks' && (
-              <TaskManager
-                tasks={tasksList}
-                staffList={staffList}
-                onTasksUpdated={() => setStateVersion((v) => v + 1)}
-              />
-            )}
-
-            {adminTab === 'menu_admin' && (
-              <MenuAdmin
-                settings={settings}
-                categories={categories}
-                menuItems={menuItems}
-                menuVariants={menuVariants}
-                onMenuUpdated={() => setStateVersion((v) => v + 1)}
-              />
-            )}
-
-            {adminTab === 'stock' && (
-              <StockManagement
-                settings={settings}
-                stockItems={stockItems}
-                onStockUpdated={() => setStateVersion((v) => v + 1)}
-              />
-            )}
-
-            {adminTab === 'staff' && (
-              <TimeTracker
-                settings={settings}
-                staffList={staffList}
-                shifts={shifts}
-                onShiftUpdated={() => setStateVersion((v) => v + 1)}
-              />
-            )}
-
-            {adminTab === 'settings' && (
-              <SettingsPanel
-                settings={settings}
-                onSettingsUpdated={() => setStateVersion((v) => v + 1)}
-              />
-            )}
-          </div>
-        )}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 w-full">
+        {store.pendingSaves > 0 && <p role="status" className="mb-4 rounded-xl border border-amber-500/30 p-3 text-amber-400">Saving {store.pendingSaves} change(s)…</p>}
+        {store.saveError && <div role="alert" className="mb-4 rounded-xl border border-rose-500/40 p-4 text-rose-300">{store.saveError}<button type="button" onClick={() => store.dismissSaveError()} className="ml-4 underline">Dismiss</button></div>}
+        <PublicMenu settings={settings} categories={categories} menuItems={menuItems} menuVariants={menuVariants} onOrderCreated={refresh} />
       </main>
 
-      {/* Footer */}
       <footer className="bg-zinc-950 border-t border-zinc-900 py-5 text-center text-xs text-zinc-500 mt-8">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p>© {new Date().getFullYear()} {settings.cafeName}. All rights reserved.</p>
-          {!isAdminView && !isPanelView ? <span className="cafe-footer-note">See you at the café.</span> : <div className="flex items-center gap-4 text-zinc-500 text-[11px]">
-            <span className="flex items-center gap-1 text-emerald-400 font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> Live System Active
-            </span>
-            <span>Cloudflare Workers & D1</span>
-          </div>}
+          <span className="cafe-footer-note">See you at the café.</span>
         </div>
       </footer>
     </div>
