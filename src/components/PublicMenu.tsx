@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Coffee, GlassWater, Leaf, Cake, Utensils, Search, Plus, Minus, ShoppingBag, CheckCircle2, X, MapPin, Phone, ChevronRight, Dice5, Heart, ArrowUp, ArrowUpRight, SlidersHorizontal } from 'lucide-react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Coffee, GlassWater, Leaf, Cake, Utensils, Search, Plus, Minus, ShoppingBag, CheckCircle2, X, MapPin, Phone, ChevronRight, Heart, ArrowUp, SlidersHorizontal, Sparkles, Shuffle, type LucideIcon } from 'lucide-react';
 import { CategorySelect, MenuItemSelect, MenuVariantSelect, SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { getOpeningStatus } from '../utils/openingHours';
@@ -22,18 +22,8 @@ interface CartItem {
   unitPrice: number;
 }
 
-const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  Coffee: <Coffee size={16} />, GlassWater: <GlassWater size={16} />,
-  Leaf: <Leaf size={16} />, Cake: <Cake size={16} />, Utensils: <Utensils size={16} />
-};
-
-function ItemPhoto({ item }: { item: MenuItemSelect }) {
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  if (!item.imageUrl || failedUrl === item.imageUrl) return null;
-  return <img src={item.imageUrl} alt={item.name} loading="lazy" decoding="async"
-    onError={() => setFailedUrl(item.imageUrl)}
-    className="menu-photo h-20 w-20 sm:h-24 sm:w-24 object-cover shrink-0" />;
-}
+const CATEGORY_ICONS: Record<string, LucideIcon> = { Coffee, GlassWater, Leaf, Cake, Utensils };
+const categoryIcon = (name?: string | null) => CATEGORY_ICONS[name || 'Coffee'] || Coffee;
 
 const SAVED_ITEMS_KEY = 'chth_menu_saved_items';
 
@@ -46,15 +36,57 @@ function readSavedItems(): string[] {
   }
 }
 
-function CupSketch() {
-  return <svg viewBox="0 0 160 150" fill="none" aria-hidden="true" className="cup-sketch">
+const reducedMotion = () => document.documentElement.dataset.motion === 'reduced' || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// A stable hue per item, so photo-less items still get their own colour swatch.
+const hueFor = (text: string) => [...text].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) % 360, 17);
+
+function greetingFor(now: Date, timeZone: string) {
+  let hour = now.getHours();
+  try { hour = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone }).format(now)); } catch { /* Fall back to device time. */ }
+  if (hour < 5) return 'Up late?';
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function ItemArt({ item, Icon, large = false }: { item: MenuItemSelect; Icon: LucideIcon; large?: boolean }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (item.imageUrl && failedUrl !== item.imageUrl) {
+    return <img src={item.imageUrl} alt="" loading="lazy" decoding="async" onError={() => setFailedUrl(item.imageUrl)} className="pm-art-photo" />;
+  }
+  return <div className="pm-art-swatch" style={{ '--pm-hue': hueFor(item.name) } as React.CSSProperties} aria-hidden="true">
+    <Icon size={large ? 56 : 34} />
+    <span>{item.name.split(/\s+/).slice(0, 2).map(word => word[0]).join('')}</span>
+  </div>;
+}
+
+function SteamingCup() {
+  return <svg viewBox="0 0 160 150" fill="none" aria-hidden="true" className="pm-cup">
     <g stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path className="pm-steam" d="M57 36c-13-12 12-17 1-30" />
+      <path className="pm-steam" d="M79 37c-13-12 12-17 1-30" />
+      <path className="pm-steam" d="M98 36c-11-9 8-14 2-24" />
       <path d="M32 57c8-8 70-8 80 0l-7 45c-2 22-65 23-67 0l-6-45Z" />
       <ellipse cx="72" cy="57" rx="40" ry="9" />
-      <path d="M111 66c38-12 39 39-4 32M25 118c18 15 79 16 102-1M57 36c-13-12 12-17 1-30M79 37c-13-12 12-17 1-30M98 36c-11-9 8-14 2-24" />
-      <path d="m68 80 4 5 4-5M55 76v3M89 76v3M20 48l-8-5M132 42l8-7M140 56l10-2" />
+      <path d="M111 66c38-12 39 39-4 32M25 118c18 15 79 16 102-1" />
+      <path d="m68 80 4 5 4-5M55 76v3M89 76v3" />
     </g>
   </svg>;
+}
+
+function Confetti({ burst }: { burst: number }) {
+  if (!burst) return null;
+  return <div key={burst} className="pm-confetti" aria-hidden="true">
+    {Array.from({ length: 28 }, (_, index) => {
+      const angle = (index / 28) * Math.PI * 2;
+      const distance = 120 + (index % 5) * 34;
+      return <i key={index} style={{
+        '--x': `${Math.cos(angle) * distance}px`, '--y': `${Math.sin(angle) * distance - 80}px`,
+        '--r': `${(index * 47) % 360}deg`, '--h': `${(index * 53) % 360}`
+      } as React.CSSProperties} />;
+    })}
+  </div>;
 }
 
 export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, menuItems, menuVariants, onOrderCreated }) => {
@@ -63,16 +95,17 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
   });
   const [dietaryFilter, setDietaryFilter] = useState('');
   const [excludedAllergen, setExcludedAllergen] = useState('');
-  const [selectedCatId, setSelectedCatId] = useState('all');
+  const [activeSectionId, setActiveSectionId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [onlyInStock, setOnlyInStock] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [savedItemIds, setSavedItemIds] = useState<string[]>(readSavedItems);
   const [savedOnly, setSavedOnly] = useState(false);
-  const [suggestedId, setSuggestedId] = useState<string | null>(null);
-  const [pickNumber, setPickNumber] = useState(0);
-  const [lastAddedId, setLastAddedId] = useState<string | null>(null);
+  const [heartBurst, setHeartBurst] = useState<{ id: string; n: number } | null>(null);
+  const [spin, setSpin] = useState<{ phase: 'idle' | 'spinning' | 'landed'; itemId: string | null; tick: number }>({ phase: 'idle', itemId: null, tick: 0 });
+  const [lastAdded, setLastAdded] = useState<{ id: string; n: number } | null>(null);
   const [activeItem, setActiveItem] = useState<MenuItemSelect | null>(null);
+  const [detailQuantity, setDetailQuantity] = useState(1);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, MenuVariantSelect>>({});
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -83,13 +116,20 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
   const [notice, setNotice] = useState('');
   const [orderError, setOrderError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confetti, setConfetti] = useState(0);
   const [now, setNow] = useState(() => new Date());
   const submittingRef = useRef(false);
   const submissionRef = useRef<{ signature: string; id: string } | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout>>();
-  const categoryBarRef = useRef<HTMLElement>(null);
-  const resultsRef = useRef<HTMLDivElement>(null);
   const addedTimer = useRef<ReturnType<typeof setTimeout>>();
+  const spinTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const confettiTimer = useRef<ReturnType<typeof setTimeout>>();
+  const railRef = useRef<HTMLElement>(null);
+  const indicatorRef = useRef<HTMLSpanElement>(null);
+  const cartBarRef = useRef<HTMLButtonElement>(null);
+  const previousCartCount = useRef(0);
+  // While a rail tap scrolls the page, scroll-spy would flick through every section on the way; hold it on the target.
+  const jumpTarget = useRef<{ id: string; until: number } | null>(null);
 
   useEffect(() => {
     try { localStorage.setItem(SAVED_ITEMS_KEY, JSON.stringify(savedItemIds)); } catch { /* Saving still works for this visit. */ }
@@ -104,24 +144,12 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
       clearInterval(timer);
       clearTimeout(noticeTimer.current);
       clearTimeout(addedTimer.current);
+      clearTimeout(confettiTimer.current);
+      spinTimers.current.forEach(clearTimeout);
       window.removeEventListener('focus', updateTime);
       document.removeEventListener('visibilitychange', updateTime);
     };
   }, []);
-
-  useEffect(() => {
-    if (selectedCatId !== 'all' && !categories.some(category => category.id === selectedCatId)) setSelectedCatId('all');
-  }, [categories, selectedCatId]);
-
-  useEffect(() => {
-    const selected = categoryBarRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]');
-    const scroller = selected?.parentElement;
-    if (selected && scroller) scroller.scrollLeft = selected.offsetLeft - scroller.offsetLeft - (scroller.clientWidth - selected.clientWidth) / 2;
-    // Switching category from deep in the list would strand the reader mid-page; start them at the top of the new list.
-    const railBottom = categoryBarRef.current?.getBoundingClientRect().bottom;
-    const resultsTop = resultsRef.current?.getBoundingClientRect().top;
-    if (railBottom !== undefined && resultsTop !== undefined && resultsTop < railBottom) window.scrollTo({ top: window.scrollY + resultsTop - railBottom - 12 });
-  }, [selectedCatId]);
 
   // Refresh an existing cart after menu changes, while keeping it fixed during submission.
   useEffect(() => {
@@ -136,6 +164,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
   }, [menuItems, menuVariants, isSubmitting]);
 
   const opening = getOpeningStatus(settings.openHours, now, settings.timeZone || 'Asia/Tehran');
+  const greeting = greetingFor(now, settings.timeZone || 'Asia/Tehran');
   const money = (amount: number) => `${settings.currency}${amount.toFixed(2).replace(/\.00$/, '')}`;
   const query = searchQuery.trim().toLocaleLowerCase();
   const matchingItems = menuItems.filter(item =>
@@ -147,17 +176,82 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
   );
   const orderedCategories = [...categories].sort((a, b) => a.displayOrder - b.displayOrder);
   const sections = orderedCategories
-    .filter(category => selectedCatId === 'all' || selectedCatId === category.id)
-    .map(category => ({ id: category.id, name: category.name, items: matchingItems.filter(item => item.categoryId === category.id) }))
+    .map(category => ({ id: category.id, name: category.name, Icon: categoryIcon(category.icon), items: matchingItems.filter(item => item.categoryId === category.id) }))
     .filter(section => section.items.length > 0);
   const uncategorizedItems = matchingItems.filter(item => !categories.some(category => category.id === item.categoryId));
-  if (selectedCatId === 'all' && uncategorizedItems.length) sections.push({ id: 'uncategorized', name: 'More from our menu', items: uncategorizedItems });
+  if (uncategorizedItems.length) sections.push({ id: 'uncategorized', name: 'More from our menu', Icon: Utensils, items: uncategorizedItems });
+  const sectionKey = sections.map(section => section.id).join('|');
+  const currentSectionId = sections.some(section => section.id === activeSectionId) ? activeSectionId : sections[0]?.id || '';
 
   const pickableItems = sections.flatMap(section => section.items).filter(item => item.isInStock);
-  const suggestedItem = pickableItems.find(item => item.id === suggestedId);
+  const spinItem = menuItems.find(item => item.id === spin.itemId);
   const savedCount = menuItems.filter(item => savedItemIds.includes(item.id)).length;
   const activeFilterCount = (dietaryFilter ? 1 : 0) + (excludedAllergen ? 1 : 0);
-  const resetFilters = () => { setSearchQuery(''); setSelectedCatId('all'); setOnlyInStock(false); setSavedOnly(false); setDietaryFilter(''); setExcludedAllergen(''); };
+  const resetFilters = () => { setSearchQuery(''); setOnlyInStock(false); setSavedOnly(false); setDietaryFilter(''); setExcludedAllergen(''); };
+  const itemIcon = (item: MenuItemSelect) => sections.find(section => section.items.includes(item))?.Icon || categoryIcon(categories.find(category => category.id === item.categoryId)?.icon);
+  const hasVariants = (item: MenuItemSelect) => menuVariants.some(variant => variant.menuItemId === item.id);
+
+  // Scroll-spy: the active chip follows whichever section sits under the sticky rail.
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const railBottom = railRef.current?.getBoundingClientRect().bottom ?? 0;
+      const held = jumpTarget.current;
+      if (held && Date.now() < held.until) {
+        const top = document.getElementById(`section-${held.id}`)?.getBoundingClientRect().top;
+        if (top === undefined || Math.abs(top - railBottom) > 24) return;
+      }
+      jumpTarget.current = null;
+      let current = sections[0]?.id || '';
+      for (const section of sections) {
+        const top = document.getElementById(`section-${section.id}`)?.getBoundingClientRect().top;
+        if (top !== undefined && top - railBottom <= 48) current = section.id;
+      }
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) current = sections[sections.length - 1]?.id || current;
+      setActiveSectionId(current);
+    };
+    const onScroll = () => { if (!frame) frame = requestAnimationFrame(update); };
+    update();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onScroll); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sectionKey]);
+
+  // Slide the rail indicator under the active chip, and keep that chip in view.
+  useLayoutEffect(() => {
+    const rail = railRef.current;
+    const indicator = indicatorRef.current;
+    const chip = rail?.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!rail || !indicator) return;
+    if (!chip) { indicator.style.opacity = '0'; return; }
+    indicator.style.opacity = '1';
+    indicator.style.width = `${chip.offsetWidth}px`;
+    indicator.style.transform = `translateX(${chip.offsetLeft}px)`;
+    const scroller = chip.parentElement;
+    if (scroller) scroller.scrollTo({ left: chip.offsetLeft - (scroller.clientWidth - chip.offsetWidth) / 2, behavior: reducedMotion() || !indicator.dataset.ready ? 'auto' : 'smooth' });
+    // The first placement snaps; later moves glide.
+    requestAnimationFrame(() => { indicator.dataset.ready = 'true'; });
+  }, [currentSectionId, sectionKey]);
+
+  // The order bar gives a small bounce whenever something new lands in it.
+  const cartCount = cart.reduce((sum, line) => sum + line.quantity, 0);
+  useEffect(() => {
+    if (cartCount > previousCartCount.current && previousCartCount.current > 0 && !reducedMotion()) {
+      cartBarRef.current?.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.05)' }, { transform: 'scale(1)' }], { duration: 320, easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' });
+    }
+    previousCartCount.current = cartCount;
+  }, [cartCount]);
+
+  const jumpTo = (sectionId: string) => {
+    const target = document.getElementById(`section-${sectionId}`);
+    const railBottom = railRef.current?.getBoundingClientRect().bottom ?? 0;
+    if (!target) return;
+    jumpTarget.current = { id: sectionId, until: Date.now() + 1200 };
+    setActiveSectionId(sectionId);
+    window.scrollTo({ top: window.scrollY + target.getBoundingClientRect().top - railBottom - 8, behavior: reducedMotion() ? 'auto' : 'smooth' });
+  };
 
   const announce = (message: string) => {
     clearTimeout(noticeTimer.current);
@@ -167,47 +261,62 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
   const toggleSaved = (item: MenuItemSelect) => {
     const wasSaved = savedItemIds.includes(item.id);
     setSavedItemIds(previous => previous.includes(item.id) ? previous.filter(id => id !== item.id) : [...previous, item.id]);
+    if (!wasSaved) setHeartBurst(previous => ({ id: item.id, n: (previous?.n || 0) + 1 }));
     announce(wasSaved ? `${item.name} removed from your favorites` : `${item.name} saved for later`);
   };
-  const pickForMe = () => {
-    const alternatives = pickableItems.filter(item => item.id !== suggestedId);
+  const spinForMe = () => {
+    if (spin.phase === 'spinning' || !pickableItems.length) return;
+    const alternatives = pickableItems.filter(item => item.id !== spin.itemId);
     const pool = alternatives.length ? alternatives : pickableItems;
-    if (!pool.length) return;
-    const item = pool[Math.floor(Math.random() * pool.length)];
-    setSuggestedId(item.id);
-    setPickNumber(previous => previous + 1);
-    announce(`The menu picked ${item.name}. Add it or try another pick.`);
+    const winner = pool[Math.floor(Math.random() * pool.length)];
+    spinTimers.current.forEach(clearTimeout);
+    spinTimers.current = [];
+    const land = () => {
+      setSpin(previous => ({ phase: 'landed', itemId: winner.id, tick: previous.tick + 1 }));
+      announce(`The reel landed on ${winner.name}. Add it or spin again.`);
+    };
+    if (reducedMotion() || pickableItems.length < 2) { land(); return; }
+    // The reel slows like a real one: each tick waits a little longer than the last.
+    let elapsed = 0;
+    for (let index = 0; index < 11; index++) {
+      elapsed += 45 * Math.pow(1.2, index);
+      const shown = pickableItems[Math.floor(Math.random() * pickableItems.length)];
+      spinTimers.current.push(setTimeout(() => setSpin(previous => ({ phase: 'spinning', itemId: shown.id, tick: previous.tick + 1 })), elapsed));
+    }
+    setSpin(previous => ({ ...previous, phase: 'spinning' }));
+    spinTimers.current.push(setTimeout(land, elapsed + 160));
   };
-  const addItem = (item: MenuItemSelect, variants: MenuVariantSelect[]) => {
+  const addItem = (item: MenuItemSelect, variants: MenuVariantSelect[], quantity = 1) => {
     if (submittingRef.current || !menuItems.find(current => current.id === item.id)?.isInStock) return;
     const id = `${item.id}-${variants.map(variant => variant.id).sort().join('-') || 'default'}`;
     const unitPrice = Number((item.basePrice + variants.reduce((sum, variant) => sum + variant.priceModifier, 0)).toFixed(2));
     setCart(previous => previous.some(line => line.id === id)
-      ? previous.map(line => line.id === id ? { ...line, quantity: line.quantity + 1 } : line)
-      : [...previous, { id, item, variants, quantity: 1, unitPrice }]);
+      ? previous.map(line => line.id === id ? { ...line, quantity: line.quantity + quantity } : line)
+      : [...previous, { id, item, variants, quantity, unitPrice }]);
     setOrderError('');
     clearTimeout(addedTimer.current);
-    setLastAddedId(item.id);
-    addedTimer.current = setTimeout(() => setLastAddedId(null), 1600);
-    announce(`${item.name} added to your order`);
+    setLastAdded(previous => ({ id: item.id, n: (previous?.n || 0) + 1 }));
+    addedTimer.current = setTimeout(() => setLastAdded(null), 900);
+    announce(quantity > 1 ? `${quantity} × ${item.name} added to your order` : `${item.name} added to your order`);
   };
   const updateQuantity = (id: string, delta: number) => {
     if (submittingRef.current) return;
     setCart(previous => previous.map(line => line.id === id ? { ...line, quantity: line.quantity + delta } : line).filter(line => line.quantity > 0));
     setOrderError('');
   };
-  const openCustomize = (item: MenuItemSelect) => {
-    if (!item.isInStock || submittingRef.current) return;
+  const openDetail = (item: MenuItemSelect) => {
+    if (submittingRef.current) return;
     const selections: Record<string, MenuVariantSelect> = {};
     menuVariants.filter(variant => variant.menuItemId === item.id).forEach(variant => {
       if (!selections[variant.groupName]) selections[variant.groupName] = variant;
     });
     setSelectedVariants(selections);
+    setDetailQuantity(1);
     setActiveItem(item);
   };
+  const quickAdd = (item: MenuItemSelect) => hasVariants(item) ? openDetail(item) : addItem(item, []);
   const customizedPrice = activeItem
     ? activeItem.basePrice + Object.values(selectedVariants).reduce((sum, variant) => sum + variant.priceModifier, 0) : 0;
-  const cartCount = cart.reduce((sum, line) => sum + line.quantity, 0);
   const subtotal = Number(cart.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0).toFixed(2));
   const tax = Number((subtotal * settings.taxRate / 100).toFixed(2));
   const total = Number((subtotal + tax).toFixed(2));
@@ -248,6 +357,11 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
       setCustomerName('');
       setTableNumber('');
       submissionRef.current = null;
+      if (!reducedMotion()) {
+        setConfetti(previous => previous + 1);
+        clearTimeout(confettiTimer.current);
+        confettiTimer.current = setTimeout(() => setConfetti(0), 1400);
+      }
       announce(`Order ${order.orderNumber} received. Please pay at the café.`);
       onOrderCreated?.();
     } catch (error) {
@@ -260,147 +374,154 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
   };
 
   return (
-    <div className="public-menu menu-zine space-y-7 pb-28" id="menu-top">
-      <div role="status" aria-live="polite" aria-atomic="true" className={notice ? 'menu-notice fixed top-20 left-4 right-4 sm:left-auto sm:right-6 z-[10000] rounded-2xl bg-zinc-900 border border-zinc-800 p-4 shadow-lg flex items-center gap-3 text-sm text-zinc-100' : 'sr-only'}>
-        {notice && <CheckCircle2 className="brand-text shrink-0" size={20} />}{notice}
-      </div>
+    <div className="public-menu pm" id="menu-top">
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">{notice}</div>
+      {notice && !activeItem && !isCartOpen && <div key={notice} className="pm-toast" aria-hidden="true"><CheckCircle2 size={18} />{notice}</div>}
+      <Confetti burst={confetti} />
 
-      <section aria-label="Café information" className="menu-hero">
-        <div className="menu-issue-line"><span>{settings.cafeName} / café menu</span><span>Take your time.</span></div>
-        <div className="menu-cover">
-          <div className="menu-cover-copy">
-            <h1>{settings.cafeName}<span className="menu-cover-aside">a little pause.</span></h1>
-            <p className="menu-cover-caption">Find your usual. Find a new usual.</p>
-            <div className="menu-hours-line">
-              <span className={`menu-open-stamp ${opening.isOpen ? 'is-open' : ''}`}>{opening.label}</span>
-              <span>{opening.detail}</span>
-            </div>
+      <section aria-label="Café information" className="pm-hero">
+        <div className="pm-hero-copy">
+          <p className="pm-eyebrow"><Sparkles size={14} />{greeting}</p>
+          <h1>{settings.cafeName}</h1>
+          <p className="pm-tagline">Find your usual. Find a new usual.</p>
+          <div className="pm-status">
+            <span className={`pm-open-pill ${opening.isOpen ? 'is-open' : ''}`}><i />{opening.label}</span>
+            <span>{opening.detail}</span>
           </div>
-          <div className="menu-cover-margin">
-            {settings.logoUrl ? <img src={settings.logoUrl} alt={settings.cafeName} className="menu-store-image" /> : <CupSketch />}
-            <div className="menu-pick-note">
-              <span className="menu-hand-note">The indecisive corner</span>
-              <p>Something different today?</p>
-              <button type="button" onClick={pickForMe} disabled={!pickableItems.length || isSubmitting} className="menu-pick-button" aria-label="Pick something for me">
-                <Dice5 key={pickNumber} className={pickNumber ? 'menu-dice-rolled' : ''} size={20} />{suggestedItem ? 'Pick again' : 'Pick for me'}<ArrowUpRight size={17} />
-              </button>
-              <span className="menu-pick-footnote">From available items in your current view.</span>
-            </div>
-          </div>
-        </div>
-        <div className="menu-cover-bottom">
-          <div className="menu-contact-links">
+          <div className="pm-contact">
             {settings.address && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(settings.address)}`} target="_blank" rel="noreferrer"><MapPin size={15} />{settings.address}</a>}
             {settings.contactPhone && <a href={`tel:${settings.contactPhone.replace(/[^+\d]/g, '')}`}><Phone size={15} />{settings.contactPhone}</a>}
           </div>
-          <button type="button" onClick={() => setIsCartOpen(true)} className="menu-order-ticket"><ShoppingBag size={17} />Your order<span>{cartCount.toString().padStart(2, '0')}</span></button>
+        </div>
+
+        <div className="pm-hero-side">
+          {settings.logoUrl ? <img src={settings.logoUrl} alt={settings.cafeName} className="pm-logo" /> : <SteamingCup />}
+          <div className={`pm-spin is-${spin.phase}`}>
+            <p className="pm-spin-label">Can’t decide?</p>
+            <div className="pm-reel" aria-hidden={spin.phase === 'spinning'}>
+              <span key={spin.tick} className="pm-reel-name">{spinItem ? spinItem.name : 'Let the menu choose'}</span>
+            </div>
+            {spin.phase === 'landed' && spinItem ? <div className="pm-spin-actions">
+              <span className="pm-spin-price">{money(spinItem.basePrice)}</span>
+              <button type="button" className="pm-button" disabled={isSubmitting} onClick={() => quickAdd(spinItem)}>{hasVariants(spinItem) ? 'Make it yours' : 'Add it'}<Plus size={16} /></button>
+              <button type="button" className="pm-icon-button" onClick={spinForMe} aria-label="Spin again"><Shuffle size={18} /></button>
+            </div> : <button type="button" className="pm-button pm-spin-button" onClick={spinForMe} disabled={!pickableItems.length || spin.phase === 'spinning' || isSubmitting}>
+              <Shuffle size={16} />{spin.phase === 'spinning' ? 'Spinning…' : 'Spin for me'}
+            </button>}
+          </div>
         </div>
       </section>
 
-      {suggestedItem && <aside key={`${suggestedItem.id}-${pickNumber}`} className="menu-recommendation" aria-label="The menu’s pick">
-        <div className="menu-recommendation-label"><Dice5 size={20} /><span>Leave it to chance</span></div>
-        <div className="menu-recommendation-copy"><h2>{suggestedItem.name}</h2>{suggestedItem.description && <p>{suggestedItem.description}</p>}</div>
-        <div className="menu-recommendation-actions">
-          <button type="button" disabled={isSubmitting} onClick={() => menuVariants.some(variant => variant.menuItemId === suggestedItem.id) ? openCustomize(suggestedItem) : addItem(suggestedItem, [])} className="menu-ink-button">{menuVariants.some(variant => variant.menuItemId === suggestedItem.id) ? 'Make it yours' : 'Add to my order'}<Plus size={16} /></button>
-          <button type="button" onClick={pickForMe} disabled={isSubmitting} className="menu-text-button"><Dice5 size={16} />Another pick</button>
-          <button type="button" aria-label="Dismiss recommendation" onClick={() => setSuggestedId(null)} className="menu-dismiss"><X size={18} /></button>
-        </div>
-      </aside>}
-
       {receipt && <OrderTracking receipt={receipt} onDismiss={() => { setReceipt(null); try { localStorage.removeItem('chth_order_receipt'); } catch {} }} />}
-      <div className="menu-tools flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
+
+      <div className="pm-tools">
+        <div className="pm-search">
+          <Search size={18} aria-hidden="true" />
           <label htmlFor="menu-search" className="sr-only">Search the menu</label>
-          <input id="menu-search" type="search" enterKeyHint="search" placeholder="Something on your mind?" value={searchQuery}
-            onChange={event => { if (!searchQuery && event.target.value) setSelectedCatId('all'); setSearchQuery(event.target.value); }}
-            onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}
-            className="w-full min-h-12 rounded-xl bg-zinc-900 border border-zinc-800 pl-11 pr-12 text-base text-zinc-100" />
-          {searchQuery && <button type="button" aria-label="Clear search" onClick={() => setSearchQuery('')} className="absolute right-1 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center text-zinc-400"><X size={18} /></button>}
+          <input id="menu-search" type="search" enterKeyHint="search" placeholder="What are you craving?" value={searchQuery}
+            onChange={event => setSearchQuery(event.target.value)}
+            onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
+          {searchQuery && <button type="button" aria-label="Clear search" onClick={() => setSearchQuery('')}><X size={18} /></button>}
         </div>
-        <button type="button" aria-pressed={onlyInStock} onClick={() => setOnlyInStock(value => !value)}
-          className={`min-h-11 rounded-xl border px-4 text-sm font-semibold ${onlyInStock ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-zinc-900 border-zinc-800 text-zinc-300'}`}>Available only</button>
-        <button type="button" aria-pressed={savedOnly} onClick={() => setSavedOnly(previous => !previous)} className={`menu-saved-toggle min-h-11 rounded-xl border px-4 text-sm font-semibold ${savedOnly ? 'is-selected' : ''}`}><Heart size={16} fill={savedOnly ? 'currentColor' : 'none'} />Saved <span>{savedCount}</span></button>
-        <button type="button" aria-expanded={filtersOpen} aria-controls="menu-filters" onClick={() => setFiltersOpen(open => !open)} className={`menu-filter-toggle min-h-11 rounded-xl border px-4 text-sm font-semibold ${activeFilterCount ? 'has-filters' : ''}`}><SlidersHorizontal size={16} />Filters{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button>
+        <div className="pm-toggles">
+          <button type="button" className="pm-chip" aria-pressed={onlyInStock} onClick={() => setOnlyInStock(value => !value)}>Available now</button>
+          <button type="button" className="pm-chip" aria-pressed={savedOnly} onClick={() => setSavedOnly(previous => !previous)}><Heart size={15} fill={savedOnly ? 'currentColor' : 'none'} />Saved<b>{savedCount}</b></button>
+          <button type="button" className={`pm-chip ${activeFilterCount ? 'has-filters' : ''}`} aria-expanded={filtersOpen} aria-controls="menu-filters" onClick={() => setFiltersOpen(open => !open)}><SlidersHorizontal size={15} />Filters{activeFilterCount > 0 && <b>{activeFilterCount}</b>}</button>
+        </div>
       </div>
 
-      {filtersOpen && <div id="menu-filters" className="menu-filters grid grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-3 mb-5 text-sm">
-        <label className="flex flex-col gap-1.5">Dietary preference<select value={dietaryFilter} onChange={e=>setDietaryFilter(e.target.value)} className="w-full sm:w-auto min-h-11 rounded-xl border border-zinc-700 bg-zinc-900 px-3"><option value="">All items</option>{['vegan','vegetarian','gluten-free','decaf','caffeine-free'].map(v=><option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}</select></label>
-        <label className="flex flex-col gap-1.5">Exclude allergen<select value={excludedAllergen} onChange={e=>setExcludedAllergen(e.target.value)} className="w-full sm:w-auto min-h-11 rounded-xl border border-zinc-700 bg-zinc-900 px-3"><option value="">No exclusion</option>{['milk','nuts','gluten','egg','soy'].map(v=><option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}</select></label>
-        <p className="col-span-2 w-full text-xs text-zinc-400">Labels are supplied by café staff. Ask staff about substitutions and cross-contact. Allergen exclusions hide items with unconfirmed labels.</p>
+      {filtersOpen && <div id="menu-filters" className="pm-filters">
+        <label>Dietary preference<select value={dietaryFilter} onChange={e => setDietaryFilter(e.target.value)}><option value="">All items</option>{['vegan', 'vegetarian', 'gluten-free', 'decaf', 'caffeine-free'].map(v => <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}</select></label>
+        <label>Exclude allergen<select value={excludedAllergen} onChange={e => setExcludedAllergen(e.target.value)}><option value="">No exclusion</option>{['milk', 'nuts', 'gluten', 'egg', 'soy'].map(v => <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}</select></label>
+        <p>Labels are supplied by café staff. Ask staff about substitutions and cross-contact. Allergen exclusions hide items with unconfirmed labels.</p>
       </div>}
-      <nav ref={categoryBarRef} aria-label="Menu categories" className="menu-categories sticky top-16 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-zinc-800 bg-zinc-950">
-        <div className="flex gap-2 overflow-x-auto no-scrollbar">
-          <button type="button" aria-pressed={selectedCatId === 'all'} onClick={() => setSelectedCatId('all')}
-            className={`shrink-0 min-h-11 rounded-xl px-4 text-sm font-semibold ${selectedCatId === 'all' ? 'btn-brand text-zinc-950' : 'bg-zinc-900 text-zinc-300'}`}>All <span className="opacity-70 ml-1">{matchingItems.length}</span></button>
-          {orderedCategories.map(category => <button key={category.id} type="button" aria-pressed={selectedCatId === category.id} onClick={() => setSelectedCatId(category.id)}
-            className={`shrink-0 min-h-11 flex items-center gap-2 rounded-xl px-4 text-sm font-semibold ${selectedCatId === category.id ? 'btn-brand text-zinc-950' : 'bg-zinc-900 text-zinc-300'}`}>
-            {CATEGORY_ICONS[category.icon || 'Coffee'] || CATEGORY_ICONS.Coffee}{category.name}<span className="opacity-70">{matchingItems.filter(item => item.categoryId === category.id).length}</span>
-          </button>)}
-        </div>
-      </nav>
 
-      <div ref={resultsRef}>
-      {sections.length === 0 ? <div className="rounded-2xl border border-zinc-800 py-12 text-center space-y-3">
-        <Coffee className="mx-auto text-zinc-500" size={32} /><h2 className="text-lg font-semibold text-zinc-100">{savedOnly && savedCount === 0 ? 'Your usuals start here.' : query ? `Nothing matches “${searchQuery.trim()}”.` : 'Nothing on this page yet.'}</h2>
-        <p className="text-sm text-zinc-400">{savedOnly && savedCount === 0 ? 'Tap a heart beside anything you like. It’ll be waiting here next time.' : query ? 'Try a shorter word, or clear your search and filters.' : 'Try another category or reset your filters.'}</p>
-        <button type="button" className="min-h-11 rounded-xl btn-brand px-5 font-semibold text-zinc-950" onClick={resetFilters}>Reset filters</button>
-      </div> : <div className="menu-sections space-y-9">
-        {sections.map((section, sectionIndex) => <section key={section.id} aria-labelledby={`category-${section.id}`} className="menu-section space-y-4">
-          <div className="menu-section-heading"><span className="menu-section-number">{(sectionIndex + 1).toString().padStart(2, '0')}</span><h2 id={`category-${section.id}`} className="text-2xl font-semibold text-zinc-100">{section.name}</h2><span className="menu-section-count">{section.items.length} things to try</span></div>
-          <div className="menu-ledger grid grid-cols-1 md:grid-cols-2">
-            {section.items.map(item => {
+      {sections.length > 0 && <nav ref={railRef} aria-label="Menu categories" className="pm-rail">
+        <div className="pm-rail-scroller">
+          <span ref={indicatorRef} className="pm-rail-indicator" aria-hidden="true" />
+          {sections.map(section => <a key={section.id} href={`#section-${section.id}`} aria-current={currentSectionId === section.id ? 'true' : undefined}
+            onClick={event => { event.preventDefault(); jumpTo(section.id); }} className="pm-rail-chip">
+            <span className="pm-rail-icon"><section.Icon size={16} /></span>{section.name}<small>{section.items.length}</small>
+          </a>)}
+        </div>
+      </nav>}
+
+      {sections.length === 0 ? <div className="pm-empty">
+        <Coffee size={36} aria-hidden="true" />
+        <h2>{savedOnly && savedCount === 0 ? 'Your usuals start here.' : query ? `Nothing matches “${searchQuery.trim()}”.` : 'Nothing on this page yet.'}</h2>
+        <p>{savedOnly && savedCount === 0 ? 'Tap a heart on anything you like. It’ll be waiting here next time.' : query ? 'Try a shorter word, or clear your search and filters.' : 'Try resetting your filters.'}</p>
+        <button type="button" className="pm-button" onClick={resetFilters}>Reset filters</button>
+      </div> : <div className="pm-sections">
+        {sections.map(section => <section key={section.id} id={`section-${section.id}`} aria-labelledby={`category-${section.id}`} className="pm-section">
+          <header className="pm-section-head">
+            <span className="pm-section-icon"><section.Icon size={22} /></span>
+            <h2 id={`category-${section.id}`}>{section.name}</h2>
+            <span className="pm-section-count">{section.items.length} to try</span>
+          </header>
+          <div className="pm-grid">
+            {section.items.map((item, index) => {
               const variants = menuVariants.filter(variant => variant.menuItemId === item.id);
               const simpleLine = cart.find(line => line.item.id === item.id && line.variants.length === 0);
               const quantity = cart.filter(line => line.item.id === item.id).reduce((sum, line) => sum + line.quantity, 0);
               const minimumModifiers = [...new Set(variants.map(variant => variant.groupName))].reduce((sum, group) => sum + Math.min(...variants.filter(variant => variant.groupName === group).map(variant => variant.priceModifier)), 0);
-              return <article key={item.id} className={`menu-card flex flex-col gap-4 ${!item.isInStock ? 'menu-card-unavailable' : ''} ${lastAddedId === item.id ? 'menu-card-just-added' : ''}`}>
-                <div className="menu-item-topline">
-                  <span className="menu-item-number">/{(menuItems.findIndex(current => current.id === item.id) + 1).toString().padStart(2, '0')}</span>
-                  <button type="button" className={`menu-save-button ${savedItemIds.includes(item.id) ? 'is-saved' : ''}`} aria-label={`${savedItemIds.includes(item.id) ? 'Unsave' : 'Save'} ${item.name}`} aria-pressed={savedItemIds.includes(item.id)} onClick={() => toggleSaved(item)}><Heart size={19} fill={savedItemIds.includes(item.id) ? 'currentColor' : 'none'} /></button>
-                </div>
-                <div className="flex gap-4 flex-1">
-                  <div className="flex-1 min-w-0">
-                    {(item.badge || !item.isInStock) && <div className="flex flex-wrap gap-2 mb-2 text-xs font-semibold">
-                      {item.badge && <span className="menu-item-badge">{item.badge}</span>}
-                      {!item.isInStock && <span className="text-rose-400">Sold out</span>}
-                    </div>}
-                    <h3 className="text-lg font-semibold text-zinc-100 leading-snug">{item.name}</h3>
-                    {item.description && <p className="text-sm text-zinc-400 mt-2 leading-relaxed">{item.description}</p>}
+              const saved = savedItemIds.includes(item.id);
+              const labels = item.dietaryLabels?.split(',').map(label => label.trim()).filter(Boolean) || [];
+              return <article key={item.id} className={`pm-card ${!item.isInStock ? 'is-sold-out' : ''} ${quantity > 0 ? 'is-in-order' : ''}`} style={{ '--pm-i': Math.min(index, 8) } as React.CSSProperties}>
+                <button type="button" className="pm-card-open" onClick={() => openDetail(item)} aria-label={`${item.name}, ${money(item.basePrice + minimumModifiers)}. View details`}>
+                  <div className="pm-art">
+                    <ItemArt item={item} Icon={section.Icon} />
+                    {item.badge && <span className="pm-badge">{item.badge}</span>}
+                    {!item.isInStock && <span className="pm-sold-out">Sold out</span>}
                   </div>
-                  <ItemPhoto item={item} />
-                </div>
-                <div className="menu-item-bottom flex flex-wrap items-center justify-between gap-3">
-                  <div><span className="text-lg font-semibold brand-text">{variants.length > 0 && <span className="text-xs text-zinc-400 mr-1">From</span>}{money(item.basePrice + minimumModifiers)}</span>
-                    {<span className="block text-xs text-zinc-400 mt-1">Allergens: {item.allergens || 'Not confirmed — ask staff'}{item.dietaryLabels ? ` · ${item.dietaryLabels}` : ''}</span>}
-                    {quantity > 0 && <span className="block text-xs text-zinc-400 mt-1">{quantity} in your order</span>}
+                  <div className="pm-card-body">
+                    <h3>{item.name}</h3>
+                    {item.description && <p>{item.description}</p>}
+                    {labels.length > 0 && <ul className="pm-tags">{labels.map(label => <li key={label}>{label}</li>)}</ul>}
                   </div>
-                  {lastAddedId === item.id && <span className="menu-added-stamp" aria-hidden="true">on the ticket ✓</span>}
-                  {variants.length > 0 ? <button type="button" onClick={() => openCustomize(item)} disabled={!item.isInStock || isSubmitting} className="min-h-11 px-4 rounded-xl btn-brand text-zinc-950 text-sm font-semibold inline-flex items-center gap-2"><Plus size={16} />Customize</button>
-                    : simpleLine ? <div className="flex items-center gap-2 rounded-xl border border-zinc-800">
-                      <button type="button" aria-label={`Remove one ${item.name}`} disabled={isSubmitting} onClick={() => updateQuantity(simpleLine.id, -1)} className="h-11 w-11 flex items-center justify-center text-zinc-300"><Minus size={16} /></button>
-                      <span className="min-w-5 text-center font-semibold text-zinc-100">{simpleLine.quantity}</span>
-                      <button type="button" aria-label={`Add one ${item.name}`} disabled={!item.isInStock || isSubmitting} onClick={() => updateQuantity(simpleLine.id, 1)} className="h-11 w-11 flex items-center justify-center brand-text"><Plus size={16} /></button>
-                    </div> : <button type="button" aria-label={`Add ${item.name}`} onClick={() => addItem(item, [])} disabled={!item.isInStock || isSubmitting} className="min-h-11 px-4 rounded-xl btn-brand text-zinc-950 text-sm font-semibold inline-flex items-center gap-2"><Plus size={16} />Add</button>}
+                </button>
+                <button type="button" className={`pm-heart ${saved ? 'is-saved' : ''}`} aria-label={`${saved ? 'Unsave' : 'Save'} ${item.name}`} aria-pressed={saved} onClick={() => toggleSaved(item)}>
+                  <Heart size={18} fill={saved ? 'currentColor' : 'none'} />
+                  {heartBurst?.id === item.id && <span key={heartBurst.n} className="pm-heart-burst" aria-hidden="true" />}
+                </button>
+                <div className="pm-card-foot">
+                  <span className="pm-price">{variants.length > 0 && <small>from</small>}{money(item.basePrice + minimumModifiers)}</span>
+                  {lastAdded?.id === item.id && <span key={lastAdded.n} className="pm-plus-one" aria-hidden="true">+1</span>}
+                  {simpleLine ? <div className="pm-stepper">
+                    <button type="button" aria-label={`Remove one ${item.name}`} disabled={isSubmitting} onClick={() => updateQuantity(simpleLine.id, -1)}><Minus size={16} /></button>
+                    <span>{simpleLine.quantity}</span>
+                    <button type="button" aria-label={`Add one ${item.name}`} disabled={!item.isInStock || isSubmitting} onClick={() => updateQuantity(simpleLine.id, 1)}><Plus size={16} /></button>
+                  </div> : <button type="button" className="pm-add" aria-label={variants.length ? `Customize ${item.name}` : `Add ${item.name}`} disabled={!item.isInStock || isSubmitting} onClick={() => quickAdd(item)}>
+                    <Plus size={20} />{quantity > 0 && <b>{quantity}</b>}
+                  </button>}
                 </div>
               </article>;
             })}
           </div>
         </section>)}
       </div>}
-      </div>
 
-      <div className="menu-endnote"><span className="menu-hand-note">Good things take a little pause.</span><button type="button" className="menu-text-button" onClick={() => document.getElementById('menu-top')?.scrollIntoView({ block: 'start', behavior: document.documentElement.dataset.motion === 'reduced' || window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })}>Back to the top<ArrowUp size={16} /></button></div>
+      <footer className="pm-endnote">
+        <span>Good things take a little pause.</span>
+        <button type="button" className="pm-link-button" onClick={() => document.getElementById('menu-top')?.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' })}>Back to the top<ArrowUp size={16} /></button>
+      </footer>
 
-      {cartCount > 0 && <div className="menu-cart-bar fixed left-4 right-4 z-40 md:left-auto md:right-6 md:w-96">
-        <button type="button" onClick={() => setIsCartOpen(true)} className="w-full min-h-14 p-4 rounded-2xl btn-brand text-zinc-950 font-semibold flex items-center justify-between gap-3 shadow-lg">
-          <span className="flex items-center gap-3"><ShoppingBag size={20} /><span>Your order · {cartCount}</span></span><span className="flex items-center gap-2">{money(total)}<ChevronRight size={18} /></span>
+      {cartCount > 0 && <div className="pm-cart-bar">
+        <button ref={cartBarRef} type="button" onClick={() => setIsCartOpen(true)}>
+          <span className="pm-cart-count"><ShoppingBag size={18} /><b>{cartCount}</b></span>
+          <span className="pm-cart-label">Your order</span>
+          <span className="pm-cart-total">{money(total)}<ChevronRight size={18} /></span>
         </button>
       </div>}
 
-      <Modal isOpen={!!activeItem} onClose={() => setActiveItem(null)} appearance="paper" title={<span className="text-lg font-semibold">{activeItem?.name}</span>}>
-        {activeItem && <div className="public-menu menu-customization space-y-6 text-sm">
+      <Modal isOpen={!!activeItem} onClose={() => setActiveItem(null)} appearance="paper" maxWidth="max-w-lg" title={<span className="text-lg font-semibold">{activeItem?.name}</span>}>
+        {activeItem && <div className="public-menu pm-detail space-y-5 text-sm">
+          <div className="pm-detail-art"><ItemArt item={activeItem} Icon={itemIcon(activeItem)} large /></div>
+          {activeItem.badge && <span className="pm-detail-badge">{activeItem.badge}</span>}
           {activeItem.description && <p className="text-zinc-400 leading-relaxed">{activeItem.description}</p>}
+          <dl className="pm-detail-facts">
+            <div><dt>Allergens</dt><dd>{activeItem.allergens || 'Not confirmed — ask staff'}</dd></div>
+            {activeItem.dietaryLabels && <div><dt>Dietary</dt><dd>{activeItem.dietaryLabels}</dd></div>}
+          </dl>
           {[...new Set(menuVariants.filter(variant => variant.menuItemId === activeItem.id).map(variant => variant.groupName))].map(group => <fieldset key={group}>
             <legend className="font-semibold text-zinc-100 mb-3">{group}</legend>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -410,10 +531,14 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
               </label>)}
             </div>
           </fieldset>)}
-          <div className="flex items-center justify-between gap-4 border-t border-zinc-800 pt-4">
-            <span className="text-xl font-semibold brand-text">{money(customizedPrice)}</span>
-            <button type="button" disabled={isSubmitting || !menuItems.find(item => item.id === activeItem.id)?.isInStock} onClick={() => { addItem(activeItem, Object.values(selectedVariants)); setActiveItem(null); }} className="min-h-12 rounded-xl btn-brand px-5 text-zinc-950 font-semibold">Add to your order</button>
-          </div>
+          {!activeItem.isInStock ? <p className="pm-detail-soldout">Sold out for now — check back soon.</p> : <div className="pm-detail-foot">
+            <div className="pm-stepper">
+              <button type="button" aria-label="One fewer" disabled={detailQuantity <= 1} onClick={() => setDetailQuantity(value => Math.max(1, value - 1))}><Minus size={16} /></button>
+              <span>{detailQuantity}</span>
+              <button type="button" aria-label="One more" disabled={detailQuantity >= 20} onClick={() => setDetailQuantity(value => Math.min(20, value + 1))}><Plus size={16} /></button>
+            </div>
+            <button type="button" disabled={isSubmitting || !menuItems.find(item => item.id === activeItem.id)?.isInStock} onClick={() => { addItem(activeItem, Object.values(selectedVariants), detailQuantity); setActiveItem(null); }} className="pm-button pm-detail-add">Add · {money(customizedPrice * detailQuantity)}</button>
+          </div>}
         </div>}
       </Modal>
 
