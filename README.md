@@ -26,7 +26,7 @@ Local apps:
 - Admin: http://admin.localhost:3000
 - Daily panel: http://panel.localhost:3000
 
-Vite runs on port 3000 and proxies `/api` to the local Worker on port 8787. Staff apps use their subdomains; `/admin` and `/panel` paths return 404.
+Vite runs on port 3000 and proxies `/api` to the local Worker on port 8787. The startup scripts enable `CAFE_DEV_PROXY` locally to preserve the staff subdomain through Wrangler; do not enable this binding in deployment. Staff apps use their subdomains; `/admin` and `/panel` paths return 404.
 
 | Command | Purpose |
 | --- | --- |

@@ -348,9 +348,9 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
 
         {/* Progress Ratio Bar Infographic */}
         <div className="w-full h-3 rounded-full bg-zinc-900 overflow-hidden border border-zinc-800 flex">
-          <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${(completedCount / Math.max(tasks.length, 1)) * 100}%` }} title="Completed" />
-          <div className="bg-amber-500 h-full transition-all duration-500" style={{ width: `${(inProgressCount / Math.max(tasks.length, 1)) * 100}%` }} title="In Progress" />
-          <div className="bg-zinc-700 h-full transition-all duration-500" style={{ width: `${(pendingCount / Math.max(tasks.length, 1)) * 100}%` }} title="Pending" />
+          <div className="bg-emerald-500 h-full transition-[width] duration-300" style={{ width: `${(completedCount / Math.max(tasks.length, 1)) * 100}%` }} title="Completed" />
+          <div className="bg-amber-500 h-full transition-[width] duration-300" style={{ width: `${(inProgressCount / Math.max(tasks.length, 1)) * 100}%` }} title="In Progress" />
+          <div className="bg-zinc-700 h-full transition-[width] duration-300" style={{ width: `${(pendingCount / Math.max(tasks.length, 1)) * 100}%` }} title="Pending" />
         </div>
 
         <div className="grid grid-cols-3 gap-3 text-center text-xs">
@@ -375,7 +375,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
         <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
           <button
             onClick={() => setFilterCategory('all')}
-            className={`px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition cursor-pointer ${
               filterCategory === 'all'
                 ? 'btn-brand text-zinc-950 shadow-md'
                 : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
@@ -391,7 +391,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
               <button
                 key={cat}
                 onClick={() => setFilterCategory(cat)}
-                className={`px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer ${
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition flex items-center gap-2 cursor-pointer ${
                   isSelected
                     ? 'btn-brand text-zinc-950 shadow-md'
                     : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
@@ -606,7 +606,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                     key={s.id}
                     type="button"
                     onClick={() => setExportStatus(s.id)}
-                    className={`py-1.5 px-1 rounded-lg text-[10px] font-extrabold uppercase transition-all cursor-pointer text-center ${
+                    className={`py-1.5 px-1 rounded-lg text-[10px] font-extrabold uppercase transition cursor-pointer text-center ${
                       exportStatus === s.id
                         ? 'bg-blue-500 text-white shadow-sm'
                         : 'text-zinc-400 hover:text-zinc-200'
@@ -633,7 +633,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({
                     key={p.id}
                     type="button"
                     onClick={() => setExportPriority(p.id)}
-                    className={`py-1.5 px-1 rounded-lg text-[10px] font-extrabold uppercase transition-all cursor-pointer text-center ${
+                    className={`py-1.5 px-1 rounded-lg text-[10px] font-extrabold uppercase transition cursor-pointer text-center ${
                       exportPriority === p.id
                         ? 'bg-amber-500 text-zinc-950 shadow-sm'
                         : 'text-zinc-400 hover:text-zinc-200'

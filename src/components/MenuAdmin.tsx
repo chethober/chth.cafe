@@ -626,7 +626,7 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
             return pct > 0 ? (
               <div
                 key={c.id}
-                className={`h-full ${palette.gradient} border-r border-zinc-950 transition-all hover:brightness-125`}
+                className={`h-full ${palette.gradient} border-r border-zinc-950 transition-[width,filter] hover:brightness-125`}
                 style={{ width: `${pct}%` }}
                 title={`${c.name}: ${count} items (${Math.round(pct)}%)`}
               />
@@ -678,8 +678,8 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded-full bg-zinc-900 text-zinc-400 text-xs font-bold border border-zinc-800">
-                    {itemsInCat.length} Items
+                  <span className="px-2.5 py-1 rounded-full bg-zinc-900 text-zinc-400 text-xs font-bold border border-zinc-800 whitespace-nowrap">
+                    {itemsInCat.length} {itemsInCat.length === 1 ? 'item' : 'items'}
                   </span>
                   <button
                     onClick={() => openEditCategory(cat)}
@@ -710,7 +710,7 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
                     return (
                       <div
                         key={item.id}
-                        className={`p-4 rounded-2xl border flex flex-col justify-between space-y-3 transition-all ${
+                        className={`p-4 rounded-2xl border flex flex-col justify-between space-y-3 transition ${
                           item.isInStock
                             ? 'bg-zinc-900/80 border-zinc-800/80 hover:border-amber-500/30'
                             : 'bg-rose-950/20 border-rose-900/40 opacity-75'
@@ -910,7 +910,7 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
                 Base Selling Price ({settings.currency})
               </label>
               <input
-                type="number"
+                type="number" inputMode="decimal"
                 step="0.01"
                 placeholder="6.75"
                 value={itemPrice}
@@ -925,7 +925,7 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
                 <TrendingUp className="w-3 h-3 text-emerald-400" /> Profit Margin ({settings.currency})
               </label>
               <input
-                type="number"
+                type="number" inputMode="decimal"
                 step="0.01"
                 placeholder="3.50"
                 value={itemProfitMargin}
@@ -1041,7 +1041,7 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
                 Base Selling Price ({settings.currency})
               </label>
               <input
-                type="number"
+                type="number" inputMode="decimal"
                 step="0.01"
                 value={editItemPrice}
                 onChange={(e) => setEditItemPrice(e.target.value)}
@@ -1055,7 +1055,7 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
                 <TrendingUp className="w-3 h-3 text-emerald-400" /> Profit Margin ({settings.currency})
               </label>
               <input
-                type="number"
+                type="number" inputMode="decimal"
                 step="0.01"
                 value={editItemProfitMargin}
                 onChange={(e) => setEditItemProfitMargin(e.target.value)}
@@ -1226,7 +1226,7 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
                 <div>
                   <label className="block text-[10px] text-zinc-400 mb-1">Qty Required Per Portion</label>
                   <input
-                    type="number"
+                    type="number" inputMode="decimal"
                     step="any"
                     placeholder="e.g. 0.015"
                     value={ingredientQty}
@@ -1335,7 +1335,7 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({
                     key={s.id}
                     type="button"
                     onClick={() => setExportStockStatus(s.id as any)}
-                    className={`py-1.5 px-1 rounded-lg text-[10px] font-extrabold uppercase transition-all cursor-pointer text-center ${
+                    className={`py-1.5 px-1 rounded-lg text-[10px] font-extrabold uppercase transition cursor-pointer text-center ${
                       exportStockStatus === s.id
                         ? 'bg-amber-500 text-zinc-950 shadow-sm'
                         : 'text-zinc-400 hover:text-zinc-200'
