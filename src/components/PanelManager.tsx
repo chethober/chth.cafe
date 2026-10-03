@@ -418,7 +418,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
           <button
             type="button"
             onClick={() => setPosCategoryFilter('all')}
-            className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap cursor-pointer transition-all ${
+            className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap cursor-pointer transition ${
               posCategoryFilter === 'all'
                 ? 'btn-brand text-zinc-950 shadow-sm'
                 : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
@@ -436,7 +436,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                 key={cat.id}
                 type="button"
                 onClick={() => setPosCategoryFilter(cat.id)}
-                className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 cursor-pointer transition-all ${
+                className={`px-3 py-1.5 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 cursor-pointer transition ${
                   isSelected
                     ? 'btn-brand text-zinc-950 shadow-sm'
                     : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
@@ -485,7 +485,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                       return (
                         <div
                           key={item.id}
-                          className={`p-3 rounded-2xl border flex flex-col justify-between space-y-2 transition-all ${
+                          className={`p-3 rounded-2xl border flex flex-col justify-between space-y-2 transition ${
                             cartQty > 0
                               ? 'bg-amber-950/30 border-amber-500/60 shadow-md ring-1 ring-amber-500/30'
                               : 'bg-zinc-900/80 border-zinc-800 hover:border-zinc-700'
@@ -514,7 +514,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                               <button
                                 type="button"
                                 onClick={() => handleToggleStockItem(item.id)}
-                                className={`px-2 py-0.5 rounded-xl text-[10px] font-black cursor-pointer transition-all ${
+                                className={`px-2 py-0.5 rounded-xl text-[10px] font-black cursor-pointer transition ${
                                   item.isInStock
                                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30'
                                     : 'bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30'
@@ -551,7 +551,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                               type="button"
                               onClick={() => handleAddItemToPOSCart(item)}
                               disabled={!item.isInStock}
-                              className={`w-full py-1.5 rounded-xl font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer transition-all ${
+                              className={`w-full py-1.5 rounded-xl font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer transition ${
                                 item.isInStock
                                   ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700'
                                   : 'bg-zinc-900 text-zinc-600 border border-zinc-800 cursor-not-allowed'
@@ -617,7 +617,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                     <div className="flex items-center gap-1">
                       <span className="text-[10px] text-zinc-500 font-bold">{settings.currency}</span>
                       <input
-                        type="number"
+                        type="number" inputMode="decimal"
                         step="any"
                         value={ci.unitPrice}
                         onChange={(e) => handleUpdatePOSCartPrice(ci.menuItemId, parseFloat(e.target.value) || 0)}
@@ -729,7 +729,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                 </div>
               </div>
               <input
-                type="number"
+                type="number" inputMode="decimal"
                 step="0.01"
                 min="0"
                 placeholder="0"
@@ -830,7 +830,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                         setEmpPasswordInput('');
                         setClockModalFeedback(null);
                       }}
-                      className={`p-3 rounded-2xl border flex flex-col items-center gap-2 transition-all cursor-pointer text-center ${
+                      className={`p-3 rounded-2xl border flex flex-col items-center gap-2 transition cursor-pointer text-center ${
                         isCheckedIn
                           ? 'bg-emerald-950/40 border-emerald-500/60 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/30 hover:border-emerald-400'
                           : 'bg-zinc-900/80 border-zinc-800 hover:border-zinc-700'
@@ -838,7 +838,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                     >
                       {/* Avatar Circle */}
                       <div
-                        className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-lg transition-all ${
+                        className={`w-11 h-11 rounded-full flex items-center justify-center font-black text-lg transition ${
                           isCheckedIn
                             ? 'bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/30'
                             : 'bg-zinc-800 text-zinc-300'
@@ -895,7 +895,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
               <button
                 onClick={() => setTaskCategoryFilter('all')}
-                className={`px-3 py-1 rounded-xl font-bold whitespace-nowrap cursor-pointer transition-all ${
+                className={`px-3 py-1 rounded-xl font-bold whitespace-nowrap cursor-pointer transition ${
                   taskCategoryFilter === 'all'
                     ? 'btn-brand text-zinc-950 shadow-sm'
                     : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
@@ -912,7 +912,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                   <button
                     key={cat}
                     onClick={() => setTaskCategoryFilter(cat)}
-                    className={`px-2.5 py-1 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 cursor-pointer transition-all ${
+                    className={`px-2.5 py-1 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 cursor-pointer transition ${
                       isSelected
                         ? 'btn-brand text-zinc-950 shadow-sm'
                         : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
@@ -934,12 +934,12 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                 No tasks in "{taskCategoryFilter}" category.
               </div>
             ) : (
-              <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {filteredTasks.map((task) => (
                   <div
                     key={task.id}
                     onClick={() => handleCycleTaskStatus(task.id, task.status)}
-                    className="p-3 rounded-2xl bg-zinc-900/80 border border-zinc-800 flex items-center justify-between gap-2 cursor-pointer hover:border-amber-500/30 transition-all text-xs"
+                    className="p-3 rounded-2xl bg-zinc-900/80 border border-zinc-800 flex items-center justify-between gap-2 cursor-pointer hover:border-amber-500/30 transition text-xs"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       {task.status === 'completed' ? (
@@ -975,34 +975,20 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                 <h2 className="font-black text-zinc-100 text-sm tracking-tight">Customer orders</h2>
               </div>
 
-              {/* Status Filter Buttons */}
-              <div className="flex flex-wrap items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
-                <button type="button" onClick={() => setOrderStatusFilter('active')} aria-pressed={orderStatusFilter === 'active'} className={`px-3 py-2 rounded-lg text-xs font-bold ${orderStatusFilter === 'active' ? 'btn-brand text-zinc-950' : 'text-zinc-400'}`}>Active ({pendingOrdersCount + preparingOrdersCount + readyOrdersCount})</button>
-                <button
-                  onClick={() => setOrderStatusFilter('all')}
-                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer ${
-                    orderStatusFilter === 'all' ? 'btn-brand text-zinc-950' : 'text-zinc-400'
-                  }`}
-                >
-                  All ({orders.length})
-                </button>
-                <button
-                  onClick={() => setOrderStatusFilter('pending')}
-                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer ${
-                    orderStatusFilter === 'pending' ? 'bg-amber-500 text-zinc-950' : 'text-zinc-400'
-                  }`}
-                >
-                  Pending ({pendingOrdersCount})
-                </button>
-                <button type="button" onClick={()=>setOrderStatusFilter('ready')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black ${orderStatusFilter === 'ready' ? 'bg-emerald-500 text-zinc-950' : 'text-zinc-400'}`}>Ready ({readyOrdersCount})</button>
-                <button
-                  onClick={() => setOrderStatusFilter('preparing')}
-                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer ${
-                    orderStatusFilter === 'preparing' ? 'bg-indigo-500 text-white' : 'text-zinc-400'
-                  }`}
-                >
-                  Preparing ({preparingOrdersCount})
-                </button>
+              {/* Status Filter Buttons: workflow order, one scrollable row on phones */}
+              <div className="order-filter flex items-center gap-1 overflow-x-auto no-scrollbar bg-zinc-900 p-1 rounded-xl border border-zinc-800 max-w-full">
+                {([
+                  ['active', 'Active', pendingOrdersCount + preparingOrdersCount + readyOrdersCount],
+                  ['pending', 'Pending', pendingOrdersCount],
+                  ['preparing', 'Preparing', preparingOrdersCount],
+                  ['ready', 'Ready', readyOrdersCount],
+                  ['all', 'All', orders.length]
+                ] as const).map(([value, label, count]) => (
+                  <button key={value} type="button" onClick={() => setOrderStatusFilter(value)} aria-pressed={orderStatusFilter === value}
+                    className={`shrink-0 min-h-10 px-3 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${orderStatusFilter === value ? 'btn-brand text-zinc-950' : 'text-zinc-400 hover:text-zinc-200'}`}>
+                    {label} <span className="tabular-nums opacity-70">{count}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1025,7 +1011,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                 <p className="text-xs text-zinc-400 font-medium">No orders matching the current filter.</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {filteredOrders.map((order) => {
                   const itemsForOrder = orderItems.filter((i) => i.orderId === order.id);
 
@@ -1033,7 +1019,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                     <div
                       key={order.id}
                       onClick={() => setPanelSelectedOrderDetails(order)}
-                      className={`p-4 rounded-2xl border flex flex-col justify-between space-y-3 transition-all cursor-pointer group ${
+                      className={`p-4 rounded-2xl border flex flex-col justify-between space-y-3 transition cursor-pointer group ${
                         order.status === 'pending'
                           ? 'bg-amber-950/20 border-amber-500/40 shadow-lg hover:border-amber-400'
                           : order.status === 'preparing'
@@ -1096,32 +1082,11 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                           {order.status}
                         </span>
 
-                        <div className="flex items-center gap-1 text-[11px]">
-                          {order.status === 'pending' && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUpdateOrderStatus(order.id, 'preparing');
-                              }}
-                              className="px-2.5 py-1 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold cursor-pointer"
-                            >
-                              Start Prep
-                            </button>
-                          )}
-
-                          {['pending','preparing','ready'].includes(order.status) && <button type="button" onClick={e=> { e.stopPropagation(); if (window.confirm(order.status === 'pending' ? 'Cancel this order and return reserved ingredients to stock?' : 'Cancel this order? Prepared ingredients remain deducted from stock.')) handleUpdateOrderStatus(order.id, 'cancelled'); }} className="px-3 py-2 rounded-xl border border-rose-500/40 text-rose-400">Cancel order</button>}
-                          {order.status === 'ready' && <button type="button" onClick={e => { e.stopPropagation(); handleUpdateOrderStatus(order.id, 'completed'); }} className="px-3 py-2 rounded-xl btn-brand text-zinc-950 font-semibold">Mark collected / paid</button>}
-                          {order.status === 'preparing' && (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUpdateOrderStatus(order.id, 'ready');
-                              }}
-                              className="px-2.5 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black cursor-pointer shadow-md"
-                            >
-                              Mark Ready
-                            </button>
-                          )}
+                        <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
+                          {['pending','preparing','ready'].includes(order.status) && <button type="button" onClick={e=> { e.stopPropagation(); if (window.confirm(order.status === 'pending' ? 'Cancel this order and return reserved ingredients to stock?' : 'Cancel this order? Prepared ingredients remain deducted from stock.')) handleUpdateOrderStatus(order.id, 'cancelled'); }} className="min-h-10 px-3 rounded-xl border border-rose-500/40 text-rose-400 font-semibold">Cancel</button>}
+                          {order.status === 'pending' && <button type="button" onClick={e => { e.stopPropagation(); handleUpdateOrderStatus(order.id, 'preparing'); }} className="order-primary min-h-10 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold">Start prep</button>}
+                          {order.status === 'preparing' && <button type="button" onClick={e => { e.stopPropagation(); handleUpdateOrderStatus(order.id, 'ready'); }} className="order-primary min-h-10 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold">Mark ready</button>}
+                          {order.status === 'ready' && <button type="button" onClick={e => { e.stopPropagation(); handleUpdateOrderStatus(order.id, 'completed'); }} className="order-primary min-h-10 px-4 rounded-xl btn-brand text-zinc-950 font-bold">Collected &amp; paid</button>}
                         </div>
                       </div>
                     </div>
@@ -1479,7 +1444,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                 Agreed / Manual Unit Price ({settings.currency || '₹'}) *
               </label>
               <input
-                type="number"
+                type="number" inputMode="decimal"
                 step="any"
                 placeholder="0.00"
                 value={customItemPrice}

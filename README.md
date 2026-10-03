@@ -4,6 +4,27 @@ Cafe management with a public menu, staff workspace, and daily operations panel.
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/chethober/chth.cafe)
 
+## Screenshots
+
+Screenshots use the demo data from `schema.sql`.
+
+**Public menu**
+
+<p>
+  <img src="docs/screenshots/menu.png" alt="Public menu on desktop" width="72%">
+  <img src="docs/screenshots/menu-mobile.png" alt="Public menu on mobile" width="24%">
+</p>
+
+**Daily panel**: orders, new orders, tasks, and clock actions for staff on shift.
+
+![Daily panel with active customer orders](docs/screenshots/panel.png)
+
+**Admin workspace**: menu pricing and margins, plus raw-material stock with low-stock alerts.
+
+![Admin menu editor](docs/screenshots/admin-menu.png)
+
+![Admin stock and inventory](docs/screenshots/admin-stock.png)
+
 ## Development
 
 Requires Node.js 22+ and npm.
@@ -26,7 +47,7 @@ Local apps:
 - Admin: http://admin.localhost:3000
 - Daily panel: http://panel.localhost:3000
 
-Vite runs on port 3000 and proxies `/api` to the local Worker on port 8787. Staff apps use their subdomains; `/admin` and `/panel` paths return 404.
+Vite runs on port 3000 and proxies `/api` to the local Worker on port 8787. The startup scripts enable `CAFE_DEV_PROXY` locally to preserve the staff subdomain through Wrangler; do not enable this binding in deployment. Staff apps use their subdomains; `/admin` and `/panel` paths return 404.
 
 | Command | Purpose |
 | --- | --- |

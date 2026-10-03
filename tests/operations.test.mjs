@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { Miniflare, Log, LogLevel, convertV4MiniflareOptions } from 'miniflare';
 const bundle = await build({ entryPoints: ['src/server.ts'], bundle: true, format: 'esm', platform: 'browser', write: false });
-const mf = new Miniflare(convertV4MiniflareOptions({ log: new Log(LogLevel.NONE), modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2025-01-01', d1Databases: { DB: 'test-cafe' }, kvNamespaces: ['KV'], bindings: { ADMIN_PASSWORD: 'test-admin-password', PANEL_PASSWORD: 'test-panel-password', SESSION_SECRET: 'test-session-secret-with-at-least-32-characters' } }] }));
+const mf = new Miniflare(convertV4MiniflareOptions({ log: new Log(LogLevel.NONE), modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2025-01-01', d1Databases: { DB: 'test-cafe' }, kvNamespaces: ['KV'], bindings: { ADMIN_PASSWORD: 'test-admin-password', PANEL_PASSWORD: 'test-panel-password', SESSION_SECRET: 'test-session-secret-with-at-least-32-characters', CAFE_DEV_PROXY: 'true' } }));
 let checks = 0;
 const check = (actual, expected) => { assert.deepEqual(actual, expected); checks++; };
 let cookie = '';
@@ -43,7 +43,7 @@ try {
   check((await panelRequest('/api/auth/login', {password:'test-admin-password'})).status,401);
   check((await request('/api/auth/login', {password:'test-panel-password'})).status,401);
   const proxiedPanel = await mf.dispatchFetch('http://localhost/api/auth/login', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Cafe-Dev-Host': 'panel.localhost:3000', Origin: 'http://panel.localhost:3000' },
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Cafe-Dev-Host': 'panel.localhost:3000', Origin: 'http://chth.cafe', 'X-Cafe-Dev-Origin': encodeURIComponent('http://panel.localhost:3000') },
     body: JSON.stringify({ password: 'test-panel-password' })
   });
   check(proxiedPanel.status, 200);

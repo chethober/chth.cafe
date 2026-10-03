@@ -143,7 +143,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
           <button
             type="button"
             onClick={() => handleTypeChange('income')}
-            className={`py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
               logType === 'income'
                 ? 'bg-emerald-500 text-zinc-950 shadow-md'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
@@ -156,7 +156,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
           <button
             type="button"
             onClick={() => handleTypeChange('expense')}
-            className={`py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`py-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
               logType === 'expense'
                 ? 'bg-rose-500 text-zinc-950 shadow-md'
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
@@ -240,7 +240,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
                 Amount ({settings.currency})
               </label>
               <input
-                type="number"
+                type="number" inputMode="decimal"
                 step="0.01"
                 min="0.01"
                 placeholder="100.00"
@@ -282,7 +282,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({
 
           <button
             type="submit" disabled={savingOrder}
-            className={`w-full py-3 rounded-xl font-black uppercase tracking-wider shadow-lg cursor-pointer transition-all flex items-center justify-center gap-2 ${
+            className={`w-full py-3 rounded-xl font-black uppercase tracking-wider shadow-lg cursor-pointer transition flex items-center justify-center gap-2 ${
               logType === 'income'
                 ? 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950'
                 : 'bg-rose-500 hover:bg-rose-400 text-zinc-950'

@@ -529,7 +529,6 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fade-in font-sans">
-      <Reconciliation settings={settings} />
       {/* Header Banner */}
       <div className="glass-panel-classy p-5 rounded-3xl border border-zinc-800 flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3.5">
@@ -554,7 +553,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
           </button>
           <button
             onClick={() => setManualLogOpen(true)}
-            className="px-4 py-2 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30 font-extrabold text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-all"
+            className="px-4 py-2 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30 font-extrabold text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition"
           >
             <Plus className="w-4 h-4 text-emerald-400" /> Log Income / Expense
           </button>
@@ -610,6 +609,8 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
         </div>
       </div>
 
+      <Reconciliation settings={settings} />
+
       {/* ========================================================================= */}
       {/* INFOGRAPHICS SECTION: REVENUE TREND & SIDE-BY-SIDE PIE CHARTS             */}
       {/* ========================================================================= */}
@@ -627,7 +628,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
               <button
                 type="button"
                 onClick={() => setTrendFilter('7d')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
                   trendFilter === '7d' ? 'btn-brand text-zinc-950 shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
@@ -636,7 +637,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
               <button
                 type="button"
                 onClick={() => setTrendFilter('30d')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
                   trendFilter === '30d' ? 'btn-brand text-zinc-950 shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
@@ -645,7 +646,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
               <button
                 type="button"
                 onClick={() => setTrendFilter('12m')}
-                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg font-bold transition cursor-pointer ${
                   trendFilter === '12m' ? 'btn-brand text-zinc-950 shadow-sm' : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
@@ -685,7 +686,6 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         points={revCoords.join(' ')}
-                        className="transition-all duration-500"
                       />
                       {/* Line 2: Expenses (Rose) */}
                       <polyline
@@ -695,7 +695,6 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         points={expCoords.join(' ')}
-                        className="transition-all duration-500"
                       />
                       {/* Line 3: Net Profit (Indigo) */}
                       <polyline
@@ -706,7 +705,6 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         points={prfCoords.join(' ')}
-                        className="transition-all duration-500"
                       />
 
                       {/* Data Dots */}
@@ -774,7 +772,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
                   />
                   {/* Cash Slice (Amber) */}
                   <path
-                    className="text-amber-500 transition-all duration-500"
+                    className="text-amber-500 transition-[stroke-dasharray] duration-300"
                     strokeDasharray={`${cashPct}, 100`}
                     strokeDashoffset="0"
                     strokeWidth="4.5"
@@ -785,7 +783,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
                   />
                   {/* Card Slice (Emerald) */}
                   <path
-                    className="text-emerald-500 transition-all duration-500"
+                    className="text-emerald-500 transition-[stroke-dasharray] duration-300"
                     strokeDasharray={`${cardPct}, 100`}
                     strokeDashoffset={`-${cashPct}`}
                     strokeWidth="4.5"
@@ -796,7 +794,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
                   />
                   {/* GPay Slice (Indigo) */}
                   <path
-                    className="text-indigo-500 transition-all duration-500"
+                    className="text-indigo-500 transition-[stroke-dasharray] duration-300"
                     strokeDasharray={`${gpayPct}, 100`}
                     strokeDashoffset={`-${cashPct + cardPct}`}
                     strokeWidth="4.5"
@@ -807,7 +805,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
                   />
                   {/* Online Slice (Rose) */}
                   <path
-                    className="text-rose-500 transition-all duration-500"
+                    className="text-rose-500 transition-[stroke-dasharray] duration-300"
                     strokeDasharray={`${onlinePct}, 100`}
                     strokeDashoffset={`-${cashPct + cardPct + gpayPct}`}
                     strokeWidth="4.5"
@@ -893,7 +891,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
                               strokeLinecap="round"
                               stroke={strokeColor}
                               fill="none"
-                              className="transition-all duration-500"
+                              className="transition-[stroke-dasharray] duration-300"
                               d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                             />
                           );
@@ -996,7 +994,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
                 <div
                   key={o.id}
                   onClick={() => setViewOrderModal(o)}
-                  className="p-3 rounded-2xl bg-zinc-900/80 border border-zinc-800 hover:border-amber-500/50 flex items-center justify-between gap-3 text-xs transition-all cursor-pointer group"
+                  className="p-3 rounded-2xl bg-zinc-900/80 border border-zinc-800 hover:border-amber-500/50 flex items-center justify-between gap-3 text-xs transition cursor-pointer group"
                 >
                   <div>
                     <div className="flex items-center gap-2">
@@ -1205,7 +1203,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
                   key={t.id}
                   type="button"
                   onClick={() => setExportType(t.id as any)}
-                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center ${
+                  className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer text-center ${
                     exportType === t.id
                       ? 'bg-emerald-500 text-zinc-950 shadow-sm'
                       : 'text-zinc-400 hover:text-zinc-200'
@@ -1231,7 +1229,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({
                   key={p.id}
                   type="button"
                   onClick={() => setExportDatePreset(p.id as DatePreset)}
-                  className={`py-1.5 px-2 rounded-xl text-[11px] font-bold border transition-all cursor-pointer text-center ${
+                  className={`py-1.5 px-2 rounded-xl text-[11px] font-bold border transition cursor-pointer text-center ${
                     exportDatePreset === p.id
                       ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 shadow-sm'
                       : 'bg-zinc-950/60 text-zinc-400 border-zinc-800 hover:bg-zinc-800 hover:text-zinc-200'

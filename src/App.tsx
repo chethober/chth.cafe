@@ -158,7 +158,7 @@ export const App: React.FC = () => {
   }, [isAdminView, isPanelView]);
 
   return (
-    <div className={`app-shell ${isAdminView || isPanelView ? 'app-workspace' : 'app-menu'} min-h-screen bg-zinc-950 text-zinc-100 flex flex-col justify-between selection:bg-amber-500 selection:text-zinc-950 font-sans antialiased`}>
+    <div className={`app-shell ${isAdminView || isPanelView ? 'app-workspace' : 'app-menu'} min-h-dvh bg-zinc-950 text-zinc-100 flex flex-col justify-between selection:bg-amber-500 selection:text-zinc-950 font-sans antialiased`}>
       {/* Header Navbar */}
       <header className="sticky top-0 z-40 bg-zinc-950/80 backdrop-blur-2xl border-b border-zinc-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
@@ -212,7 +212,7 @@ export const App: React.FC = () => {
                 <div className="hidden xl:flex items-center gap-1 bg-zinc-900/90 p-1 rounded-xl border border-zinc-800">
                   <button
                     onClick={() => setAdminTab('financials')}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
                       adminTab === 'financials'
                         ? 'btn-brand text-zinc-950 shadow-md'
                         : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
@@ -224,7 +224,7 @@ export const App: React.FC = () => {
 
                   <button
                     onClick={() => setAdminTab('tasks')}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
                       adminTab === 'tasks'
                         ? 'btn-brand text-zinc-950 shadow-md'
                         : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
@@ -236,7 +236,7 @@ export const App: React.FC = () => {
 
                   <button
                     onClick={() => setAdminTab('menu_admin')}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
                       adminTab === 'menu_admin'
                         ? 'btn-brand text-zinc-950 shadow-md'
                         : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
@@ -248,7 +248,7 @@ export const App: React.FC = () => {
 
                   <button
                     onClick={() => setAdminTab('stock')}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
                       adminTab === 'stock'
                         ? 'btn-brand text-zinc-950 shadow-md'
                         : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
@@ -260,7 +260,7 @@ export const App: React.FC = () => {
 
                   <button
                     onClick={() => setAdminTab('staff')}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
                       adminTab === 'staff'
                         ? 'btn-brand text-zinc-950 shadow-md'
                         : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
@@ -272,7 +272,7 @@ export const App: React.FC = () => {
 
                   <button
                     onClick={() => setAdminTab('settings')}
-                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-lg font-bold text-xs transition flex items-center gap-1.5 cursor-pointer ${
                       adminTab === 'settings'
                         ? 'btn-brand text-zinc-950 shadow-md'
                         : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
@@ -286,7 +286,7 @@ export const App: React.FC = () => {
                 {/* Mobile Top Header Settings Button */}
                 <button
                   onClick={() => setAdminTab('settings')}
-                  className={`xl:hidden px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 border cursor-pointer ${
+                  className={`xl:hidden px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 border cursor-pointer ${
                     adminTab === 'settings'
                       ? 'btn-brand text-zinc-950 shadow-md border-amber-500'
                       : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:text-white'
@@ -315,7 +315,7 @@ export const App: React.FC = () => {
               onClick={toggleTheme}
               title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
               aria-label="Toggle Theme"
-              className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-amber-400 border border-zinc-800 transition-all cursor-pointer shadow-sm flex items-center gap-1.5"
+              className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-amber-400 border border-zinc-800 transition cursor-pointer shadow-sm flex items-center gap-1.5"
             >
               {theme === 'dark' ? (
                 <>
@@ -393,7 +393,7 @@ export const App: React.FC = () => {
                     placeholder="••••••••••••"
                     value={passwordInput}
                     onChange={(e) => setPasswordInput(e.target.value)}
-                    className="w-full px-4 py-3 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-zinc-100 text-sm focus:outline-none focus:border-amber-500 transition-all"
+                    className="w-full px-4 py-3 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-zinc-100 text-sm focus:outline-none focus:border-amber-500 transition"
                     autoFocus
                     required
                   />
@@ -413,10 +413,12 @@ export const App: React.FC = () => {
           /* Admin Dashboard Workspace Views (Authenticated) */
           <div className="pb-20 xl:pb-0">
             {/* Fixed Mobile Admin Navigation Bar (Bottom Docked) */}
-            <div className="xl:hidden fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800/80 p-1.5 shadow-2xl grid grid-cols-6 gap-1">
+            <nav aria-label="Admin sections" className="admin-tabbar xl:hidden fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800/80 p-1.5 shadow-2xl grid grid-cols-5 gap-1">
               <button
+                type="button"
+                aria-current={adminTab === 'financials' ? 'page' : undefined}
                 onClick={() => setAdminTab('financials')}
-                className={`py-2 px-1 rounded-xl font-bold text-[10px] text-center flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
+                className={`min-h-12 py-2 px-1 rounded-xl font-bold text-[11px] justify-center text-center flex flex-col items-center gap-0.5 cursor-pointer transition ${
                   adminTab === 'financials' ? 'btn-brand text-zinc-950 shadow-md' : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
@@ -424,8 +426,10 @@ export const App: React.FC = () => {
                 Finances
               </button>
               <button
+                type="button"
+                aria-current={adminTab === 'tasks' ? 'page' : undefined}
                 onClick={() => setAdminTab('tasks')}
-                className={`py-2 px-1 rounded-xl font-bold text-[10px] text-center flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
+                className={`min-h-12 py-2 px-1 rounded-xl font-bold text-[11px] justify-center text-center flex flex-col items-center gap-0.5 cursor-pointer transition ${
                   adminTab === 'tasks' ? 'btn-brand text-zinc-950 shadow-md' : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
@@ -433,8 +437,10 @@ export const App: React.FC = () => {
                 Tasks
               </button>
               <button
+                type="button"
+                aria-current={adminTab === 'menu_admin' ? 'page' : undefined}
                 onClick={() => setAdminTab('menu_admin')}
-                className={`py-2 px-1 rounded-xl font-bold text-[10px] text-center flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
+                className={`min-h-12 py-2 px-1 rounded-xl font-bold text-[11px] justify-center text-center flex flex-col items-center gap-0.5 cursor-pointer transition ${
                   adminTab === 'menu_admin' ? 'btn-brand text-zinc-950 shadow-md' : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
@@ -442,8 +448,10 @@ export const App: React.FC = () => {
                 Menu
               </button>
               <button
+                type="button"
+                aria-current={adminTab === 'stock' ? 'page' : undefined}
                 onClick={() => setAdminTab('stock')}
-                className={`py-2 px-1 rounded-xl font-bold text-[10px] text-center flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
+                className={`min-h-12 py-2 px-1 rounded-xl font-bold text-[11px] justify-center text-center flex flex-col items-center gap-0.5 cursor-pointer transition ${
                   adminTab === 'stock' ? 'btn-brand text-zinc-950 shadow-md' : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
@@ -451,15 +459,17 @@ export const App: React.FC = () => {
                 Stock
               </button>
               <button
+                type="button"
+                aria-current={adminTab === 'staff' ? 'page' : undefined}
                 onClick={() => setAdminTab('staff')}
-                className={`py-2 px-1 rounded-xl font-bold text-[10px] text-center flex flex-col items-center gap-0.5 cursor-pointer transition-all ${
+                className={`min-h-12 py-2 px-1 rounded-xl font-bold text-[11px] justify-center text-center flex flex-col items-center gap-0.5 cursor-pointer transition ${
                   adminTab === 'staff' ? 'btn-brand text-zinc-950 shadow-md' : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
                 <Clock className="w-4 h-4" />
                 Staff
               </button>
-            </div>
+            </nav>
 
             {adminTab === 'financials' && (
               <FinancialTracker
