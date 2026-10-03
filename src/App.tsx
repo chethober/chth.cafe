@@ -74,6 +74,9 @@ export const App: React.FC = () => {
         root.classList.add('dark');
         root.classList.remove('light');
       }
+      // Browser chrome and the status bar follow the page paper, not the OS scheme, because the theme is chosen in-app.
+      const paper = getComputedStyle(root).getPropertyValue('--menu-paper').trim();
+      if (paper) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', paper);
       localStorage.setItem('chth_theme', theme);
     }
   }, [theme]);

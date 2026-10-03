@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Coffee, GlassWater, Leaf, Cake, Utensils, Search, Plus, Minus, ShoppingBag, CheckCircle2, X, MapPin, Phone, ChevronRight, Dice5, Heart, ArrowUp, ArrowUpRight } from 'lucide-react';
+import { Coffee, GlassWater, Leaf, Cake, Utensils, Search, Plus, Minus, ShoppingBag, CheckCircle2, X, MapPin, Phone, ChevronRight, Dice5, Heart, ArrowUp, ArrowUpRight, SlidersHorizontal } from 'lucide-react';
 import { CategorySelect, MenuItemSelect, MenuVariantSelect, SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { getOpeningStatus } from '../utils/openingHours';
@@ -66,6 +66,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
   const [selectedCatId, setSelectedCatId] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [onlyInStock, setOnlyInStock] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [savedItemIds, setSavedItemIds] = useState<string[]>(readSavedItems);
   const [savedOnly, setSavedOnly] = useState(false);
   const [suggestedId, setSuggestedId] = useState<string | null>(null);
@@ -87,6 +88,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
   const submissionRef = useRef<{ signature: string; id: string } | null>(null);
   const noticeTimer = useRef<ReturnType<typeof setTimeout>>();
   const categoryBarRef = useRef<HTMLElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   const addedTimer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
@@ -115,6 +117,10 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
     const selected = categoryBarRef.current?.querySelector<HTMLElement>('[aria-pressed="true"]');
     const scroller = selected?.parentElement;
     if (selected && scroller) scroller.scrollLeft = selected.offsetLeft - scroller.offsetLeft - (scroller.clientWidth - selected.clientWidth) / 2;
+    // Switching category from deep in the list would strand the reader mid-page; start them at the top of the new list.
+    const railBottom = categoryBarRef.current?.getBoundingClientRect().bottom;
+    const resultsTop = resultsRef.current?.getBoundingClientRect().top;
+    if (railBottom !== undefined && resultsTop !== undefined && resultsTop < railBottom) window.scrollTo({ top: window.scrollY + resultsTop - railBottom - 12 });
   }, [selectedCatId]);
 
   // Refresh an existing cart after menu changes, while keeping it fixed during submission.
@@ -130,7 +136,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
   }, [menuItems, menuVariants, isSubmitting]);
 
   const opening = getOpeningStatus(settings.openHours, now, settings.timeZone || 'Asia/Tehran');
-  const money = (amount: number) => `${settings.currency}${amount.toFixed(2)}`;
+  const money = (amount: number) => `${settings.currency}${amount.toFixed(2).replace(/\.00$/, '')}`;
   const query = searchQuery.trim().toLocaleLowerCase();
   const matchingItems = menuItems.filter(item =>
     (!dietaryFilter || item.dietaryLabels?.split(',').some(label => label.trim().toLowerCase() === dietaryFilter)) &&
@@ -150,6 +156,8 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
   const pickableItems = sections.flatMap(section => section.items).filter(item => item.isInStock);
   const suggestedItem = pickableItems.find(item => item.id === suggestedId);
   const savedCount = menuItems.filter(item => savedItemIds.includes(item.id)).length;
+  const activeFilterCount = (dietaryFilter ? 1 : 0) + (excludedAllergen ? 1 : 0);
+  const resetFilters = () => { setSearchQuery(''); setSelectedCatId('all'); setOnlyInStock(false); setSavedOnly(false); setDietaryFilter(''); setExcludedAllergen(''); };
 
   const announce = (message: string) => {
     clearTimeout(noticeTimer.current);
@@ -252,7 +260,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
   };
 
   return (
-    <div className="public-menu menu-zine space-y-7 pb-28 md:pb-16" id="menu-top">
+    <div className="public-menu menu-zine space-y-7 pb-28" id="menu-top">
       <div role="status" aria-live="polite" aria-atomic="true" className={notice ? 'menu-notice fixed top-20 left-4 right-4 sm:left-auto sm:right-6 z-[10000] rounded-2xl bg-zinc-900 border border-zinc-800 p-4 shadow-lg flex items-center gap-3 text-sm text-zinc-100' : 'sr-only'}>
         {notice && <CheckCircle2 className="brand-text shrink-0" size={20} />}{notice}
       </div>
@@ -299,25 +307,28 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
         </div>
       </aside>}
 
+      {receipt && <OrderTracking receipt={receipt} onDismiss={() => { setReceipt(null); try { localStorage.removeItem('chth_order_receipt'); } catch {} }} />}
       <div className="menu-tools flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400" />
           <label htmlFor="menu-search" className="sr-only">Search the menu</label>
-          <input id="menu-search" type="search" placeholder="Something on your mind?" value={searchQuery} onChange={event => setSearchQuery(event.target.value)}
+          <input id="menu-search" type="search" enterKeyHint="search" placeholder="Something on your mind?" value={searchQuery}
+            onChange={event => { if (!searchQuery && event.target.value) setSelectedCatId('all'); setSearchQuery(event.target.value); }}
+            onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }}
             className="w-full min-h-12 rounded-xl bg-zinc-900 border border-zinc-800 pl-11 pr-12 text-base text-zinc-100" />
           {searchQuery && <button type="button" aria-label="Clear search" onClick={() => setSearchQuery('')} className="absolute right-1 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center text-zinc-400"><X size={18} /></button>}
         </div>
         <button type="button" aria-pressed={onlyInStock} onClick={() => setOnlyInStock(value => !value)}
           className={`min-h-11 rounded-xl border px-4 text-sm font-semibold ${onlyInStock ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-zinc-900 border-zinc-800 text-zinc-300'}`}>Available only</button>
         <button type="button" aria-pressed={savedOnly} onClick={() => setSavedOnly(previous => !previous)} className={`menu-saved-toggle min-h-11 rounded-xl border px-4 text-sm font-semibold ${savedOnly ? 'is-selected' : ''}`}><Heart size={16} fill={savedOnly ? 'currentColor' : 'none'} />Saved <span>{savedCount}</span></button>
+        <button type="button" aria-expanded={filtersOpen} aria-controls="menu-filters" onClick={() => setFiltersOpen(open => !open)} className={`menu-filter-toggle min-h-11 rounded-xl border px-4 text-sm font-semibold ${activeFilterCount ? 'has-filters' : ''}`}><SlidersHorizontal size={16} />Filters{activeFilterCount > 0 && <span>{activeFilterCount}</span>}</button>
       </div>
 
-      {receipt && <OrderTracking receipt={receipt} onDismiss={() => { setReceipt(null); try { localStorage.removeItem('chth_order_receipt'); } catch {} }} />}
-      <div className="menu-filters grid grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-3 mb-5 text-sm">
+      {filtersOpen && <div id="menu-filters" className="menu-filters grid grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-3 mb-5 text-sm">
         <label className="flex flex-col gap-1.5">Dietary preference<select value={dietaryFilter} onChange={e=>setDietaryFilter(e.target.value)} className="w-full sm:w-auto min-h-11 rounded-xl border border-zinc-700 bg-zinc-900 px-3"><option value="">All items</option>{['vegan','vegetarian','gluten-free','decaf','caffeine-free'].map(v=><option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}</select></label>
         <label className="flex flex-col gap-1.5">Exclude allergen<select value={excludedAllergen} onChange={e=>setExcludedAllergen(e.target.value)} className="w-full sm:w-auto min-h-11 rounded-xl border border-zinc-700 bg-zinc-900 px-3"><option value="">No exclusion</option>{['milk','nuts','gluten','egg','soy'].map(v=><option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}</select></label>
         <p className="col-span-2 w-full text-xs text-zinc-400">Labels are supplied by café staff. Ask staff about substitutions and cross-contact. Allergen exclusions hide items with unconfirmed labels.</p>
-      </div>
+      </div>}
       <nav ref={categoryBarRef} aria-label="Menu categories" className="menu-categories sticky top-16 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 border-b border-zinc-800 bg-zinc-950">
         <div className="flex gap-2 overflow-x-auto no-scrollbar">
           <button type="button" aria-pressed={selectedCatId === 'all'} onClick={() => setSelectedCatId('all')}
@@ -329,10 +340,11 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
         </div>
       </nav>
 
+      <div ref={resultsRef}>
       {sections.length === 0 ? <div className="rounded-2xl border border-zinc-800 py-12 text-center space-y-3">
-        <Coffee className="mx-auto text-zinc-500" size={32} /><h2 className="text-lg font-semibold text-zinc-100">{savedOnly && savedCount === 0 ? 'Your usuals start here.' : 'Nothing on this page yet.'}</h2>
-        <p className="text-sm text-zinc-400">{savedOnly && savedCount === 0 ? 'Tap a heart beside anything you like. It’ll be waiting here next time.' : 'Try another category or reset your filters.'}</p>
-        <button type="button" className="min-h-11 rounded-xl btn-brand px-5 font-semibold text-zinc-950" onClick={() => { setSearchQuery(''); setSelectedCatId('all'); setOnlyInStock(false); setSavedOnly(false); }}>Reset filters</button>
+        <Coffee className="mx-auto text-zinc-500" size={32} /><h2 className="text-lg font-semibold text-zinc-100">{savedOnly && savedCount === 0 ? 'Your usuals start here.' : query ? `Nothing matches “${searchQuery.trim()}”.` : 'Nothing on this page yet.'}</h2>
+        <p className="text-sm text-zinc-400">{savedOnly && savedCount === 0 ? 'Tap a heart beside anything you like. It’ll be waiting here next time.' : query ? 'Try a shorter word, or clear your search and filters.' : 'Try another category or reset your filters.'}</p>
+        <button type="button" className="min-h-11 rounded-xl btn-brand px-5 font-semibold text-zinc-950" onClick={resetFilters}>Reset filters</button>
       </div> : <div className="menu-sections space-y-9">
         {sections.map((section, sectionIndex) => <section key={section.id} aria-labelledby={`category-${section.id}`} className="menu-section space-y-4">
           <div className="menu-section-heading"><span className="menu-section-number">{(sectionIndex + 1).toString().padStart(2, '0')}</span><h2 id={`category-${section.id}`} className="text-2xl font-semibold text-zinc-100">{section.name}</h2><span className="menu-section-count">{section.items.length} things to try</span></div>
@@ -376,10 +388,11 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
           </div>
         </section>)}
       </div>}
+      </div>
 
       <div className="menu-endnote"><span className="menu-hand-note">Good things take a little pause.</span><button type="button" className="menu-text-button" onClick={() => document.getElementById('menu-top')?.scrollIntoView({ block: 'start', behavior: document.documentElement.dataset.motion === 'reduced' || window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })}>Back to the top<ArrowUp size={16} /></button></div>
 
-      {cartCount > 0 && <div className="menu-cart-bar fixed left-4 right-4 z-40 md:hidden">
+      {cartCount > 0 && <div className="menu-cart-bar fixed left-4 right-4 z-40 md:left-auto md:right-6 md:w-96">
         <button type="button" onClick={() => setIsCartOpen(true)} className="w-full min-h-14 p-4 rounded-2xl btn-brand text-zinc-950 font-semibold flex items-center justify-between gap-3 shadow-lg">
           <span className="flex items-center gap-3"><ShoppingBag size={20} /><span>Your order · {cartCount}</span></span><span className="flex items-center gap-2">{money(total)}<ChevronRight size={18} /></span>
         </button>

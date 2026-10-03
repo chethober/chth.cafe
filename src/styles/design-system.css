@@ -38,6 +38,9 @@ html .app-shell.app-shell > header {
   backdrop-filter: none;
 }
 .app-shell > main, .app-shell > header > div, .app-shell > footer > div { max-width: 1160px; }
+/* viewport-fit=cover paints under the notch; keep content clear of it in landscape. */
+.app-shell { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.app-shell > header { padding-top: env(safe-area-inset-top, 0px); }
 .app-shell > main { padding-top: 32px; }
 .app-shell > header img { border-radius: 50%; box-shadow: none; --tw-ring-color: transparent; filter: saturate(.6); }
 .app-shell > header button { border-radius: 3px; box-shadow: none; }
@@ -82,7 +85,9 @@ html :is(.app-shell, .menu-paper-dialog) :is(.bg-zinc-900, .bg-zinc-800) { backg
 .menu-cover-bottom { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 15px; padding: 13px 0; border-top: 1px solid var(--menu-rule); }
 .menu-contact-links { display: flex; flex-wrap: wrap; gap: 8px 24px; font-size: 12px; color: var(--menu-muted); }
 .menu-contact-links a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
-.menu-contact-links a:hover { color: var(--menu-ink); text-decoration: underline; text-underline-offset: 4px; }
+@media (hover: hover) and (pointer: fine) {
+  .menu-contact-links a:hover { color: var(--menu-ink); text-decoration: underline; text-underline-offset: 4px; }
+}
 .menu-order-ticket { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 0 16px; min-height: 46px; border: 1px dashed var(--menu-rule); font: 12px var(--menu-mono); }
 .menu-order-ticket span { border-left: 1px dashed var(--menu-rule); padding-left: 14px; }
 .menu-recommendation { position: relative; display: flex; align-items: center; gap: 24px; flex-wrap: wrap; padding: 20px 52px 20px 22px; border: 1px dashed var(--menu-accent); background: var(--menu-sheet); animation: menu-slip-in .25s ease-out; }
@@ -99,7 +104,10 @@ html .menu-zine .menu-tools input { background: transparent !important; border: 
 .menu-tools > button { display: flex; align-items: center; justify-content: center; gap: 8px; font: 11px var(--menu-mono); border-radius: 2px; padding: 0 14px; }
 html .menu-zine .menu-tools > button { border-color: var(--menu-rule); background: transparent !important; color: var(--menu-muted) !important; }
 html .menu-zine .menu-tools > button[aria-pressed='true'] { background: var(--menu-ink) !important; color: var(--menu-paper) !important; border-color: var(--menu-ink); }
-.menu-tools .menu-saved-toggle > span { font-size: 10px; }
+.menu-tools :is(.menu-saved-toggle, .menu-filter-toggle) > span { font-size: 10px; }
+/* Collapsed filters still show they are on, so hidden items never look like missing menu items. */
+html .menu-zine .menu-tools > .menu-filter-toggle.has-filters { color: var(--menu-ink) !important; border-color: var(--menu-accent); }
+html .menu-zine .menu-tools > .menu-filter-toggle[aria-expanded='true'] { background: var(--menu-sheet) !important; color: var(--menu-ink) !important; }
 html .menu-zine .menu-categories { background: var(--menu-paper) !important; border-bottom: 1px solid var(--menu-rule); padding-top: 0; padding-bottom: 0; }
 .menu-categories > div { padding-top: 8px; gap: 4px; }
 html .menu-zine .menu-categories button { background: transparent !important; color: var(--menu-muted) !important; font: 11px var(--menu-mono); min-height: 52px; border-radius: 4px 4px 0 0; border: 1px solid transparent; border-bottom: 0; transition: background 150ms ease; }
