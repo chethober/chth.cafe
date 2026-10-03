@@ -17,6 +17,7 @@ import {
 import { store } from './db/store';
 import { api } from './services/api';
 import { applyAppearance } from './utils/appearance';
+import { applyFavicon, brandTitle } from './utils/branding';
 import { PublicMenu } from './components/PublicMenu';
 import { SettingsPanel } from './components/SettingsPanel';
 import { TimeTracker } from './components/TimeTracker';
@@ -133,8 +134,10 @@ export const App: React.FC = () => {
   useEffect(() => { applyAppearance(settings.appearance); }, [settings.appearance]);
 
   useEffect(() => {
-    document.title = isAdminView ? 'CHTH Admin' : isPanelView ? 'CHTH Management' : 'CHTH Cafe';
-  }, [isAdminView, isPanelView]);
+    document.title = brandTitle(settings.cafeName, isAdminView ? 'Admin' : isPanelView ? 'Daily panel' : undefined);
+  }, [settings.cafeName, isAdminView, isPanelView]);
+
+  useEffect(() => { applyFavicon(settings.logoUrl); }, [settings.logoUrl]);
 
   /* ------------------------------------------------------------ Workspace */
   if (isWorkspace) {
