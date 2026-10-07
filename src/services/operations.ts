@@ -7,13 +7,25 @@ export function ensureFeatureTables(db: D1Database) {
   if (!pending) {
     pending = (async () => {
       // Split at statement boundaries, keeping trigger bodies intact.
-      const statements = migration.match(/CREATE TRIGGER[\s\S]*?\nEND;|CREATE TABLE[\s\S]*?;/g) || [];
-      for (const sql of statements) await db.prepare(sql).run();
+      const statements = migration.match(/CREATE TRIGGER[\s\S]*?\nEND;|CREATE (?:TABLE|INDEX)[\s\S]*?;/g) || [];
+      for (const sql of statements) {
+        // Indexes only speed up reads; a database with older column names still serves requests without them.
+        if (sql.startsWith('CREATE INDEX')) await db.prepare(sql).run().catch(error => console.warn('Index skipped:', error));
+        else await db.prepare(sql).run();
+      }
     })();
     ready.set(db, pending);
     pending.catch(() => ready.delete(db));
   }
   return pending;
+}
+/** Bumped after every successful write, so clients can skip re-reading data that has not changed. */
+export async function dataVersion(db: D1Database) {
+  const row = await db.prepare('SELECT version FROM sync_state WHERE id = 1').first<{ version: number }>();
+  return row?.version ?? 0;
+}
+export function bumpDataVersion(db: D1Database) {
+  return db.prepare('INSERT INTO sync_state (id, version) VALUES (1, 1) ON CONFLICT(id) DO UPDATE SET version = version + 1').run();
 }
 export function publicSettings(config: Record<string, unknown>) {
   const keys = ['id','cafeName','logoUrl','brandPrimary','brandSecondary','appearance','currency','taxRate','openHours','timeZone','contactPhone','address','updatedAt'];
@@ -23,6 +35,11 @@ export async function trackingToken(id: string, secret?: string) {
   if (!secret) throw new Error('SESSION_SECRET is required for order tracking');
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return Array.from(new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(`tracking:${id}`))), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+/** UTC bounds wide enough to hold every instant of a café date in any time zone. */
+export function utcWindow(date: string): [string, string] {
+  const day = Date.parse(`${date}T00:00:00.000Z`);
+  return [new Date(day - 86_400_000).toISOString(), new Date(day + 2 * 86_400_000).toISOString()];
 }
 export const cafeDate = (date: Date, timeZone: string) => new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 export function registerOperations(app: Hono<Env>) {
@@ -46,7 +63,8 @@ export function registerOperations(app: Hono<Env>) {
   async function expected(db: D1Database, date: string, openingCash: number) {
     const config = await db.prepare('SELECT time_zone FROM settings WHERE id = ?').bind('cafe_config').first();
     const timeZone = String(config?.time_zone || 'Asia/Tehran');
-    const orders = (await db.prepare("SELECT * FROM orders WHERE status = 'completed'").all()).results.filter(o => cafeDate(new Date(String(o.createdAt)), timeZone) === date);
+    const [from, to] = utcWindow(date);
+    const orders = (await db.prepare("SELECT * FROM orders WHERE status = 'completed' AND createdAt >= ? AND createdAt < ?").bind(from, to).all()).results.filter(o => cafeDate(new Date(String(o.createdAt)), timeZone) === date);
     const expenses = (await db.prepare("SELECT amount FROM expenses WHERE date = ? AND payment_method = 'cash'").bind(date).all()).results;
     return {
       expectedCash: Number((openingCash + orders.filter(o => o.payment_method === 'cash').reduce((sum, o) => sum + Number(o.total_amount), 0) - expenses.reduce((sum, e) => sum + Number(e.amount), 0)).toFixed(2)),

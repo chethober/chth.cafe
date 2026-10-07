@@ -85,8 +85,11 @@ export const App: React.FC = () => {
   useEffect(() => {
     const checkSession = () => fetch('/api/auth/session').then(res => res.json()).then(data => setIsAdminAuthed((data as { authenticated?: boolean }).authenticated === true)).catch(() => {});
     void checkSession().finally(() => setAuthLoading(false));
-    const timer = window.setInterval(() => { void store.syncFromAPI(); void checkSession(); }, 15000);
-    return () => window.clearInterval(timer);
+    // Hidden tabs stop polling and catch up as soon as they are shown again.
+    const poll = () => { if (document.visibilityState === 'visible') { void store.syncFromAPI(); void checkSession(); } };
+    const timer = window.setInterval(poll, 15000);
+    document.addEventListener('visibilitychange', poll);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', poll); };
   }, []);
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);

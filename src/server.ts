@@ -2,7 +2,7 @@ import { Hono, type Context } from 'hono';
 import { getSignedCookie, setSignedCookie, deleteCookie } from 'hono/cookie';
 import { getOpeningStatus } from './utils/openingHours';
 import { store } from './db/store';
-import { ensureFeatureTables, publicSettings, trackingToken, registerOperations, cafeDate } from './services/operations';
+import { ensureFeatureTables, dataVersion, bumpDataVersion, publicSettings, trackingToken, registerOperations, cafeDate, utcWindow } from './services/operations';
 import { parseAppearance } from './utils/appearance';
 import {
   sendTelegramNotification,
@@ -52,82 +52,102 @@ function mapRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {
   return rows.map(mapRow);
 }
 
-async function ensureSettingsColumns(db: D1Database) {
-  const alterStatements = [
-    `ALTER TABLE settings ADD COLUMN time_zone TEXT NOT NULL DEFAULT 'Asia/Tehran'`,
-    `ALTER TABLE settings ADD COLUMN appearance TEXT NOT NULL DEFAULT '{}'`,
-    'ALTER TABLE settings ADD COLUMN telegram_bot_token TEXT DEFAULT ""',
-    'ALTER TABLE settings ADD COLUMN telegram_chat_id TEXT DEFAULT ""',
-    'ALTER TABLE settings ADD COLUMN notify_sales INTEGER NOT NULL DEFAULT 1',
-    'ALTER TABLE settings ADD COLUMN notify_shifts INTEGER NOT NULL DEFAULT 1',
-    'ALTER TABLE settings ADD COLUMN notify_tasks INTEGER NOT NULL DEFAULT 1',
-    'ALTER TABLE settings ADD COLUMN notify_daily_report INTEGER NOT NULL DEFAULT 1',
-    'ALTER TABLE settings ADD COLUMN notify_low_stock INTEGER NOT NULL DEFAULT 1'
-  ];
-  const table = alterStatements[0].split(' ')[2];
-  const { results } = await db.prepare(`PRAGMA table_info(${table})`).all();
-  const columns = new Set(results.map(row => row.name));
-  for (const stmt of alterStatements) {
-    if (!columns.has(stmt.split(' ')[5])) await db.prepare(stmt).run();
+// Schema checks run once per Worker isolate rather than before every request.
+const schemaChecks = new Map<string, Promise<void>>();
+function onceSchema(name: string, check: () => Promise<void>) {
+  let pending = schemaChecks.get(name);
+  if (!pending) {
+    pending = check();
+    schemaChecks.set(name, pending);
+    pending.catch(() => schemaChecks.delete(name));
   }
+  return pending;
 }
 
-async function ensureStockTables(db: D1Database) {
-  try {
-    await db.prepare(`
-      CREATE TABLE IF NOT EXISTS stock_items (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        category TEXT NOT NULL DEFAULT 'Tea & Coffee',
-        quantity REAL NOT NULL DEFAULT 0.0,
-        unit TEXT NOT NULL DEFAULT 'kg',
-        unit_cost REAL NOT NULL DEFAULT 0.0,
-        total_price REAL NOT NULL DEFAULT 0.0,
-        min_threshold REAL NOT NULL DEFAULT 5.0,
-        updated_at TEXT NOT NULL,
-        created_at TEXT NOT NULL
-      )
-    `).run();
-  } catch (e) {}
-  try {
-    await db.prepare(`
-      CREATE TABLE IF NOT EXISTS recipes (
-        id TEXT PRIMARY KEY,
-        menu_item_id TEXT NOT NULL,
-        stock_item_id TEXT NOT NULL,
-        quantity_required REAL NOT NULL DEFAULT 0.0
-      )
-    `).run();
-  } catch (e) {}
+function ensureSettingsColumns(db: D1Database) {
+  return onceSchema('settings', async () => {
+    const alterStatements = [
+      `ALTER TABLE settings ADD COLUMN time_zone TEXT NOT NULL DEFAULT 'Asia/Tehran'`,
+      `ALTER TABLE settings ADD COLUMN appearance TEXT NOT NULL DEFAULT '{}'`,
+      'ALTER TABLE settings ADD COLUMN telegram_bot_token TEXT DEFAULT ""',
+      'ALTER TABLE settings ADD COLUMN telegram_chat_id TEXT DEFAULT ""',
+      'ALTER TABLE settings ADD COLUMN notify_sales INTEGER NOT NULL DEFAULT 1',
+      'ALTER TABLE settings ADD COLUMN notify_shifts INTEGER NOT NULL DEFAULT 1',
+      'ALTER TABLE settings ADD COLUMN notify_tasks INTEGER NOT NULL DEFAULT 1',
+      'ALTER TABLE settings ADD COLUMN notify_daily_report INTEGER NOT NULL DEFAULT 1',
+      'ALTER TABLE settings ADD COLUMN notify_low_stock INTEGER NOT NULL DEFAULT 1'
+    ];
+    const table = alterStatements[0].split(' ')[2];
+    const { results } = await db.prepare(`PRAGMA table_info(${table})`).all();
+    const columns = new Set(results.map(row => row.name));
+    for (const stmt of alterStatements) {
+      if (!columns.has(stmt.split(' ')[5])) await db.prepare(stmt).run();
+    }
+  });
 }
 
-async function ensureMenuColumns(db: D1Database) {
-  const alterStatements = [
-    "ALTER TABLE menu_items ADD COLUMN allergens TEXT NOT NULL DEFAULT ''",
-    "ALTER TABLE menu_items ADD COLUMN dietary_labels TEXT NOT NULL DEFAULT ''",
-    'ALTER TABLE menu_items ADD COLUMN profit_margin REAL NOT NULL DEFAULT 0.0'
-  ];
-  const table = alterStatements[0].split(' ')[2];
-  const { results } = await db.prepare(`PRAGMA table_info(${table})`).all();
-  const columns = new Set(results.map(row => row.name));
-  for (const stmt of alterStatements) {
-    if (!columns.has(stmt.split(' ')[5])) await db.prepare(stmt).run();
-  }
+function ensureStockTables(db: D1Database) {
+  return onceSchema('stock', async () => {
+    try {
+      await db.prepare(`
+        CREATE TABLE IF NOT EXISTS stock_items (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          category TEXT NOT NULL DEFAULT 'Tea & Coffee',
+          quantity REAL NOT NULL DEFAULT 0.0,
+          unit TEXT NOT NULL DEFAULT 'kg',
+          unit_cost REAL NOT NULL DEFAULT 0.0,
+          total_price REAL NOT NULL DEFAULT 0.0,
+          min_threshold REAL NOT NULL DEFAULT 5.0,
+          updated_at TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        )
+      `).run();
+    } catch (e) {}
+    try {
+      await db.prepare(`
+        CREATE TABLE IF NOT EXISTS recipes (
+          id TEXT PRIMARY KEY,
+          menu_item_id TEXT NOT NULL,
+          stock_item_id TEXT NOT NULL,
+          quantity_required REAL NOT NULL DEFAULT 0.0
+        )
+      `).run();
+    } catch (e) {}
+  });
 }
 
-async function ensureLogsTable(db: D1Database) {
-  try {
-    await db.prepare(`
-      CREATE TABLE IF NOT EXISTS logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        employee_name TEXT NOT NULL,
-        action TEXT NOT NULL,
-        timestamp TEXT NOT NULL
-      )
-    `).run();
-  } catch (e) {
-    // Table already exists or SQLite error ignore
-  }
+function ensureMenuColumns(db: D1Database) {
+  return onceSchema('menu', async () => {
+    const alterStatements = [
+      "ALTER TABLE menu_items ADD COLUMN allergens TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE menu_items ADD COLUMN dietary_labels TEXT NOT NULL DEFAULT ''",
+      'ALTER TABLE menu_items ADD COLUMN profit_margin REAL NOT NULL DEFAULT 0.0'
+    ];
+    const table = alterStatements[0].split(' ')[2];
+    const { results } = await db.prepare(`PRAGMA table_info(${table})`).all();
+    const columns = new Set(results.map(row => row.name));
+    for (const stmt of alterStatements) {
+      if (!columns.has(stmt.split(' ')[5])) await db.prepare(stmt).run();
+    }
+  });
+}
+
+function ensureLogsTable(db: D1Database) {
+  return onceSchema('logs', async () => {
+    try {
+      await db.prepare(`
+        CREATE TABLE IF NOT EXISTS logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          employee_name TEXT NOT NULL,
+          action TEXT NOT NULL,
+          timestamp TEXT NOT NULL
+        )
+      `).run();
+    } catch (e) {
+      // Table already exists or SQLite error ignore
+    }
+  });
 }
 
 const app = new Hono<Env>();
@@ -169,6 +189,7 @@ app.use('/api/*', async (c, next) => {
     await ensureFeatureTables(c.env.DB);
   }
   await next();
+  if (c.env?.DB && c.req.method !== 'GET' && !path.startsWith('/api/auth/') && c.res.ok) await bumpDataVersion(c.env.DB);
 });
 app.onError((error, c) => {
   if (error instanceof SyntaxError) return c.json({ success: false, message: 'Invalid request data.' }, 400);
@@ -177,7 +198,13 @@ app.onError((error, c) => {
   console.error('API request failed', error);
   return c.json({ success: false, message: 'The change could not be saved. Please try again.' }, 503);
 });
-app.get('/api/auth/session', c => c.json({ authenticated: c.get('authed') === true, workspace: c.get('workspace') }));
+app.get('/api/auth/session', async c => {
+  let version: number | null = null;
+  if (c.env?.DB) {
+    try { await ensureFeatureTables(c.env.DB); version = await dataVersion(c.env.DB); } catch (e) { console.warn('Data version unavailable:', e); }
+  }
+  return c.json({ authenticated: c.get('authed') === true, workspace: c.get('workspace'), version });
+});
 app.post('/api/auth/login', async c => {
   const workspace = c.get('workspace');
   const password = workspace === 'panel' ? c.env.PANEL_PASSWORD : c.env.ADMIN_PASSWORD;
@@ -1397,9 +1424,10 @@ export async function sendDailyFinancialReport(env: any): Promise<{ success: boo
 
     if (env?.DB) {
       try {
-        const { results: orders } = await env.DB.prepare('SELECT * FROM orders').all();
-        const { results: expenses } = await env.DB.prepare('SELECT * FROM expenses').all();
         const settingsRow = await env.DB.prepare('SELECT currency, time_zone FROM settings WHERE id = ?').bind('cafe_config').first();
+        const [from, to] = utcWindow(cafeDate(new Date(), String(settingsRow?.time_zone || timeZone)));
+        const { results: orders } = await env.DB.prepare('SELECT * FROM orders WHERE createdAt >= ? AND createdAt < ?').bind(from, to).all();
+        const { results: expenses } = await env.DB.prepare('SELECT * FROM expenses WHERE date >= ? AND date < ?').bind(from.slice(0, 10), to.slice(0, 10)).all();
         if (orders) ordersList = mapRows(orders as Record<string, unknown>[]);
         if (expenses) expensesList = mapRows(expenses as Record<string, unknown>[]);
         if (settingsRow?.currency) currency = settingsRow.currency as string;

@@ -1,9 +1,10 @@
 import { ImageUpload } from './ImageUpload';
 import React, { useEffect, useRef, useState } from 'react';
-import { Boxes, CheckSquare, Clock, Database, Download, Eye, EyeOff, Palette, RefreshCw, Send, ShoppingCart, Store, UserCheck } from 'lucide-react';
+import { Boxes, CalendarClock, CheckSquare, Clock, Database, Download, Eye, EyeOff, Palette, RefreshCw, Send, ShoppingCart, Store, UserCheck } from 'lucide-react';
 import { SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { AppearanceEditor } from './AppearanceEditor';
+import { OpeningHoursEditor, openingHoursErrors, parseOpeningHours } from './OpeningHoursEditor';
 import { AppearanceSettings, parseAppearance } from '../utils/appearance';
 import { Button, Card, ConfirmDialog, Field, IconButton, Input, Notice, Page, PageHeader, Segmented, ToggleRow, localDateKey } from '../ui';
 
@@ -22,6 +23,7 @@ const PRESET_ACCENTS = [
 ];
 const SECTIONS = [
   { id: 'details', label: 'Café details', icon: Store },
+  { id: 'hours', label: 'Opening hours', icon: CalendarClock },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'notifications', label: 'Notifications', icon: Send },
   { id: 'data', label: 'Data', icon: Database }
@@ -57,6 +59,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
   const appearance = parseAppearance(formData.appearance);
   const updateAppearance = (partial: Partial<AppearanceSettings>) =>
     edit(prev => ({ ...prev, appearance: JSON.stringify({ ...parseAppearance(prev.appearance), ...partial }) }));
+  const openingHours = parseOpeningHours(formData.openHours);
+  const hoursInvalid = Object.keys(openingHoursErrors(openingHours)).length > 0;
 
   const [showToken, setShowToken] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
@@ -68,6 +72,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
+    if (hoursInvalid) { setSaveError('Fix the opening hours before saving.'); return; }
     setSaving(true); setSaved(false); setSaveError('');
     try {
       const updated = await store.saveSettings(formData);
@@ -147,6 +152,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
                     </div>
                   </div>
                 </Card>
+              </section>
+
+              <section id="settings-hours" className="ws-section" aria-label="Opening hours">
+                <OpeningHoursEditor hours={openingHours} disabled={saving} onChange={hours => edit({ openHours: JSON.stringify(hours) })} />
               </section>
 
               <section id="settings-appearance" className="ws-section" aria-label="Appearance">

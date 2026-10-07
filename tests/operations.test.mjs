@@ -19,7 +19,7 @@ try {
     }
   }
   const embeddedMigration = await readFile('src/services/operationsMigration.ts','utf8');
-  check(embeddedMigration.slice(embeddedMigration.indexOf('`')+1,embeddedMigration.lastIndexOf('`')),await readFile('migrations/0002_operations.sql','utf8'));
+  check(embeddedMigration.slice(embeddedMigration.indexOf('`')+1,embeddedMigration.lastIndexOf('`')),await readFile('migrations/0002_operations.sql','utf8')+(await readFile('migrations/0003_sync_and_indexes.sql','utf8')).replace(/^--.*\n/,''));
   const db = await mf.getD1Database('DB');
   // Start with the old schema to exercise the upgrade path, then seed real D1.
   const schema = (await readFile('schema.sql','utf8')).replace(/^--.*$/gm,'').replace(/  time_zone TEXT[^\n]*\n/g,'').replace(/  allergens TEXT[^\n]*\n/g,'').replace(/  dietary_labels TEXT[^\n]*\n/g,'');

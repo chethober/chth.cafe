@@ -23,7 +23,9 @@ export function InventoryMovements({ items }: { items: StockItemSelect[] }) {
   const [error, setError] = useState('');
 
   const refresh = async () => { const result = await api<{ data: Movement[] }>('/api/inventory-movements'); setMovements(result.data); };
-  useEffect(() => { void refresh().catch(e => setError(e.message)); }, [items]);
+  // Refetch only when stock levels move, not whenever a sync hands over a fresh array.
+  const stockKey = items.map(item => `${item.id}:${item.quantity}`).join('|');
+  useEffect(() => { void refresh().catch(e => setError(e.message)); }, [stockKey]);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();

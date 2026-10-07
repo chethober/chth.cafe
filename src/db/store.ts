@@ -54,6 +54,7 @@ class CafeStore {
   private orderAttempts = new Map<string,string>();
   private mutationQueue: Promise<unknown> = Promise.resolve();
   private listeners: Set<() => void> = new Set();
+  private lastSyncKey = '';
 
   constructor() {
     this.state = this.loadFromStorage();
@@ -125,7 +126,12 @@ class CafeStore {
       const session = await this.safeFetchJSON('/api/auth/session');
       const managementView = /^(admin|panel)\./.test(window.location.hostname) || /^\/(admin|panel)(\/|$)/.test(window.location.pathname);
       const adminAccess = session?.authenticated && window.location.hostname.startsWith('admin.');
-      const privateFetch = (url: string) => session?.authenticated && managementView ? this.safeFetchJSON(url) : Promise.resolve(null);
+      // Nothing was written since the last complete sync for this access level, so skip re-reading every table.
+      const syncKey = typeof session?.version === 'number' ? `${session.version}|${Boolean(session.authenticated)}|${managementView}|${Boolean(adminAccess)}` : '';
+      if (syncKey && syncKey === this.lastSyncKey) return;
+      let incomplete = false;
+      const fetchJSON = (url: string) => this.safeFetchJSON(url).then(result => { if (!result) incomplete = true; return result; });
+      const privateFetch = (url: string) => session?.authenticated && managementView ? fetchJSON(url) : Promise.resolve(null);
       if (!session?.authenticated || !managementView) this.clearPrivateData();
       const [ordersData, orderItemsData, tasksData, staffData, shiftsData, expensesData, settingsData, menuData, stockData, recipesData] = await Promise.all([
         privateFetch('/api/orders'),
@@ -134,8 +140,8 @@ class CafeStore {
         privateFetch('/api/staff'),
         privateFetch('/api/staff/shifts'),
         adminAccess ? privateFetch('/api/expenses') : Promise.resolve(null),
-        this.safeFetchJSON(adminAccess ? '/api/admin/settings' : '/api/settings'),
-        this.safeFetchJSON(adminAccess ? '/api/admin/menu' : '/api/menu'),
+        fetchJSON(adminAccess ? '/api/admin/settings' : '/api/settings'),
+        fetchJSON(adminAccess ? '/api/admin/menu' : '/api/menu'),
         privateFetch('/api/stock'),
         privateFetch('/api/recipes')
       ]);
@@ -206,6 +212,7 @@ class CafeStore {
         this.saveToStorage();
         this.notify();
       }
+      this.lastSyncKey = incomplete ? '' : syncKey;
     } catch (e) {
       console.warn('syncFromAPI error:', e);
     }

@@ -7,12 +7,15 @@ export function OrderTracking({ receipt, onDismiss }: { receipt: OrderReceipt; o
   useEffect(() => {
     let active = true;
     const refresh = async () => {
+      if (document.visibilityState !== 'visible') return;
       try {
         const result = await api<{ data: { status: string } }>(`/api/orders/${encodeURIComponent(receipt.id)}/tracking?token=${encodeURIComponent(receipt.token)}`);
         if (active) { setStatus(result.data.status); setError(''); }
+        // A collected or cancelled order never changes again.
+        if (['completed', 'cancelled'].includes(result.data.status)) clearInterval(timer);
       } catch { if (active) setError('Status unavailable. Your order receipt is saved; we’ll retry shortly.'); }
     };
-    void refresh(); const timer = window.setInterval(refresh, 10000);
+    const timer = window.setInterval(refresh, 10000); void refresh();
     return () => { active = false; clearInterval(timer); };
   }, [receipt.id, receipt.token]);
   const labels: Record<string,string> = { pending: 'Received by the café', preparing: 'Your order is being prepared', ready: 'Ready to collect', completed: 'Collected — enjoy!', cancelled: 'Order cancelled. Please speak to staff.' };
