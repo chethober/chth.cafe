@@ -2,16 +2,17 @@ import { Hono, type Context } from 'hono';
 import { getSignedCookie, setSignedCookie, deleteCookie } from 'hono/cookie';
 import { getOpeningStatus } from './utils/openingHours';
 import { store } from './db/store';
-import { ensureFeatureTables, dataVersion, bumpDataVersion, publicSettings, trackingToken, registerOperations, cafeDate, utcWindow } from './services/operations';
+import { ensureFeatureTables, dataVersion, bumpDataVersion, publicSettings, trackingToken, registerOperations } from './services/operations';
 import { parseAppearance } from './utils/appearance';
 import {
   sendTelegramNotification,
   formatSaleMessage,
   formatShiftMessage,
   formatTaskMessage,
-  formatDailyFinancialReportMessage,
-  formatStockAlertMessage
+  formatStockAlertMessage,
+  type FormatContext
 } from './services/telegram';
+import { registerTelegramBot, runScheduledTelegram, sendDailyReport } from './services/telegramBot';
 
 export type Env = {
   Variables: { authed: boolean; workspace: 'admin' | 'panel' };
@@ -241,6 +242,7 @@ app.post('/api/auth/logout', async c => {
 });
 
 registerOperations(app);
+registerTelegramBot(app);
 
 // --- 1. Settings & Branding Routes ---
 const getSettings = async (c: Context<Env>) => {
@@ -596,8 +598,7 @@ app.post('/api/stock', async (c) => {
   }
 
   if (newItem.quantity <= newItem.minThreshold) {
-    const currency = store.getSettings().currency || '₹';
-    const alertMsg = formatStockAlertMessage(newItem, currency);
+    const alertMsg = (ctx: FormatContext) => formatStockAlertMessage(newItem, ctx);
     if (c.executionCtx?.waitUntil) {
       c.executionCtx.waitUntil(sendTelegramNotification(c.env, alertMsg, 'lowStock'));
     } else {
@@ -832,8 +833,7 @@ app.post('/api/staff/clock-in', async (c) => {
 
   const staffName = result.staff?.name || 'Staff';
   const shiftObj = result.shift || shift || { id: `shift-${Date.now()}`, staffId, clockIn: new Date().toISOString() };
-  const currency = store.getSettings().currency || '₹';
-  const msg = formatShiftMessage('in', staffName, shiftObj as any, currency);
+  const msg = (ctx: FormatContext) => formatShiftMessage('in', staffName, shiftObj as any, ctx);
   if (c.executionCtx?.waitUntil) {
     c.executionCtx.waitUntil(sendTelegramNotification(c.env, msg, 'shifts'));
   } else {
@@ -918,8 +918,7 @@ app.post('/api/staff/clock-out', async (c) => {
 
   const shiftToReport = shiftRecord || result.shift || shift;
   if (shiftToReport) {
-    const currency = store.getSettings().currency || '₹';
-    const msg = formatShiftMessage('out', staffName, shiftToReport, currency);
+    const msg = (ctx: FormatContext) => formatShiftMessage('out', staffName, shiftToReport, ctx);
     if (c.executionCtx?.waitUntil) {
       c.executionCtx.waitUntil(sendTelegramNotification(c.env, msg, 'shifts'));
     } else {
@@ -1181,8 +1180,7 @@ app.post('/api/orders', async (c) => {
     store.recordConfirmedOrder(orderData, body.items);
   }
 
-  const currency = store.getSettings().currency || '₹';
-  const msg = formatSaleMessage(orderData, body.items, currency);
+  const msg = (ctx: FormatContext) => formatSaleMessage(orderData, body.items, ctx);
   if (c.executionCtx?.waitUntil) {
     c.executionCtx.waitUntil(sendTelegramNotification(c.env, msg, 'sales'));
   } else {
@@ -1382,7 +1380,7 @@ app.put('/api/tasks/:id/status', async (c) => {
 
   if (status === 'completed' && updated) {
     const staffName = updated.assignedStaffId ? (store.getStaff().find(s => s.id === updated.assignedStaffId)?.name) : undefined;
-    const msg = formatTaskMessage(updated, staffName);
+    const msg = (ctx: FormatContext) => formatTaskMessage(updated, staffName, ctx);
     if (c.executionCtx?.waitUntil) {
       c.executionCtx.waitUntil(sendTelegramNotification(c.env, msg, 'tasks'));
     } else {
@@ -1414,60 +1412,7 @@ app.get('/api/kv-cache', async (c) => {
   return c.json({ data: snapshot });
 });
 
-// --- Telegram Test & Daily Financial Report Helpers ---
-export async function sendDailyFinancialReport(env: any): Promise<{ success: boolean; error?: string }> {
-  try {
-    let ordersList: any[] = [];
-    let expensesList: any[] = [];
-    let currency = '₹';
-    let timeZone = 'Asia/Tehran';
-
-    if (env?.DB) {
-      try {
-        const settingsRow = await env.DB.prepare('SELECT currency, time_zone FROM settings WHERE id = ?').bind('cafe_config').first();
-        const [from, to] = utcWindow(cafeDate(new Date(), String(settingsRow?.time_zone || timeZone)));
-        const { results: orders } = await env.DB.prepare('SELECT * FROM orders WHERE createdAt >= ? AND createdAt < ?').bind(from, to).all();
-        const { results: expenses } = await env.DB.prepare('SELECT * FROM expenses WHERE date >= ? AND date < ?').bind(from.slice(0, 10), to.slice(0, 10)).all();
-        if (orders) ordersList = mapRows(orders as Record<string, unknown>[]);
-        if (expenses) expensesList = mapRows(expenses as Record<string, unknown>[]);
-        if (settingsRow?.currency) currency = settingsRow.currency as string;
-        if (settingsRow?.time_zone) timeZone = settingsRow.time_zone as string;
-      } catch (e) {
-        throw e;
-      }
-    }
-
-    const todayStr = cafeDate(new Date(), timeZone);
-    const todayOrders = ordersList.filter(o => o.status === 'completed' && cafeDate(new Date(o.createdAt), timeZone) === todayStr);
-    const todayExpenses = expensesList.filter(e => (e.date || '').slice(0,10) === todayStr);
-
-    const totalRevenue = todayOrders.reduce((sum: number, o: any) => sum + Number(o.totalAmount || 0), 0);
-    const totalExpenses = todayExpenses.reduce((sum: number, e: any) => sum + Number(e.amount || 0), 0);
-    const netProfit = totalRevenue - totalExpenses;
-
-    const cashTotal = todayOrders.filter((o: any) => o.paymentMethod === 'cash').reduce((sum: number, o: any) => sum + Number(o.totalAmount || 0), 0);
-    const cardTotal = todayOrders.filter((o: any) => o.paymentMethod === 'card').reduce((sum: number, o: any) => sum + Number(o.totalAmount || 0), 0);
-    const qrTotal = todayOrders.filter((o: any) => o.paymentMethod === 'qr_pay').reduce((sum: number, o: any) => sum + Number(o.totalAmount || 0), 0);
-
-    const messageHtml = formatDailyFinancialReportMessage({
-      dateStr: todayStr,
-      totalRevenue,
-      totalOrders: todayOrders.length,
-      totalExpenses,
-      netProfit,
-      cashTotal,
-      cardTotal,
-      qrTotal,
-      currency
-    });
-
-    return await sendTelegramNotification(env, messageHtml, 'dailyReport');
-  } catch (err: any) {
-    console.error('[Daily Financial Report Error]:', err);
-    return { success: false, error: err.message || 'Failed to send daily financial report' };
-  }
-}
-
+// --- Telegram Test & Daily Financial Report ---
 app.post('/api/telegram/test', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const { botToken, chatId } = body;
@@ -1478,7 +1423,7 @@ app.post('/api/telegram/test', async (c) => {
 });
 
 app.post('/api/telegram/daily-report', async (c) => {
-  const result = await sendDailyFinancialReport(c.env);
+  const result = await sendDailyReport(c.env, undefined, true);
   return c.json(result);
 });
 
@@ -1504,9 +1449,9 @@ export default {
   fetch: app.fetch,
   async scheduled(event: any, env: Env['Bindings'], ctx: any) {
     if (ctx?.waitUntil) {
-      ctx.waitUntil(sendDailyFinancialReport(env));
+      ctx.waitUntil(runScheduledTelegram(env, new Date(event?.scheduledTime || Date.now())));
     } else {
-      await sendDailyFinancialReport(env);
+      await runScheduledTelegram(env, new Date(event?.scheduledTime || Date.now()));
     }
   }
 };

@@ -13,7 +13,7 @@
     "db:migrate:local": "wrangler d1 execute chth-cafe-db --local --file=./backup.sql",
     "db:migrate:remote": "wrangler d1 execute chth-cafe-db --remote --file=./backup.sql",
     "deploy": "npm run build && wrangler deploy",
-    "test": "node tests/operations.test.mjs",
+    "test": "node tests/operations.test.mjs && node tests/telegram.test.mjs",
     "dev:worker": "wrangler dev --local --var CAFE_DEV_PROXY:true",
     "dev:ui": "vite"
   },

@@ -1,6 +1,6 @@
 import { ImageUpload } from './ImageUpload';
 import React, { useEffect, useRef, useState } from 'react';
-import { Boxes, CalendarClock, CheckSquare, Clock, Database, Download, Eye, EyeOff, Palette, RefreshCw, Send, ShoppingCart, Store, UserCheck } from 'lucide-react';
+import { Bot, Boxes, CalendarClock, CheckSquare, Clock, Database, Download, Eye, EyeOff, Link2Off, Palette, RefreshCw, Send, ShoppingCart, Store, UserCheck } from 'lucide-react';
 import { SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { AppearanceEditor } from './AppearanceEditor';
@@ -68,6 +68,31 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
   const [reportLoading, setReportLoading] = useState(false);
   const [reportFeedback, setReportFeedback] = useState<Feedback>(null);
   const [resetOpen, setResetOpen] = useState(false);
+  const [botStatus, setBotStatus] = useState<{ connected: boolean; url: string; lastError: string } | null>(null);
+  const [botLoading, setBotLoading] = useState(false);
+  const [botFeedback, setBotFeedback] = useState<Feedback>(null);
+  const savedBotToken = !!settings.telegramBotToken;
+  const loadBotStatus = async () => {
+    try {
+      const res = await fetch('/api/telegram/webhook');
+      const data = await res.json() as { success?: boolean; data?: { connected: boolean; url: string; lastError: string } };
+      setBotStatus(data.success && data.data ? data.data : null);
+    } catch { setBotStatus(null); }
+  };
+  useEffect(() => { if (savedBotToken) void loadBotStatus(); }, [savedBotToken]);
+  const changeBotWebhook = async (method: 'POST' | 'DELETE') => {
+    setBotLoading(true); setBotFeedback(null);
+    try {
+      const res = await fetch('/api/telegram/webhook', { method });
+      const data = await res.json() as { success?: boolean; error?: string };
+      setBotFeedback(data.success
+        ? { success: true, message: method === 'POST' ? 'Bot commands are on. Send /help to your bot.' : 'Bot commands are off. Alerts still send.' }
+        : { success: false, message: data.error || 'Telegram did not accept the request.' });
+      await loadBotStatus();
+    } catch (err) {
+      setBotFeedback({ success: false, message: err instanceof Error ? err.message : 'Could not reach the Telegram API.' });
+    } finally { setBotLoading(false); }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -209,12 +234,29 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
                     {!telegramReady && <Notice tone="neutral">Add a bot token and chat ID to send tests. Saved credentials are used by the server.</Notice>}
                   </div>
                 </Card>
+                <Card title="Bot commands" description="Check sales, open orders, stock, shifts and tasks from Telegram, and act on them with buttons. Only the chat above can use them.">
+                  <div style={{ display: 'grid', gap: 12 }}>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <Button size="sm" icon={<Bot />} loading={botLoading} disabled={!savedBotToken || dirty} onClick={() => changeBotWebhook('POST')}>
+                        {botStatus?.connected ? 'Reconnect bot commands' : 'Connect bot commands'}
+                      </Button>
+                      {botStatus?.url && (
+                        <Button size="sm" variant="ghost" icon={<Link2Off />} disabled={botLoading || dirty} onClick={() => changeBotWebhook('DELETE')}>Disconnect</Button>
+                      )}
+                    </div>
+                    {botFeedback && <Notice tone={botFeedback.success ? 'positive' : 'danger'}>{botFeedback.message}</Notice>}
+                    {!botFeedback && botStatus?.connected && <Notice tone="positive">Connected. Try /today, /orders, /stock, /menu or /help in the chat.</Notice>}
+                    {!botFeedback && botStatus && !botStatus.connected && botStatus.url && <Notice tone="neutral">The bot sends updates to another address ({botStatus.url}). Reconnect to use it here.</Notice>}
+                    {botStatus?.lastError && <Notice tone="danger">Telegram’s last delivery error: {botStatus.lastError}</Notice>}
+                    {(!savedBotToken || dirty) && <Notice tone="neutral">Save a bot token and chat ID first. Send /chatid to the bot to find a chat’s ID once connected.</Notice>}
+                  </div>
+                </Card>
                 <Card title="What to send">
                   <ToggleRow icon={<ShoppingCart width={18} height={18} />} title="Sales" description="Order number, items, total, and payment method" checked={!!formData.notifySales} onChange={v => edit({ notifySales: v })} />
                   <ToggleRow icon={<UserCheck width={18} height={18} />} title="Clock in and out" description="Who, how long, and the wage for the shift" checked={!!formData.notifyShifts} onChange={v => edit({ notifyShifts: v })} />
                   <ToggleRow icon={<CheckSquare width={18} height={18} />} title="Checklist completed" description="Task, priority, category, and assignee" checked={!!formData.notifyTasks} onChange={v => edit({ notifyTasks: v })} />
-                  <ToggleRow icon={<Clock width={18} height={18} />} title="Daily summary at midnight" description="Revenue, expenses, profit, and payment mix" checked={!!formData.notifyDailyReport} onChange={v => edit({ notifyDailyReport: v })} />
-                  <ToggleRow icon={<Boxes width={18} height={18} />} title="Low stock" description="When a material reaches its reorder level" checked={!!formData.notifyLowStock} onChange={v => edit({ notifyLowStock: v })} />
+                  <ToggleRow icon={<Clock width={18} height={18} />} title="Daily summary at midnight" description="Yesterday’s revenue, expenses, profit, payment mix and top sellers" checked={!!formData.notifyDailyReport} onChange={v => edit({ notifyDailyReport: v })} />
+                  <ToggleRow icon={<Boxes width={18} height={18} />} title="Low stock" description="When a material reaches its reorder level, plus a 9:00 morning check" checked={!!formData.notifyLowStock} onChange={v => edit({ notifyLowStock: v })} />
                 </Card>
               </section>
             </fieldset>
