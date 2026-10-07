@@ -86,6 +86,27 @@ For the button flow, use `npm run deploy` as the deploy command; it builds the a
 
 Telegram notifications optionally use `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Set the cafe timezone and opening hours in Settings before accepting orders.
 
+### Telegram bot
+
+Add a bot token and chat ID in **Settings → Notifications** (or set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`) to receive sales, shift, checklist and low-stock alerts. Pending orders arrive with buttons to start, finish or cancel them.
+
+To manage the café from the chat, deploy over HTTPS and press **Connect bot commands**. That registers `/telegram/webhook` with Telegram, protected by a secret derived from `SESSION_SECRET`. Only the configured chat can use the commands; any other chat can only send `/chatid` to find its ID.
+
+| Command | What it does |
+| --- | --- |
+| `/today` | Revenue, expenses, payment mix and top sellers so far |
+| `/orders` | Open orders, with a button to move each one along |
+| `/stock`, `/stock all` | Ingredients at or below their reorder level, or everything |
+| `/restock milk 12` | Record a purchase in the ingredient's own unit |
+| `/menu latte`, `/soldout` | Mark menu items sold out or back on |
+| `/staff` | Who is clocked in, and for how long |
+| `/tasks` | Open checklist tasks; tap to complete |
+| `/expense 250 milk` | Log a cash expense for today |
+| `/week`, `/report [YYYY-MM-DD]` | Last 7 days, or a full daily report (yesterday by default) |
+| `/status`, `/alerts` | Open or closed now; turn each alert on or off |
+
+The cron runs hourly. After midnight café time it sends yesterday's report, and from 09:00 it sends a low-stock check. Each runs once a day, tracked in KV.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md).
