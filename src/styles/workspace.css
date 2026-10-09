@@ -665,6 +665,17 @@ button.ws-stat:active { transform: scale(.98); transition-duration: 160ms; }
 .ws-tile-qty { position: absolute; top: -8px; right: -8px; min-width: 26px; height: 26px; padding: 0 7px; border-radius: var(--ws-pill); background: var(--ws-count); color: #fff; font: 700 13px/26px var(--font-sans); text-align: center; box-shadow: 0 0 0 3px var(--ws-bg); animation: ws-pop 280ms var(--ws-spring); }
 @keyframes ws-pop { from { transform: scale(.6); opacity: 0; } }
 
+.ws-pick { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px; border: 1.5px dashed var(--ws-accent); border-radius: var(--ws-radius); background: var(--ws-accent-soft); }
+.ws-pick-reel { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow: hidden; mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent); padding: 4px 0; }
+.ws-pick-label { font: 700 11px var(--font-sans); text-transform: uppercase; letter-spacing: .1em; color: var(--ws-muted); }
+.ws-pick-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 18px/1.25 var(--ws-display); }
+.ws-pick.is-spinning .ws-pick-name { animation: ws-reel-tick 110ms linear; }
+.ws-pick.is-landed .ws-pick-name { color: var(--ws-accent); animation: ws-reel-land 460ms var(--ws-spring); }
+.ws-pick-actions { display: flex; align-items: center; gap: 6px; }
+@keyframes ws-reel-tick { from { transform: translateY(-75%); opacity: .2; } }
+@keyframes ws-reel-land { from { transform: translateY(-60%) scale(.96); opacity: 0; } }
+@media (max-width: 480px) { .ws-pick { flex-wrap: wrap; } .ws-pick-reel { flex-basis: 100%; } .ws-pick-actions, .ws-pick > .ws-btn, .ws-pick-actions > .ws-btn { flex: 1; } }
+
 .ws-clock { font: 600 clamp(44px, 8vw, 72px)/1 var(--font-mono); letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
 .ws-people { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); }
 .ws-person {
