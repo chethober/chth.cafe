@@ -29,6 +29,7 @@ wrangler.production.jsonc
 
 # hastea.shop deploy config, credentials, and DB backups
 wrangler.hastea.jsonc
+wrangler.hastea-new.jsonc
 .hastea-credentials
 backups/
 

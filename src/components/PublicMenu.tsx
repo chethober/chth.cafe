@@ -5,6 +5,7 @@ import { store } from '../db/store';
 import { getOpeningStatus } from '../utils/openingHours';
 import { OrderTracking, OrderReceipt } from './OrderTracking';
 import { Modal } from './Modal';
+import { reducedMotion } from '../ui';
 
 interface PublicMenuProps {
   settings: SettingsSelect;
@@ -35,8 +36,6 @@ function readSavedItems(): string[] {
     return [];
   }
 }
-
-const reducedMotion = () => document.documentElement.dataset.motion === 'reduced' || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // A stable hue per item, so photo-less items still get their own colour swatch.
 const hueFor = (text: string) => [...text].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) % 360, 17);

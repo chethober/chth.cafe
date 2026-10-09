@@ -645,25 +645,59 @@ button.ws-stat:active { transform: scale(.98); transition-duration: 160ms; }
 .ws-lane-dot { width: 10px; height: 10px; border-radius: 50%; }
 .ws-lane-empty { padding: 28px 16px; text-align: center; font-size: 13px; color: var(--ws-muted); border: 2px dashed var(--ws-rule); border-radius: var(--ws-radius-lg); }
 
-.ws-tiles { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 168px), 1fr)); }
-.ws-tile {
-  position: relative; display: flex; flex-direction: column; gap: 8px; padding: 14px 14px 10px; min-height: 124px;
-  background: var(--ws-surface); border: 1px solid var(--ws-rule); border-radius: 18px; box-shadow: var(--ws-shadow);
-  transition: border-color 200ms ease, box-shadow 240ms ease, transform 240ms var(--ws-ease);
-}
-.ws-tile:has(.ws-tile-hit:active:not(:disabled)) { transform: scale(.97); transition-duration: 160ms; }
-.ws-tile[data-selected] { border-color: var(--ws-accent); box-shadow: inset 0 0 0 1px var(--ws-accent), var(--ws-shadow); }
-.ws-tile[aria-disabled='true'] { background: var(--ws-soft); box-shadow: none; }
-.ws-tile[aria-disabled='true'] .ws-tile-name { color: var(--ws-muted); text-decoration: line-through; text-decoration-thickness: 1px; }
-@media (hover: hover) and (pointer: fine) { .ws-tile:has(.ws-tile-hit:hover:not(:disabled):not(:active)) { transform: translateY(-3px); box-shadow: var(--ws-shadow-hover); } }
-.ws-tile-hit { flex: 1; display: flex; flex-direction: column; gap: 6px; padding: 2px; margin: -2px; text-align: left; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; border-radius: var(--ws-radius-sm); }
-.ws-tile-hit:disabled { cursor: default; }
-.ws-tile-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin: 0 -4px; }
-.ws-tile-name { font: 600 17px/1.2 var(--ws-display); letter-spacing: -.01em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.ws-tile-price { font: 700 15px var(--font-sans); font-variant-numeric: tabular-nums; margin-top: auto; }
-/* The same red count bubble as the menu's basket. */
-.ws-tile-qty { position: absolute; top: -8px; right: -8px; min-width: 26px; height: 26px; padding: 0 7px; border-radius: var(--ws-pill); background: var(--ws-count); color: #fff; font: 700 13px/26px var(--font-sans); text-align: center; box-shadow: 0 0 0 3px var(--ws-bg); animation: ws-pop 280ms var(--ws-spring); }
 @keyframes ws-pop { from { transform: scale(.6); opacity: 0; } }
+
+/* Menu picker: categories that open into their items. Tapped all day, so motion stays small and quick. */
+.ws-picker { display: flex; flex-direction: column; gap: 8px; }
+.ws-picker-group { background: var(--ws-surface); border: 1px solid var(--ws-rule); border-radius: 18px; box-shadow: var(--ws-shadow); overflow: hidden; }
+.ws-dialog .ws-picker-group { box-shadow: none; }
+.ws-picker-head {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 14px;
+  background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color 120ms ease;
+}
+.ws-picker-head:active { background: var(--ws-pressed); }
+@media (hover: hover) and (pointer: fine) { .ws-picker-head:hover:not(:active) { background: var(--ws-hover); } }
+.ws-picker-icon { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; border-radius: 12px; background: var(--ws-accent-tile); color: var(--ws-accent); }
+.ws-picker-icon > svg { width: 18px; height: 18px; }
+.ws-picker-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 17px/1.2 var(--ws-display); letter-spacing: -.01em; }
+.ws-picker-meta { flex-shrink: 0; font-size: 13px; color: var(--ws-muted); font-variant-numeric: tabular-nums; }
+.ws-picker-chevron { width: 18px; height: 18px; flex-shrink: 0; color: var(--ws-muted); transition: transform 200ms var(--ws-ease); }
+.ws-picker-head[aria-expanded='true'] .ws-picker-chevron { transform: rotate(180deg); }
+.ws-picker-items { list-style: none; margin: 0; padding: 6px; display: flex; flex-direction: column; gap: 2px; }
+.ws-picker-head + .ws-picker-items { border-top: 1px solid var(--ws-rule); animation: ws-picker-in 180ms var(--ws-ease); }
+@keyframes ws-picker-in { from { opacity: 0; transform: translateY(-4px); } }
+.ws-picker-item { display: flex; align-items: center; gap: 4px; padding-right: 4px; border-radius: 12px; transition: background-color 120ms ease; }
+@media (hover: hover) and (pointer: fine) { .ws-picker-item:has(.ws-picker-add:hover:not(:disabled)) { background: var(--ws-hover); } }
+.ws-picker-add {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 8px 6px 10px;
+  background: none; border: 0; border-radius: 12px; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  transition: background-color 120ms ease, transform 160ms var(--ws-ease);
+}
+.ws-picker-add:active:not(:disabled) { transform: scale(.98); background: var(--ws-pressed); }
+.ws-picker-add:disabled { cursor: default; }
+.ws-picker-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ws-picker-price { flex-shrink: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ws-picker-item[data-sold-out] .ws-picker-item-name { color: var(--ws-muted); text-decoration: line-through; text-decoration-thickness: 1px; }
+.ws-picker-item[data-sold-out] .ws-picker-add:disabled .ws-picker-price { color: var(--ws-muted); font-weight: 500; font-size: 13px; }
+.ws-picker-plus, .ws-picker-qty { flex-shrink: 0; min-width: 26px; height: 26px; display: grid; place-items: center; border-radius: var(--ws-pill); }
+.ws-picker-plus { background: var(--ws-soft); color: var(--ws-accent); }
+.ws-picker-plus > svg { width: 15px; height: 15px; }
+.ws-picker-add:disabled .ws-picker-plus { visibility: hidden; }
+/* The same red count bubble as the menu's basket. */
+.ws-picker-qty { padding: 0 7px; background: var(--ws-count); color: #fff; font: 700 13px/1 var(--font-sans); font-variant-numeric: tabular-nums; animation: ws-pop 280ms var(--ws-spring); }
+.ws-picker-head .ws-picker-qty { min-width: 22px; height: 22px; font-size: 12px; }
+.ws-picker-actions { flex-shrink: 0; display: flex; align-items: center; gap: 2px; }
+
+.ws-pick { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px; border: 1.5px dashed var(--ws-accent); border-radius: var(--ws-radius); background: var(--ws-accent-soft); }
+.ws-pick-reel { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow: hidden; mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent); padding: 4px 0; }
+.ws-pick-label { font: 700 11px var(--font-sans); text-transform: uppercase; letter-spacing: .1em; color: var(--ws-muted); }
+.ws-pick-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 18px/1.25 var(--ws-display); }
+.ws-pick.is-spinning .ws-pick-name { animation: ws-reel-tick 110ms linear; }
+.ws-pick.is-landed .ws-pick-name { color: var(--ws-accent); animation: ws-reel-land 460ms var(--ws-spring); }
+.ws-pick-actions { display: flex; align-items: center; gap: 6px; }
+@keyframes ws-reel-tick { from { transform: translateY(-75%); opacity: .2; } }
+@keyframes ws-reel-land { from { transform: translateY(-60%) scale(.96); opacity: 0; } }
+@media (max-width: 480px) { .ws-pick { flex-wrap: wrap; } .ws-pick-reel { flex-basis: 100%; } .ws-pick-actions, .ws-pick > .ws-btn, .ws-pick-actions > .ws-btn { flex: 1; } }
 
 .ws-clock { font: 600 clamp(44px, 8vw, 72px)/1 var(--font-mono); letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
 .ws-people { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); }

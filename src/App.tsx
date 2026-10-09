@@ -222,7 +222,7 @@ export const App: React.FC = () => {
         mobileActions={<IconButton label="Settings" variant={adminTab === 'settings' ? 'tonal' : 'ghost'} onClick={() => setAdminTab('settings')}><Settings /></IconButton>}
         {...shellProps}
       >
-        {adminTab === 'financials' && <FinancialTracker settings={settings} orders={orders} expenses={expenses} menuItems={menuItems} onFinancialsUpdated={refresh} />}
+        {adminTab === 'financials' && <FinancialTracker settings={settings} orders={orders} expenses={expenses} categories={categories} menuItems={menuItems} onFinancialsUpdated={refresh} />}
         {adminTab === 'tasks' && <TaskManager tasks={tasksList} staffList={staffList} onTasksUpdated={refresh} />}
         {adminTab === 'menu_admin' && <MenuAdmin settings={settings} categories={categories} menuItems={menuItems} menuVariants={menuVariants} onMenuUpdated={refresh} />}
         {adminTab === 'stock' && <StockManagement settings={settings} stockItems={stockItems} onStockUpdated={refresh} />}

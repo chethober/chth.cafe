@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Boxes, CheckSquare, ChefHat, Clock, History, LayoutGrid, Plus, Receipt, ShoppingBag, Tag, Trash2, Users, UtensilsCrossed } from 'lucide-react';
+import { Boxes, CheckSquare, ChefHat, Clock, History, LayoutGrid, Plus, Receipt, ShoppingBag, Shuffle, Tag, Trash2, Users } from 'lucide-react';
 import {
   OrderSelect,
   OrderItemSelect,
@@ -15,10 +15,10 @@ import { store } from '../db/store';
 import {
   AffixInput, Avatar, Badge, Button, Card, Chips, ConfirmDialog, Dialog, EmptyState, Field, FormDialog, IconButton, Input,
   KeyValue, List, ListItem, Meter, Notice, Page, PageHeader, SearchInput, Segmented, Select, Stat, StatGrid, Stepper, Switch,
-  ageLabel, formatDate, formatTime, localDateKey, minutesSince, money, orderTypeLabel, paymentLabel, plural, timestampForDay,
+  ageLabel, formatDate, reducedMotion, formatTime, localDateKey, minutesSince, money, orderTypeLabel, paymentLabel, plural, timestampForDay,
   ORDER_PAYMENT_METHODS, OrderPaymentMethod
 } from '../ui';
-import { OrderDetailsDialog, TaskFormDialog, TaskRow, TASK_CATEGORIES, TASK_CATEGORY_ICONS, nextTaskStatus } from './shared';
+import { MenuPicker, OrderDetailsDialog, TaskFormDialog, TaskRow, TASK_CATEGORIES, TASK_CATEGORY_ICONS, nextTaskStatus } from './shared';
 
 export type PanelSection = 'orders' | 'pos' | 'tasks' | 'shifts';
 type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
@@ -99,7 +99,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
 
   /* ---------------------------------------------------------------- POS */
   const [cart, setCart] = useState<CartLine[]>([]);
-  const [posCategory, setPosCategory] = useState('all');
+  const [posOpen, setPosOpen] = useState<string[]>([]);
   const [posSearch, setPosSearch] = useState('');
   const [posCustomer, setPosCustomer] = useState('');
   const [posOrderType, setPosOrderType] = useState<OrderType>('dine_in');
@@ -177,10 +177,38 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
     setCustomOpen(false);
   };
 
-  const visibleMenu = menuItems.filter(item => {
-    const q = posSearch.trim().toLowerCase();
-    return (posCategory === 'all' || item.categoryId === posCategory) && (!q || item.name.toLowerCase().includes(q));
-  });
+  // What's on screen: search matches, else the open categories, else the whole menu.
+  const posQuery = posSearch.trim().toLowerCase();
+  const visibleMenu = menuItems.filter(item => posQuery
+    ? item.name.toLowerCase().includes(posQuery)
+    : !posOpen.length || posOpen.includes(categories.some(c => c.id === item.categoryId) ? item.categoryId : 'other'));
+  const cartQuantities = Object.fromEntries(cart.map(l => [l.menuItemId, l.quantity]));
+
+  // "Pick for me": a short reel through the in-stock items on screen that slows to a stop, like the public menu's.
+  const [pick, setPick] = useState<{ phase: 'idle' | 'spinning' | 'landed'; itemId: string | null; tick: number }>({ phase: 'idle', itemId: null, tick: 0 });
+  const pickTimers = useRef<number[]>([]);
+  useEffect(() => () => pickTimers.current.forEach(window.clearTimeout), []);
+  const pickable = visibleMenu.filter(item => item.isInStock);
+  const pickedItem = menuItems.find(item => item.id === pick.itemId);
+  const pickForMe = () => {
+    if (pick.phase === 'spinning' || !pickable.length) return;
+    const alternatives = pickable.filter(item => item.id !== pick.itemId);
+    const pool = alternatives.length ? alternatives : pickable;
+    // Roll outside the updaters: StrictMode double-invokes them.
+    const winner = pool[Math.floor(Math.random() * pool.length)];
+    pickTimers.current.forEach(window.clearTimeout);
+    pickTimers.current = [];
+    const land = () => setPick(prev => ({ phase: 'landed', itemId: winner.id, tick: prev.tick + 1 }));
+    if (reducedMotion() || pickable.length < 2) { land(); return; }
+    let elapsed = 0;
+    for (let index = 0; index < 11; index++) {
+      elapsed += 45 * Math.pow(1.2, index);
+      const shown = pickable[Math.floor(Math.random() * pickable.length)];
+      pickTimers.current.push(window.setTimeout(() => setPick(prev => ({ phase: 'spinning', itemId: shown.id, tick: prev.tick + 1 })), elapsed));
+    }
+    setPick(prev => ({ ...prev, phase: 'spinning' }));
+    pickTimers.current.push(window.setTimeout(land, elapsed + 160));
+  };
 
   /* -------------------------------------------------------------- Tasks */
   const [taskStatus, setTaskStatus] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
@@ -336,32 +364,39 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
           <div className="ws-grid ws-grid-pos">
             <div className="ws-toolbar-stack" style={{ minWidth: 0 }}>
               <SearchInput value={posSearch} onChange={setPosSearch} placeholder="Find a drink or dish" label="Search menu" />
-              <Chips label="Menu category" value={posCategory} onChange={setPosCategory} options={[
-                { value: 'all', label: 'Everything', count: menuItems.length },
-                ...categories.map(c => ({ value: c.id, label: c.name, count: menuItems.filter(i => i.categoryId === c.id).length }))
-              ]} />
-              {visibleMenu.length === 0 ? (
-                <Card><EmptyState icon={<UtensilsCrossed />} title="Nothing matches" description="Try another category or search term." /></Card>
-              ) : (
-                <div className="ws-tiles">
-                  {visibleMenu.map(item => {
-                    const qty = cart.find(l => l.menuItemId === item.id)?.quantity || 0;
-                    return (
-                      <div key={item.id} className="ws-tile" data-selected={qty > 0 ? '' : undefined} aria-disabled={!item.isInStock}>
-                        {qty > 0 && <span className="ws-tile-qty" aria-hidden="true">{qty}</span>}
-                        <button type="button" className="ws-tile-hit" disabled={!item.isInStock} onClick={() => addToCart(item)} aria-label={item.isInStock ? `Add ${item.name}, ${fmt(item.basePrice)}${qty ? `. ${qty} in order` : ''}` : `${item.name} is sold out`}>
-                          <span className="ws-tile-name">{item.name}</span>
-                          <span className="ws-tile-price">{item.isInStock ? fmt(item.basePrice) : 'Sold out'}</span>
-                        </button>
-                        <div className="ws-tile-foot">
-                          <IconButton label={`Recipe for ${item.name}`} onClick={() => setRecipeItem(item)}><Boxes /></IconButton>
-                          <Switch label={`${item.name} available`} checked={item.isInStock} onChange={() => { store.toggleStock(item.id); onStateChange(); }} />
-                        </div>
-                      </div>
-                    );
-                  })}
+              <div className={`ws-pick is-${pick.phase}`}>
+                <div className="ws-pick-reel" aria-hidden={pick.phase !== 'landed'}>
+                  <span className="ws-pick-label">{pick.phase === 'landed' ? 'How about' : 'Can’t decide?'}</span>
+                  <span key={pick.tick} className="ws-pick-name">{pickedItem ? pickedItem.name : 'Let the menu choose'}</span>
                 </div>
-              )}
+                <span className="sr-only" role="status">{pick.phase === 'landed' && pickedItem ? `Picked ${pickedItem.name}, ${fmt(pickedItem.basePrice)}` : ''}</span>
+                {pick.phase === 'landed' && pickedItem ? (
+                  <div className="ws-pick-actions">
+                    <Button variant="primary" icon={<Plus />} disabled={!pickedItem.isInStock || savingOrder} onClick={() => addToCart(pickedItem)}>
+                      {pickedItem.isInStock ? `Add · ${fmt(pickedItem.basePrice)}` : 'Sold out'}
+                    </Button>
+                    <IconButton label="Pick again" onClick={pickForMe} disabled={!pickable.length || savingOrder}><Shuffle /></IconButton>
+                  </div>
+                ) : (
+                  <Button icon={<Shuffle />} onClick={pickForMe} disabled={!pickable.length || pick.phase === 'spinning' || savingOrder}>
+                    {pick.phase === 'spinning' ? 'Picking…' : 'Pick for me'}
+                  </Button>
+                )}
+              </div>
+              <MenuPicker
+                categories={categories}
+                menuItems={menuItems}
+                query={posSearch}
+                open={posOpen}
+                onOpenChange={setPosOpen}
+                quantities={cartQuantities}
+                onAdd={addToCart}
+                fmt={fmt}
+                itemActions={item => <>
+                  <IconButton label={`Recipe for ${item.name}`} onClick={() => setRecipeItem(item)}><Boxes /></IconButton>
+                  <Switch label={`${item.name} available`} checked={item.isInStock} onChange={() => { store.toggleStock(item.id); onStateChange(); }} />
+                </>}
+              />
             </div>
 
             <div ref={ticketRef} className="ws-sticky-col" style={{ scrollMarginTop: 80 }}>
