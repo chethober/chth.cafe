@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
-import { MenuItemSelect, SettingsSelect } from '../db/schema';
+import { Trash2 } from 'lucide-react';
+import { CategorySelect, MenuItemSelect, SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import {
-  Button, Field, FormDialog, IconButton, Input, KeyValue, Notice, Segmented, Select, Stepper,
+  Field, FormDialog, IconButton, Input, KeyValue, Notice, SearchInput, Segmented, Select, Stepper,
   localDateKey, money, paymentLabel, plural, timestampForDay, ORDER_PAYMENT_METHODS, OrderPaymentMethod
 } from '../ui';
+import { MenuPicker } from './shared';
 
 interface QuickPOSModalProps {
   isOpen: boolean;
   onClose: () => void;
+  categories: CategorySelect[];
   menuItems: MenuItemSelect[];
   settings: SettingsSelect;
   onOrderCreated: () => void;
@@ -18,7 +20,7 @@ interface QuickPOSModalProps {
 interface Line { menuItemId: string; itemName: string; quantity: number; unitPrice: number }
 
 /** Records a completed sale after the fact (e.g. a missed walk-in or back-dated order). */
-export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({ isOpen, onClose, menuItems, settings, onOrderCreated }) => {
+export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({ isOpen, onClose, categories, menuItems, settings, onOrderCreated }) => {
   const fmt = (v: number) => money(v, settings.currency);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -26,22 +28,20 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({ isOpen, onClose, m
   const [customer, setCustomer] = useState('');
   const [orderType, setOrderType] = useState<'dine_in' | 'takeout' | 'pickup'>('dine_in');
   const [payment, setPayment] = useState<OrderPaymentMethod>('card');
-  const [selectedId, setSelectedId] = useState('');
+  const [search, setSearch] = useState('');
+  const [openCategories, setOpenCategories] = useState<string[]>([]);
   const [cart, setCart] = useState<Line[]>([]);
 
   useEffect(() => {
     if (!isOpen) return;
     setDate(localDateKey()); setCustomer(''); setOrderType('dine_in'); setPayment('card');
-    setSelectedId(menuItems[0]?.id || ''); setCart([]); setError('');
+    setSearch(''); setOpenCategories([]); setCart([]); setError('');
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const add = () => {
-    const item = menuItems.find(i => i.id === selectedId);
-    if (!item) return;
+  const add = (item: MenuItemSelect) =>
     setCart(prev => prev.some(l => l.menuItemId === item.id)
       ? prev.map(l => l.menuItemId === item.id ? { ...l, quantity: l.quantity + 1 } : l)
       : [...prev, { menuItemId: item.id, itemName: item.name, quantity: 1, unitPrice: item.basePrice }]);
-  };
   const changeQty = (id: string, delta: number) =>
     setCart(prev => prev.flatMap(l => l.menuItemId !== id ? [l] : l.quantity + delta > 0 ? [{ ...l, quantity: l.quantity + delta }] : []));
 
@@ -85,14 +85,23 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({ isOpen, onClose, m
       onSubmit={handleSubmit}
     >
       {error && <Notice tone="danger">{error}</Notice>}
-      <Field label="Add items">{id => (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Select id={id} value={selectedId} onChange={e => setSelectedId(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}>
-            {menuItems.map(i => <option key={i.id} value={i.id}>{i.name} · {fmt(i.basePrice)}</option>)}
-          </Select>
-          <Button icon={<Plus />} onClick={add} disabled={!selectedId}>Add</Button>
+      <div className="ws-field">
+        <span className="ws-label">Add items</span>
+        <div className="ws-toolbar-stack">
+          <SearchInput value={search} onChange={setSearch} placeholder="Find a drink or dish" label="Search menu" />
+          <MenuPicker
+            categories={categories}
+            menuItems={menuItems}
+            query={search}
+            open={openCategories}
+            onOpenChange={setOpenCategories}
+            quantities={Object.fromEntries(cart.map(l => [l.menuItemId, l.quantity]))}
+            onAdd={add}
+            fmt={fmt}
+            allowSoldOut
+          />
         </div>
-      )}</Field>
+      </div>
 
       {cart.length === 0 ? (
         <div className="ws-lane-empty">No items yet.</div>

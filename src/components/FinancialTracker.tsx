@@ -1,7 +1,7 @@
 import { Reconciliation } from './Reconciliation';
 import React, { useMemo, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, Download, PenLine, Percent, Plus, Receipt, ShoppingBag, Trash2, Wallet } from 'lucide-react';
-import { OrderSelect, ExpenseSelect, SettingsSelect, MenuItemSelect } from '../db/schema';
+import { CategorySelect, OrderSelect, ExpenseSelect, SettingsSelect, MenuItemSelect } from '../db/schema';
 import { store } from '../db/store';
 import {
   Amount, Button, Card, ConfirmDialog, EmptyState, IconButton, LineChart, List, ListItem, Page, PageHeader, Segmented, Stat, StatGrid,
@@ -16,6 +16,7 @@ interface FinancialTrackerProps {
   settings: SettingsSelect;
   orders: OrderSelect[];
   expenses: ExpenseSelect[];
+  categories: CategorySelect[];
   menuItems: MenuItemSelect[];
   onFinancialsUpdated: () => void;
 }
@@ -26,7 +27,7 @@ const PAYMENT_COLORS: Record<string, string> = {
   cash: 'var(--ws-series-1)', card: 'var(--ws-series-2)', google_pay: 'var(--ws-series-3)', online: 'var(--ws-series-4)'
 };
 
-export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, orders, expenses, menuItems, onFinancialsUpdated }) => {
+export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, orders, expenses, categories, menuItems, onFinancialsUpdated }) => {
   const currency = settings.currency;
   const fmt = (v: number) => money(v, currency);
   const [manualLogOpen, setManualLogOpen] = useState(false);
@@ -236,7 +237,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
 
       <OrderDetailsDialog order={viewOrder} items={viewOrder ? store.getOrderItems(viewOrder.id) : []} currency={currency} taxRate={settings.taxRate} onClose={() => setViewOrder(null)} />
       <ManualLogModal isOpen={manualLogOpen} onClose={() => setManualLogOpen(false)} settings={settings} onFinancialsUpdated={onFinancialsUpdated} />
-      <QuickPOSModal isOpen={quickSaleOpen} onClose={() => setQuickSaleOpen(false)} menuItems={menuItems} settings={settings} onOrderCreated={onFinancialsUpdated} />
+      <QuickPOSModal isOpen={quickSaleOpen} onClose={() => setQuickSaleOpen(false)} categories={categories} menuItems={menuItems} settings={settings} onOrderCreated={onFinancialsUpdated} />
       <FinanceExportDialog open={exportOpen} onClose={() => setExportOpen(false)} orders={orders} expenses={expenses} currency={currency} />
       <ConfirmDialog
         open={!!deleteTarget}

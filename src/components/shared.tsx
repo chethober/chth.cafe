@@ -1,11 +1,90 @@
 import React, { useEffect, useState } from 'react';
-import { Boxes, CheckCircle2, Circle, Moon, PlayCircle, Sparkles, Sun, Trash2, User, Wrench } from 'lucide-react';
-import { OrderItemSelect, OrderSelect, StaffSelect, TaskSelect } from '../db/schema';
+import { Boxes, Cake, CheckCircle2, ChevronDown, Circle, Coffee, GlassWater, Leaf, Moon, PlayCircle, Plus, Sparkles, Sun, Trash2, User, Utensils, Wrench } from 'lucide-react';
+import { CategorySelect, MenuItemSelect, OrderItemSelect, OrderSelect, StaffSelect, TaskSelect } from '../db/schema';
 import { store } from '../db/store';
 import {
-  Badge, Button, Dialog, Field, FormDialog, IconButton, Input, KeyValue, ListItem, Select,
-  formatDateTime, localDateKey, money, orderStatusTone, orderTypeLabel, paymentLabel, ORDER_STATUS_LABELS
+  Badge, Button, Dialog, EmptyState, Field, FormDialog, IconButton, Input, KeyValue, ListItem, Select,
+  formatDateTime, plural, localDateKey, money, orderStatusTone, orderTypeLabel, paymentLabel, ORDER_STATUS_LABELS
 } from '../ui';
+
+/* --------------------------------------------------------------- Menu */
+
+export const CATEGORY_ICONS: Record<string, { icon: React.ReactNode; label: string }> = {
+  Coffee: { icon: <Coffee />, label: 'Coffee / espresso' },
+  Leaf: { icon: <Leaf />, label: 'Tea' },
+  GlassWater: { icon: <GlassWater />, label: 'Cold drinks' },
+  Cake: { icon: <Cake />, label: 'Bakery & pastries' },
+  Utensils: { icon: <Utensils />, label: 'Brunch & food' }
+};
+
+/**
+ * The menu as a short list of categories: tap one to open its items, tap an item to add it.
+ * Several can be open at once, so opening one never shifts the others. A search query lists matches flat.
+ */
+export function MenuPicker({ categories, menuItems, query = '', open, onOpenChange, quantities, onAdd, fmt, allowSoldOut, itemActions }: {
+  categories: CategorySelect[];
+  menuItems: MenuItemSelect[];
+  query?: string;
+  open: string[];
+  onOpenChange: (open: string[]) => void;
+  quantities: Record<string, number>;
+  onAdd: (item: MenuItemSelect) => void;
+  fmt: (value: number) => string;
+  /** Let sold-out items be added anyway, e.g. when recording a past sale. */
+  allowSoldOut?: boolean;
+  itemActions?: (item: MenuItemSelect) => React.ReactNode;
+}) {
+  const known = new Set(categories.map(c => c.id));
+  const groups = [
+    ...categories.map(c => ({ id: c.id, name: c.name, icon: CATEGORY_ICONS[c.icon || '']?.icon || <Coffee />, items: menuItems.filter(i => i.categoryId === c.id) })),
+    { id: 'other', name: 'Other', icon: <Utensils />, items: menuItems.filter(i => !known.has(i.categoryId)) }
+  ].filter(g => g.items.length > 0);
+
+  const row = (item: MenuItemSelect) => {
+    const qty = quantities[item.id] || 0;
+    const addable = item.isInStock || !!allowSoldOut;
+    return (
+      <li key={item.id} className="ws-picker-item" data-sold-out={!item.isInStock || undefined}>
+        <button type="button" className="ws-picker-add" disabled={!addable} onClick={() => onAdd(item)}
+          aria-label={addable ? `Add ${item.name}, ${fmt(item.basePrice)}${qty ? `. ${qty} in order` : ''}` : `${item.name} is sold out`}>
+          <span className="ws-picker-item-name">{item.name}</span>
+          <span className="ws-picker-price">{addable ? fmt(item.basePrice) : 'Sold out'}</span>
+          {qty > 0 ? <span className="ws-picker-qty" aria-hidden="true">{qty}</span> : <span className="ws-picker-plus" aria-hidden="true"><Plus /></span>}
+        </button>
+        {itemActions && <div className="ws-picker-actions">{itemActions(item)}</div>}
+      </li>
+    );
+  };
+
+  const q = query.trim().toLowerCase();
+  if (q) {
+    const matches = menuItems.filter(i => i.name.toLowerCase().includes(q));
+    if (!matches.length) return <div className="ws-picker-group"><EmptyState title="Nothing matches" description="Try another search term." /></div>;
+    return <div className="ws-picker-group"><ul className="ws-picker-items" aria-label="Search results">{matches.map(row)}</ul></div>;
+  }
+
+  return (
+    <div className="ws-picker">
+      {groups.map(group => {
+        const isOpen = open.includes(group.id);
+        const inOrder = group.items.reduce((sum, i) => sum + (quantities[i.id] || 0), 0);
+        return (
+          <section key={group.id} className="ws-picker-group">
+            <button type="button" className="ws-picker-head" aria-expanded={isOpen} aria-controls={`ws-picker-${group.id}`}
+              onClick={() => onOpenChange(isOpen ? open.filter(id => id !== group.id) : [...open, group.id])}>
+              <span className="ws-picker-icon" aria-hidden="true">{group.icon}</span>
+              <span className="ws-picker-name">{group.name}</span>
+              {inOrder > 0 && <span className="ws-picker-qty" aria-label={`${inOrder} in order`}>{inOrder}</span>}
+              <span className="ws-picker-meta">{plural(group.items.length, 'item')}</span>
+              <ChevronDown className="ws-picker-chevron" aria-hidden="true" />
+            </button>
+            {isOpen && <ul id={`ws-picker-${group.id}`} className="ws-picker-items" aria-label={group.name}>{group.items.map(row)}</ul>}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------------ Tasks */
 

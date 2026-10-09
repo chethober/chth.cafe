@@ -1,6 +1,6 @@
 import { ImageUpload } from './ImageUpload';
 import React, { useMemo, useState } from 'react';
-import { Boxes, Cake, CheckCircle2, Coffee, Download, FolderPlus, GlassWater, Leaf, Pencil, Percent, Plus, Trash2, Utensils, UtensilsCrossed, XCircle } from 'lucide-react';
+import { Boxes, CheckCircle2, Coffee, Download, FolderPlus, Pencil, Percent, Plus, Trash2, UtensilsCrossed, XCircle } from 'lucide-react';
 import { CategorySelect, MenuItemSelect, MenuVariantSelect, SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { copyCSVToClipboard, downloadCSV, downloadJSON, downloadStyledExcel } from '../utils/exportUtils';
@@ -8,6 +8,7 @@ import {
   AffixInput, Badge, Button, Card, Checkbox, Chips, ConfirmDialog, Dialog, EmptyState, ExportDialog, Field, FormDialog, IconButton, Input, KeyValue,
   List, ListItem, Notice, Page, PageHeader, SearchInput, Segmented, Select, SortFilter, Stat, StatGrid, Switch, Textarea, localDateKey, money, plural, slug
 } from '../ui';
+import { CATEGORY_ICONS } from './shared';
 
 interface MenuAdminProps {
   settings: SettingsSelect;
@@ -17,13 +18,6 @@ interface MenuAdminProps {
   onMenuUpdated: () => void;
 }
 
-const CATEGORY_ICONS: Record<string, { icon: React.ReactNode; label: string }> = {
-  Coffee: { icon: <Coffee />, label: 'Coffee / espresso' },
-  Leaf: { icon: <Leaf />, label: 'Tea' },
-  GlassWater: { icon: <GlassWater />, label: 'Cold drinks' },
-  Cake: { icon: <Cake />, label: 'Bakery & pastries' },
-  Utensils: { icon: <Utensils />, label: 'Brunch & food' }
-};
 type SortField = 'price' | 'margin' | 'name' | 'category' | 'stock';
 const marginPct = (price: number, margin: number) => (price > 0 ? (margin / price) * 100 : 0);
 const EMPTY_ITEM = { name: '', categoryId: '', description: '', price: '', margin: '', badge: '', imageUrl: '', allergens: '', dietaryLabels: '' };
