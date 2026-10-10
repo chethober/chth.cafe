@@ -46,4 +46,13 @@ CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(createdAt);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
 -- Cancelling keeps ingredients deducted, only deleting an order returns them.
 DROP TRIGGER IF EXISTS order_cancel_restore;
+CREATE TABLE IF NOT EXISTS customers (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL UNIQUE,
+  notes TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
 `;

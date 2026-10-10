@@ -9,7 +9,8 @@ import {
   MenuItemSelect,
   SettingsSelect,
   CategorySelect,
-  MenuVariantSelect
+  MenuVariantSelect,
+  CustomerSelect
 } from '../db/schema';
 import { store } from '../db/store';
 import {
@@ -18,9 +19,10 @@ import {
   ageLabel, formatDate, reducedMotion, formatTime, localDateKey, minutesSince, money, orderTypeLabel, paymentLabel, plural, timestampForDay,
   ORDER_PAYMENT_METHODS, OrderPaymentMethod
 } from '../ui';
+import { CustomerClub, CustomerPicker } from './CustomerClub';
 import { MenuPicker, OrderDetailsDialog, TaskFormDialog, TaskRow, TASK_CATEGORIES, TASK_CATEGORY_ICONS, nextTaskStatus } from './shared';
 
-export type PanelSection = 'orders' | 'pos' | 'tasks' | 'shifts';
+export type PanelSection = 'orders' | 'pos' | 'customers' | 'tasks' | 'shifts';
 type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
 type OrderType = 'dine_in' | 'takeout' | 'pickup';
 
@@ -36,6 +38,7 @@ interface PanelManagerProps {
   menuItems: MenuItemSelect[];
   categories: CategorySelect[];
   menuVariants: MenuVariantSelect[];
+  customers: CustomerSelect[];
   onStateChange: () => void;
 }
 
@@ -49,7 +52,7 @@ const LANES: { status: 'pending' | 'preparing' | 'ready'; label: string; color: 
 const LATE_AFTER_MIN = 15;
 
 export const PanelManager: React.FC<PanelManagerProps> = ({
-  section, onNavigate, settings, orders, orderItems, tasks, staffList: staff, shifts, menuItems, categories, onStateChange
+  section, onNavigate, settings, orders, orderItems, tasks, staffList: staff, shifts, menuItems, categories, customers, onStateChange
 }) => {
   const currency = settings.currency;
   const fmt = (v: number) => money(v, currency);
@@ -102,6 +105,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
   const [posOpen, setPosOpen] = useState<string[]>([]);
   const [posSearch, setPosSearch] = useState('');
   const [posCustomer, setPosCustomer] = useState('');
+  const [posMember, setPosMember] = useState<CustomerSelect | null>(null);
   const [posOrderType, setPosOrderType] = useState<OrderType>('dine_in');
   const [posPayment, setPosPayment] = useState<OrderPaymentMethod>('card');
   const [posDate, setPosDate] = useState(() => localDateKey());
@@ -145,7 +149,8 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
     setSavingOrder(true);
     try {
       await store.createOrder({
-        customerName: posCustomer.trim() || 'Walk-in',
+        customerName: posMember?.name || posCustomer.trim() || 'Walk-in',
+        customerId: posMember?.id,
         orderType: posOrderType,
         paymentMethod: posPayment,
         discountAmount: discount,
@@ -159,9 +164,10 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
     } finally {
       setSavingOrder(false);
     }
-    setOrderPlaced(`Order for ${posCustomer.trim() || 'walk-in'} sent to the board.`);
+    setOrderPlaced(`Order for ${posMember?.name || posCustomer.trim() || 'walk-in'} sent to the board.`);
     setCart([]);
     setPosCustomer('');
+    setPosMember(null);
     setPosDiscount('');
     setPosDate(localDateKey());
     onStateChange();
@@ -427,20 +433,18 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                   <Segmented block label="Order type" value={posOrderType} onChange={setPosOrderType} options={[
                     { value: 'dine_in', label: 'Dine-in' }, { value: 'takeout', label: 'Takeout' }, { value: 'pickup', label: 'Pickup' }
                   ]} />
+                  <CustomerPicker customers={customers} orders={orders} text={posCustomer} onTextChange={setPosCustomer} member={posMember} onMemberChange={setPosMember} />
                   <div className="ws-form-row cols-2">
-                    <Field label="Customer or table" optional>{id => <Input id={id} value={posCustomer} onChange={e => setPosCustomer(e.target.value)} placeholder="Walk-in" />}</Field>
                     <Field label="Payment">{id => (
                       <Select id={id} value={posPayment} onChange={e => setPosPayment(e.target.value as OrderPaymentMethod)}>
                         {ORDER_PAYMENT_METHODS.map(m => <option key={m} value={m}>{paymentLabel(m)}</option>)}
                       </Select>
                     )}</Field>
-                  </div>
-                  <div className="ws-form-row cols-2">
-                    <Field label="Discount" aside={
-                      <Segmented label="Discount type" value={posDiscountType} onChange={setPosDiscountType} options={[{ value: 'percent', label: '%' }, { value: 'fixed', label: currency }]} />
-                    }>{id => <Input id={id} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" value={posDiscount} onChange={e => setPosDiscount(e.target.value)} />}</Field>
                     <Field label="Order date" hint={posDate !== localDateKey() ? 'Back-dated order' : undefined}>{id => <Input id={id} type="date" value={posDate} max={localDateKey()} onChange={e => setPosDate(e.target.value || localDateKey())} />}</Field>
                   </div>
+                  <Field label="Discount" aside={
+                    <Segmented label="Discount type" value={posDiscountType} onChange={setPosDiscountType} options={[{ value: 'percent', label: '%' }, { value: 'fixed', label: currency }]} />
+                  }>{id => <Input id={id} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" value={posDiscount} onChange={e => setPosDiscount(e.target.value)} />}</Field>
                   <KeyValue
                     items={[
                       { label: 'Subtotal', value: fmt(subtotal) },
@@ -464,6 +468,10 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
             </div>
           )}
         </Page>
+      )}
+
+      {section === 'customers' && (
+        <CustomerClub settings={settings} customers={customers} orders={orders} orderItems={orderItems} canDelete={false} onChanged={onStateChange} />
       )}
 
       {section === 'tasks' && (

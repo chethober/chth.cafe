@@ -6,6 +6,9 @@ export function ensureFeatureTables(db: D1Database) {
   let pending = ready.get(db);
   if (!pending) {
     pending = (async () => {
+      // Runs first: the migration indexes orders.customer_id, and SQLite has no ADD COLUMN IF NOT EXISTS.
+      const { results: orderColumns } = await db.prepare('PRAGMA table_info(orders)').all();
+      if (!orderColumns.some(column => column.name === 'customer_id')) await db.prepare('ALTER TABLE orders ADD COLUMN customer_id TEXT').run();
       // Split at statement boundaries, keeping trigger bodies intact.
       const statements = migration.match(/DROP TRIGGER[^;]*;|CREATE TRIGGER[\s\S]*?\nEND;|CREATE (?:TABLE|INDEX)[\s\S]*?;/g) || [];
       for (const sql of statements) {

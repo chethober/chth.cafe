@@ -185,7 +185,8 @@ export function FormDialog({ open, onClose, title, description, size, busy, subm
         </>
       }
     >
-      <form id={formId} className="ws-form" onSubmit={onSubmit} aria-busy={busy || undefined}>
+      {/* React bubbles submit through the portal, so a dialog opened inside another form would submit that one too. */}
+      <form id={formId} className="ws-form" onSubmit={e => { e.stopPropagation(); onSubmit(e); }} aria-busy={busy || undefined}>
         <fieldset className="ws-fieldset ws-form" disabled={busy}>{children}</fieldset>
       </form>
     </Dialog>

@@ -477,6 +477,14 @@ button.ws-stat:active { transform: scale(.98); transition-duration: 160ms; }
 .ws-amount { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ws-amount[data-tone='positive'] { color: var(--ws-positive); }
 .ws-amount[data-tone='danger'] { color: var(--ws-danger); }
+
+/* Customer club: the linked member on the till, its suggestions, and the tappable phone */
+.ws-member-chip { display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 12px; border: 1px solid var(--ws-rule); border-radius: var(--ws-radius-sm); background: var(--ws-sunken); }
+.ws-member-matches { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.ws-member-matches > .ws-list { align-self: stretch; border: 1px solid var(--ws-rule); border-radius: var(--ws-radius-sm); overflow: hidden; }
+.ws-member-matches .ws-list-item { --ws-pad: 12px; min-height: 48px; }
+.ws-member-phone { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ws-accent); text-decoration: none; }
+.ws-member-phone svg { width: 16px; height: 16px; }
 @media (max-width: 639px) {
   .ws-list-item { flex-wrap: wrap; }
   .ws-list-item > .ws-list-actions { margin-left: auto; }

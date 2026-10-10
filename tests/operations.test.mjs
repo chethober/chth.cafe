@@ -19,12 +19,12 @@ try {
     }
   }
   const embeddedMigration = await readFile('src/services/operationsMigration.ts','utf8');
-  check(embeddedMigration.slice(embeddedMigration.indexOf('`')+1,embeddedMigration.lastIndexOf('`')),await readFile('migrations/0002_operations.sql','utf8')+(await readFile('migrations/0003_sync_and_indexes.sql','utf8')).replace(/^--.*\n/,'')+(await readFile('migrations/0004_cancel_keeps_stock.sql','utf8')).replace(/^--.*\n/,''));
+  check(embeddedMigration.slice(embeddedMigration.indexOf('`')+1,embeddedMigration.lastIndexOf('`')),await readFile('migrations/0002_operations.sql','utf8')+(await readFile('migrations/0003_sync_and_indexes.sql','utf8')).replace(/^--.*\n/,'')+(await readFile('migrations/0004_cancel_keeps_stock.sql','utf8')).replace(/^--.*\n/,'')+(await readFile('migrations/0005_customers.sql','utf8')).replace(/^--.*\n/,''));
   const db = await mf.getD1Database('DB');
   // Start with the old schema to exercise the upgrade path, then seed real D1.
-  const schema = (await readFile('schema.sql','utf8')).replace(/^--.*$/gm,'').replace(/  time_zone TEXT[^\n]*\n/g,'').replace(/  allergens TEXT[^\n]*\n/g,'').replace(/  dietary_labels TEXT[^\n]*\n/g,'');
+  const schema = (await readFile('schema.sql','utf8')).replace(/^--.*$/gm,'').replace(/  time_zone TEXT[^\n]*\n/g,'').replace(/  allergens TEXT[^\n]*\n/g,'').replace(/  dietary_labels TEXT[^\n]*\n/g,'').replace(/  customer_id TEXT[^\n]*\n/g,'');
   const statements = schema.match(/CREATE TRIGGER[\s\S]*?\nEND;|CREATE TABLE[\s\S]*?;|INSERT[\s\S]*?;/g);
-  for (const sql of statements) if (!/CREATE TRIGGER|CREATE TABLE IF NOT EXISTS (inventory_movements|reconciliations|order_requests)/.test(sql)) await db.prepare(sql).run();
+  for (const sql of statements) if (!/CREATE TRIGGER|CREATE TABLE IF NOT EXISTS (inventory_movements|reconciliations|order_requests|customers)/.test(sql)) await db.prepare(sql).run();
   // Databases created before cancelling stopped restocking still carry this trigger; the Worker must drop it.
   await db.prepare("CREATE TRIGGER order_cancel_restore AFTER UPDATE OF status ON orders WHEN NEW.status = 'cancelled' BEGIN SELECT 1; END").run();
   await db.prepare("UPDATE settings SET telegram_bot_token='private-test-token', telegram_chat_id='private-chat', notify_sales=0,notify_shifts=0,notify_low_stock=0").run();
@@ -65,6 +65,17 @@ try {
   check((await panelRequest('/api/staff',{},panelCookie)).status,403);
   check((await panelRequest('/api/expenses',undefined,panelCookie)).status,403);
   check((await panelRequest('/api/analytics',undefined,panelCookie)).status,403);
+  // Customer club: the panel signs members up and corrects them, only the admin deletes them.
+  check((await request('/api/customers')).status,401);
+  check((await request('/api/customers',{name:'Sneaky',phone:'09120000000'})).status,401);
+  response = await panelRequest('/api/customers',{name:'  Sara Ahmadi ',phone:'0912 111-2233',notes:'Oat milk'},panelCookie); check(response.status,200);
+  const sara = (await response.json()).data; check(sara.name,'Sara Ahmadi'); check(sara.phone,'09121112233'); assert.match(sara.id,/^cus-/); checks++;
+  check((await panelRequest('/api/customers',{name:'Someone',phone:'۰۹۱۲۱۱۱۲۲۳۳'},panelCookie)).status,409);
+  check((await panelRequest('/api/customers',{name:'',phone:'09120000000'},panelCookie)).status,400);
+  check((await panelRequest('/api/customers',{name:'Short',phone:'12'},panelCookie)).status,400);
+  check((await panelRequest(`/api/customers/${sara.id}`,{notes:'Oat milk, no sugar'},panelCookie,'PUT')).status,200);
+  check((await panelRequest(`/api/customers/${sara.id}`,undefined,panelCookie,'DELETE')).status,403);
+  check((await (await panelRequest('/api/customers',undefined,panelCookie)).json()).data.map(c=>[c.name,c.notes]),[['Sara Ahmadi','Oat milk, no sugar']]);
   check((await panelRequest('/api/orders',undefined,cookie)).status,401);
   check((await mf.dispatchFetch('http://localhost/api/orders',{headers:{Cookie:panelCookie}})).status,401);
   check((await panelRequest('/api/auth/logout',{},panelCookie)).status,200);
@@ -103,6 +114,21 @@ try {
   check((await db.prepare('SELECT item_name FROM order_items WHERE order_id=?').bind(order.id).first()).item_name,'Espresso');
   const retry=await (await request('/api/orders',input)).json();check(retry.data.id,order.id);check(retry.data.orderNumber,order.orderNumber);
   const collision={...input,customerName:'someone else'}; check((await request('/api/orders',collision)).status,409);
+  // Staff orders link to a member and take their name; public orders cannot claim one.
+  const member=(await (await request('/api/customers',undefined,true)).json()).data[0];
+  check((await request('/api/customers',{name:'Reza',phone:'09121112233'},true)).status,409);
+  response=await request('/api/orders',{...orderInput(),id:`ord-${crypto.randomUUID()}`,customerName:'Table 9',customerId:member.id},true); check(response.status,200);
+  const memberOrder=(await response.json()).data; check(memberOrder.customerId,member.id); check(memberOrder.customerName,'Sara Ahmadi');
+  check((await (await request('/api/orders',undefined,true)).json()).data.find(o=>o.id===memberOrder.id).customerId,member.id);
+  check((await request('/api/orders',{...orderInput(),id:`ord-${crypto.randomUUID()}`,customerId:'cus-missing'},true)).status,400);
+  response=await request('/api/orders',{...orderInput(),customerId:member.id}); check(response.status,200);
+  const publicClaim=(await response.json()).data; check(publicClaim.customerId,null); check(publicClaim.customerName,'Table 4');
+  check((await request(`/api/customers/${member.id}`,{phone:'abc'},true,'PUT')).status,400);
+  check((await request(`/api/customers/${member.id}`,undefined,true,'DELETE')).status,200);
+  check((await db.prepare('SELECT customer_id, customer_name FROM orders WHERE id=?').bind(memberOrder.id).first()),{customer_id:null,customer_name:'Sara Ahmadi'});
+  check((await (await request('/api/customers',undefined,true)).json()).data,[]);
+  // Remove these orders so the later reconciliation totals stay as they were.
+  for (const id of [memberOrder.id,publicClaim.id]) check((await request(`/api/orders/${id}`,undefined,true,'DELETE')).status,200);
   check((await request(`/api/orders/${order.id}/tracking?token=wrong`)).status,404);
   response=await request(`/api/orders/${order.id}/tracking?token=${order.trackingToken}`); check(response.status,200); const tracking=(await response.json()).data;check(tracking.status,'pending');check(tracking.customer_name,undefined);
   check((await request(`/api/orders/${order.id}/status`,{status:'preparing'},true,'PUT')).status,200);

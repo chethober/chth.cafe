@@ -93,6 +93,7 @@ export const orders = sqliteTable('orders', {
   id: text('id').primaryKey(),
   orderNumber: text('order_number').notNull(), // e.g. "#1001"
   customerName: text('customer_name').default('Walk-in Customer'),
+  customerId: text('customer_id'), // Customer club member, when the order was linked to one
   orderType: text('order_type').notNull().default('dine_in'), // 'dine_in', 'takeout', 'pickup'
   subtotal: real('subtotal').notNull(),
   taxAmount: real('tax_amount').notNull(),
@@ -163,6 +164,16 @@ export const recipes = sqliteTable('recipes', {
   quantityRequired: real('quantity_required').notNull().default(0.0) // Raw material consumed per portion
 });
 
+// 13. Customer Club Members (visits and spend are derived from their orders)
+export const customers = sqliteTable('customers', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  phone: text('phone').notNull().unique(),
+  notes: text('notes').notNull().default(''),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull()
+});
+
 // Types exported for frontend & backend consumption
 export type SettingsSelect = Omit<typeof settings.$inferSelect, 'timeZone'> & { timeZone?: string };
 export type CategorySelect = typeof categories.$inferSelect;
@@ -176,3 +187,4 @@ export type ExpenseSelect = typeof expenses.$inferSelect;
 export type TaskSelect = typeof tasks.$inferSelect;
 export type StockItemSelect = typeof stockItems.$inferSelect;
 export type RecipeSelect = typeof recipes.$inferSelect;
+export type CustomerSelect = typeof customers.$inferSelect;
