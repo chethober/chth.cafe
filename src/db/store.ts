@@ -10,7 +10,8 @@ import {
   ExpenseSelect,
   TaskSelect,
   StockItemSelect,
-  RecipeSelect
+  RecipeSelect,
+  CustomerSelect
 } from './schema';
 import {
   initialSettings,
@@ -39,6 +40,7 @@ export interface CafeState {
   tasks: TaskSelect[];
   stockItems: StockItemSelect[];
   recipes: RecipeSelect[];
+  customers: CustomerSelect[];
   kvCache: {
     cafe_settings_cache?: string;
     public_menu_cache?: string;
@@ -90,9 +92,9 @@ class CafeStore {
   public clearPrivateData() {
     this.state.staff = []; this.state.shifts = []; this.state.orders = [];
     this.state.orderItems = []; this.state.expenses = []; this.state.tasks = [];
-    this.state.stockItems = []; this.state.recipes = [];
+    this.state.stockItems = []; this.state.recipes = []; this.state.customers = [];
     this.state.settings.telegramBotToken = ''; this.state.settings.telegramChatId = '';
-    this.confirmedState.staff=[]; this.confirmedState.shifts=[]; this.confirmedState.orders=[]; this.confirmedState.orderItems=[]; this.confirmedState.expenses=[]; this.confirmedState.tasks=[]; this.confirmedState.stockItems=[]; this.confirmedState.recipes=[];
+    this.confirmedState.staff=[]; this.confirmedState.shifts=[]; this.confirmedState.orders=[]; this.confirmedState.orderItems=[]; this.confirmedState.expenses=[]; this.confirmedState.tasks=[]; this.confirmedState.stockItems=[]; this.confirmedState.recipes=[]; this.confirmedState.customers=[];
     this.confirmedState.settings.telegramBotToken=''; this.confirmedState.settings.telegramChatId='';
     this.notify();
   }
@@ -133,7 +135,7 @@ class CafeStore {
       const fetchJSON = (url: string) => this.safeFetchJSON(url).then(result => { if (!result) incomplete = true; return result; });
       const privateFetch = (url: string) => session?.authenticated && managementView ? fetchJSON(url) : Promise.resolve(null);
       if (!session?.authenticated || !managementView) this.clearPrivateData();
-      const [ordersData, orderItemsData, tasksData, staffData, shiftsData, expensesData, settingsData, menuData, stockData, recipesData] = await Promise.all([
+      const [ordersData, orderItemsData, tasksData, staffData, shiftsData, expensesData, settingsData, menuData, stockData, recipesData, customersData] = await Promise.all([
         privateFetch('/api/orders'),
         privateFetch('/api/order-items'),
         privateFetch('/api/tasks'),
@@ -143,7 +145,8 @@ class CafeStore {
         fetchJSON(adminAccess ? '/api/admin/settings' : '/api/settings'),
         fetchJSON(adminAccess ? '/api/admin/menu' : '/api/menu'),
         privateFetch('/api/stock'),
-        privateFetch('/api/recipes')
+        privateFetch('/api/recipes'),
+        privateFetch('/api/customers')
       ]);
 
       let hasChanges = false;
@@ -153,6 +156,10 @@ class CafeStore {
       }
       if (recipesData?.data && Array.isArray(recipesData.data)) {
         this.state.recipes = recipesData.data;
+        hasChanges = true;
+      }
+      if (customersData?.data && Array.isArray(customersData.data)) {
+        this.state.customers = customersData.data;
         hasChanges = true;
       }
       if (ordersData?.data && Array.isArray(ordersData.data)) {
@@ -267,6 +274,7 @@ class CafeStore {
       tasks: [],
       stockItems: [],
       recipes: [],
+      customers: [],
       kvCache: {}
     };
   }
@@ -861,6 +869,7 @@ class CafeStore {
 
   public async createOrder(orderInput: {
     customerName?: string;
+    customerId?: string | null;
     orderType: 'dine_in' | 'takeout' | 'pickup';
     paymentMethod: 'cash' | 'card' | 'google_pay' | 'online';
     discountAmount?: number;
@@ -891,6 +900,7 @@ class CafeStore {
       id: orderId,
       orderNumber,
       customerName: orderInput.customerName || 'Walk-in Customer',
+      customerId: orderInput.customerId || null,
       orderType: orderInput.orderType,
       subtotal,
       taxAmount,
@@ -953,6 +963,49 @@ class CafeStore {
     return undefined;
   }
 
+
+  // --- 4b. Customer Club ---
+  /** For saves made from a form: the form shows the server's reason, so the page-wide banner stays quiet. */
+  private async formMutation(url: string, options: RequestInit): Promise<Response> {
+    try { return await this.mutationFetch(url, options); }
+    catch (error) { this.dismissSaveError(); throw error; }
+  }
+
+  public getCustomers(): CustomerSelect[] {
+    return this.state.customers;
+  }
+
+  /** Waits for the server, which owns phone uniqueness, so the form can show why a sign-up was refused. */
+  public async createCustomer(input: Pick<CustomerSelect, 'name' | 'phone' | 'notes'>): Promise<CustomerSelect> {
+    const response = await this.formMutation('/api/customers', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...input, id: `cus-${crypto.randomUUID()}` })
+    });
+    const { data } = await response.json() as { data: CustomerSelect };
+    this.state.customers = [...this.state.customers, data].sort((a, b) => a.name.localeCompare(b.name));
+    this.confirmedState.customers = structuredClone(this.state.customers);
+    this.notify();
+    return data;
+  }
+
+  public async updateCustomer(customerId: string, input: Pick<CustomerSelect, 'name' | 'phone' | 'notes'>): Promise<CustomerSelect> {
+    const response = await this.formMutation(`/api/customers/${customerId}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input)
+    });
+    const { data } = await response.json() as { data: CustomerSelect };
+    this.state.customers = this.state.customers.map(c => c.id === customerId ? data : c);
+    this.confirmedState.customers = structuredClone(this.state.customers);
+    this.notify();
+    return data;
+  }
+
+  public deleteCustomer(customerId: string): void {
+    this.state.customers = this.state.customers.filter(c => c.id !== customerId);
+    this.state.orders = this.state.orders.map(o => o.customerId === customerId ? { ...o, customerId: null } : o);
+    this.notify();
+    this.mutationFetch(`/api/customers/${customerId}`, { method: 'DELETE' }).catch(err => console.warn('API Delete Customer Error:', err));
+  }
 
   // --- 5. Expenses & Financial Analytics ---
   public getExpenses(): ExpenseSelect[] {

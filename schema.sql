@@ -99,6 +99,7 @@ CREATE TABLE IF NOT EXISTS orders (
   id TEXT PRIMARY KEY,
   order_number TEXT NOT NULL,
   customer_name TEXT DEFAULT 'Walk-in Customer',
+  customer_id TEXT,
   order_type TEXT NOT NULL DEFAULT 'dine_in',
   subtotal REAL NOT NULL,
   tax_amount REAL NOT NULL,
@@ -315,4 +316,12 @@ END;
 CREATE TABLE IF NOT EXISTS order_requests (
   id TEXT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
   fingerprint TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS customers (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL UNIQUE,
+  notes TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
 );

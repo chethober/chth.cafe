@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Trash2 } from 'lucide-react';
-import { CategorySelect, MenuItemSelect, SettingsSelect } from '../db/schema';
+import { CategorySelect, CustomerSelect, MenuItemSelect, SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import {
   Field, FormDialog, IconButton, Input, KeyValue, Notice, SearchInput, Segmented, Select, Stepper,
   localDateKey, money, paymentLabel, plural, timestampForDay, ORDER_PAYMENT_METHODS, OrderPaymentMethod
 } from '../ui';
+import { CustomerPicker } from './CustomerClub';
 import { MenuPicker } from './shared';
 
 interface QuickPOSModalProps {
@@ -26,6 +27,7 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({ isOpen, onClose, c
   const [error, setError] = useState('');
   const [date, setDate] = useState(() => localDateKey());
   const [customer, setCustomer] = useState('');
+  const [member, setMember] = useState<CustomerSelect | null>(null);
   const [orderType, setOrderType] = useState<'dine_in' | 'takeout' | 'pickup'>('dine_in');
   const [payment, setPayment] = useState<OrderPaymentMethod>('card');
   const [search, setSearch] = useState('');
@@ -34,7 +36,7 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({ isOpen, onClose, c
 
   useEffect(() => {
     if (!isOpen) return;
-    setDate(localDateKey()); setCustomer(''); setOrderType('dine_in'); setPayment('card');
+    setDate(localDateKey()); setCustomer(''); setMember(null); setOrderType('dine_in'); setPayment('card');
     setSearch(''); setOpenCategories([]); setCart([]); setError('');
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -56,7 +58,8 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({ isOpen, onClose, c
     setSaving(true);
     try {
       await store.createOrder({
-        customerName: customer.trim() || 'Walk-in',
+        customerName: member?.name || customer.trim() || 'Walk-in',
+        customerId: member?.id,
         orderType,
         paymentMethod: payment,
         status: 'completed',
@@ -124,8 +127,8 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({ isOpen, onClose, c
       )}
 
       <Segmented block label="Order type" value={orderType} onChange={setOrderType} options={[{ value: 'dine_in', label: 'Dine-in' }, { value: 'takeout', label: 'Takeout' }, { value: 'pickup', label: 'Pickup' }]} />
-      <div className="ws-form-row cols-3">
-        <Field label="Customer" optional>{id => <Input id={id} value={customer} onChange={e => setCustomer(e.target.value)} placeholder="Walk-in" />}</Field>
+      <CustomerPicker customers={store.getCustomers()} orders={store.getOrders()} text={customer} onTextChange={setCustomer} member={member} onMemberChange={setMember} allowSignUp={false} />
+      <div className="ws-form-row cols-2">
         <Field label="Payment">{id => (
           <Select id={id} value={payment} onChange={e => setPayment(e.target.value as OrderPaymentMethod)}>
             {ORDER_PAYMENT_METHODS.map(m => <option key={m} value={m}>{paymentLabel(m)}</option>)}

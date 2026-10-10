@@ -13,6 +13,7 @@ import {
   type FormatContext
 } from './services/telegram';
 import { registerTelegramBot, runScheduledTelegram, sendDailyReport } from './services/telegramBot';
+import { registerCustomers } from './services/customers';
 
 export type Env = {
   Variables: { authed: boolean; workspace: 'admin' | 'panel' };
@@ -175,9 +176,9 @@ app.use('/api/*', async (c, next) => {
   const publicWrite = c.req.method === 'POST' && ['/api/auth/login', '/api/orders'].includes(path);
   const tracking = c.req.method === 'GET' && /^\/api\/orders\/[^/]+\/tracking$/.test(path);
   if (!authed && !publicRead && !publicWrite && !tracking) return c.json({ success: false, message: 'Please sign in.' }, 401);
-  const panelAccess = (c.req.method === 'GET' && ['/api/orders', '/api/order-items', '/api/tasks', '/api/staff', '/api/staff/shifts', '/api/stock', '/api/recipes'].includes(path))
-    || (c.req.method === 'POST' && ['/api/tasks', '/api/staff/clock-in', '/api/staff/clock-out'].includes(path))
-    || (c.req.method === 'PUT' && /^\/api\/(orders\/[^/]+\/status|tasks\/[^/]+\/status|menu\/items\/[^/]+\/stock)$/.test(path))
+  const panelAccess = (c.req.method === 'GET' && ['/api/orders', '/api/order-items', '/api/tasks', '/api/staff', '/api/staff/shifts', '/api/stock', '/api/recipes', '/api/customers'].includes(path))
+    || (c.req.method === 'POST' && ['/api/tasks', '/api/staff/clock-in', '/api/staff/clock-out', '/api/customers'].includes(path))
+    || (c.req.method === 'PUT' && /^\/api\/(orders\/[^/]+\/status|tasks\/[^/]+\/status|menu\/items\/[^/]+\/stock|customers\/[^/]+)$/.test(path))
     || (c.req.method === 'GET' && /^\/api\/menu\/[^/]+\/recipe$/.test(path));
   if (workspace === 'panel' && !publicRead && !publicWrite && !tracking && !path.startsWith('/api/auth/') && !panelAccess) {
     return c.json({ success: false, message: 'This action requires the admin workspace.' }, 403);
@@ -243,6 +244,7 @@ app.post('/api/auth/logout', async c => {
 
 registerOperations(app);
 registerTelegramBot(app);
+registerCustomers(app);
 
 // --- 1. Settings & Branding Routes ---
 const getSettings = async (c: Context<Env>) => {
@@ -1079,7 +1081,7 @@ app.post('/api/orders', async (c) => {
   if (!c.env?.DB) return c.json({ success: false, message: 'Ordering is unavailable until the database is configured.' }, 503);
   if (body.id && (typeof body.id !== 'string' || !/^(public|ord)-[0-9a-f-]{36}$/i.test(body.id) || (!authed && !body.id.startsWith('public-')))) return c.json({ success: false, message: 'Invalid order ID.' }, 400);
   body.id ||= `${authed ? 'ord' : 'public'}-${crypto.randomUUID()}`;
-  const fingerprintBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({ items: body.items, customerName: body.customerName, orderType: body.orderType, paymentMethod: body.paymentMethod, discountAmount: body.discountAmount || 0 })));
+  const fingerprintBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({ items: body.items, customerName: body.customerName, customerId: body.customerId, orderType: body.orderType, paymentMethod: body.paymentMethod, discountAmount: body.discountAmount || 0 })));
   const fingerprint = Array.from(new Uint8Array(fingerprintBytes), byte=>byte.toString(16).padStart(2,'0')).join('');
   const replay = async () => {
     const row = await c.env.DB.prepare('SELECT o.*, r.fingerprint FROM orders o LEFT JOIN order_requests r ON r.id=o.id WHERE o.id=?').bind(body.id).first();
@@ -1125,11 +1127,15 @@ app.post('/api/orders', async (c) => {
   if (!Number.isFinite(taxAmount) || taxAmount < 0) throw new Error('Invalid configured tax rate');
   if (body.customerName && (typeof body.customerName !== 'string' || body.customerName.length > 100)) return c.json({ success: false, message: 'Customer name is too long.' }, 400);
   if (authed && body.createdAt && !Number.isFinite(Date.parse(body.createdAt))) return c.json({ success: false, message: 'Invalid order date.' }, 400);
+  // Only staff link orders to club members; the order keeps the member's name as it was at the time.
+  const member = authed && body.customerId ? await c.env.DB.prepare('SELECT id, name FROM customers WHERE id = ?').bind(String(body.customerId)).first<{ id: string; name: string }>() : null;
+  if (authed && body.customerId && !member) return c.json({ success: false, message: 'This club member no longer exists. Pick them again.' }, 400);
   if (body.id && (typeof body.id !== 'string' || !/^[a-zA-Z0-9-]{16,100}$/.test(body.id))) return c.json({ success: false, message: 'Invalid order ID.' }, 400);
   const orderData = {
     id: body.id || `ord-${crypto.randomUUID()}`,
     orderNumber: `#${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-    customerName: body.customerName || 'Guest Customer',
+    customerName: member?.name || body.customerName || 'Guest Customer',
+    customerId: member?.id || null,
     orderType: body.orderType || 'dine_in',
     subtotal, taxAmount, discountAmount,
     totalAmount: Number((subtotal - discountAmount + taxAmount).toFixed(2)),
@@ -1144,10 +1150,10 @@ app.post('/api/orders', async (c) => {
       // D1 batch is transactional: a failed item insert rolls back the whole order.
       // A strict order INSERT also makes concurrent retries of the same ID safe.
       const statements = [c.env.DB.prepare(
-        `INSERT INTO orders (id, order_number, customer_name, order_type, subtotal, tax_amount, discount_amount, total_amount, payment_method, status, createdAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO orders (id, order_number, customer_name, customer_id, order_type, subtotal, tax_amount, discount_amount, total_amount, payment_method, status, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
-        orderData.id, orderData.orderNumber, orderData.customerName, orderData.orderType,
+        orderData.id, orderData.orderNumber, orderData.customerName, orderData.customerId, orderData.orderType,
         orderData.subtotal, orderData.taxAmount, orderData.discountAmount,
         orderData.totalAmount, orderData.paymentMethod, orderData.status, orderData.createdAt
       )];

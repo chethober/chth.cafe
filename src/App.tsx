@@ -12,7 +12,8 @@ import {
   Boxes,
   ShoppingBag,
   Plus,
-  Users
+  Users,
+  Contact
 } from 'lucide-react';
 import { store } from './db/store';
 import { api } from './services/api';
@@ -26,11 +27,12 @@ import { MenuAdmin } from './components/MenuAdmin';
 import { TaskManager } from './components/TaskManager';
 import { PanelManager, PanelSection } from './components/PanelManager';
 import { StockManagement } from './components/StockManagement';
+import { CustomerClub } from './components/CustomerClub';
 import { Button, Field, IconButton, Input, Notice, NavItem, WorkspaceShell } from './ui';
 
-type AdminTab = 'financials' | 'tasks' | 'menu_admin' | 'stock' | 'staff' | 'settings';
-const ADMIN_TABS: AdminTab[] = ['financials', 'tasks', 'menu_admin', 'stock', 'staff', 'settings'];
-const PANEL_SECTIONS: PanelSection[] = ['orders', 'pos', 'tasks', 'shifts'];
+type AdminTab = 'financials' | 'customers' | 'tasks' | 'menu_admin' | 'stock' | 'staff' | 'settings';
+const ADMIN_TABS: AdminTab[] = ['financials', 'customers', 'tasks', 'menu_admin', 'stock', 'staff', 'settings'];
+const PANEL_SECTIONS: PanelSection[] = ['orders', 'pos', 'customers', 'tasks', 'shifts'];
 
 function usePersistentState<T extends string>(key: string, allowed: readonly T[], fallback: T) {
   const [value, setValue] = useState<T>(() => {
@@ -127,6 +129,7 @@ export const App: React.FC = () => {
   const expenses = store.getExpenses();
   const tasksList = store.getTasks();
   const stockItems = store.getStockItems();
+  const customers = store.getCustomers();
 
   // Dynamically update CSS root variables for brand theme
   useEffect(() => {
@@ -181,6 +184,7 @@ export const App: React.FC = () => {
       const panelNav: NavItem<PanelSection>[] = [
         { id: 'orders', label: 'Orders', icon: ShoppingBag, badge: liveOrders },
         { id: 'pos', label: 'New order', short: 'New', icon: Plus },
+        { id: 'customers', label: 'Customer club', short: 'Club', icon: Contact },
         { id: 'tasks', label: 'Checklist', icon: CheckSquare, badge: openTasks },
         { id: 'shifts', label: 'Clock in / out', short: 'Clock', icon: Clock }
       ];
@@ -198,6 +202,7 @@ export const App: React.FC = () => {
             menuItems={menuItems}
             categories={categories}
             menuVariants={menuVariants}
+            customers={customers}
             onStateChange={refresh}
           />
         </WorkspaceShell>
@@ -207,6 +212,7 @@ export const App: React.FC = () => {
     const lowStock = stockItems.filter(i => i.quantity <= i.minThreshold).length;
     const adminNav: NavItem<AdminTab>[] = [
       { id: 'financials', label: 'Finances', icon: TrendingUp, group: 'Business' },
+      { id: 'customers', label: 'Customer club', short: 'Club', icon: Contact, group: 'Business' },
       { id: 'menu_admin', label: 'Menu', icon: UtensilsCrossed, group: 'Catalogue' },
       { id: 'stock', label: 'Stock', icon: Boxes, group: 'Catalogue', badge: lowStock },
       { id: 'staff', label: 'Staff & shifts', short: 'Staff', icon: Users, group: 'Team' },
@@ -223,6 +229,7 @@ export const App: React.FC = () => {
         {...shellProps}
       >
         {adminTab === 'financials' && <FinancialTracker settings={settings} orders={orders} expenses={expenses} categories={categories} menuItems={menuItems} onFinancialsUpdated={refresh} />}
+        {adminTab === 'customers' && <CustomerClub settings={settings} customers={customers} orders={orders} orderItems={orderItems} canDelete onChanged={refresh} />}
         {adminTab === 'tasks' && <TaskManager tasks={tasksList} staffList={staffList} onTasksUpdated={refresh} />}
         {adminTab === 'menu_admin' && <MenuAdmin settings={settings} categories={categories} menuItems={menuItems} menuVariants={menuVariants} onMenuUpdated={refresh} />}
         {adminTab === 'stock' && <StockManagement settings={settings} stockItems={stockItems} onStockUpdated={refresh} />}
