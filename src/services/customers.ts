@@ -3,10 +3,14 @@ import type { Env } from '../server';
 
 const COLUMNS = 'id, name, phone, notes, created_at AS createdAt, updated_at AS updatedAt';
 
-/** Phone numbers are matched by digits only, so "0912 345 6789" and "09123456789" are the same member. Persian and Arabic digits count too. */
+/**
+ * Phone numbers are matched by digits only, so "0912 345 6789" and "09123456789" are the same member. Persian and Arabic digits count too.
+ * Iran's country code is written as the local trunk 0: "+98 912…", "+98 0912…" and "0098 912…" are all stored as "0912…".
+ */
 export function normalizePhone(value: unknown): string {
   const text = String(value ?? '').trim().replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06f0)).replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660));
-  return (text.startsWith('+') ? '+' : '') + text.replace(/\D/g, '');
+  const phone = (text.startsWith('+') ? '+' : '') + text.replace(/\D/g, '');
+  return phone.replace(/^(?:\+|00)980?(?=\d)/, '0');
 }
 
 function validate(input: { name?: unknown; phone?: unknown; notes?: unknown }) {

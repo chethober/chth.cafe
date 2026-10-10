@@ -71,6 +71,7 @@ try {
   response = await panelRequest('/api/customers',{name:'  Sara Ahmadi ',phone:'0912 111-2233',notes:'Oat milk'},panelCookie); check(response.status,200);
   const sara = (await response.json()).data; check(sara.name,'Sara Ahmadi'); check(sara.phone,'09121112233'); assert.match(sara.id,/^cus-/); checks++;
   check((await panelRequest('/api/customers',{name:'Someone',phone:'۰۹۱۲۱۱۱۲۲۳۳'},panelCookie)).status,409);
+  for (const phone of ['+98 912 111 2233','+98 0912 111 2233','0098 912-111-2233']) check((await panelRequest('/api/customers',{name:'Someone',phone},panelCookie)).status,409);
   check((await panelRequest('/api/customers',{name:'',phone:'09120000000'},panelCookie)).status,400);
   check((await panelRequest('/api/customers',{name:'Short',phone:'12'},panelCookie)).status,400);
   check((await panelRequest(`/api/customers/${sara.id}`,{notes:'Oat milk, no sugar'},panelCookie,'PUT')).status,200);
