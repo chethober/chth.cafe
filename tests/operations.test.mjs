@@ -19,12 +19,14 @@ try {
     }
   }
   const embeddedMigration = await readFile('src/services/operationsMigration.ts','utf8');
-  check(embeddedMigration.slice(embeddedMigration.indexOf('`')+1,embeddedMigration.lastIndexOf('`')),await readFile('migrations/0002_operations.sql','utf8')+(await readFile('migrations/0003_sync_and_indexes.sql','utf8')).replace(/^--.*\n/,''));
+  check(embeddedMigration.slice(embeddedMigration.indexOf('`')+1,embeddedMigration.lastIndexOf('`')),await readFile('migrations/0002_operations.sql','utf8')+(await readFile('migrations/0003_sync_and_indexes.sql','utf8')).replace(/^--.*\n/,'')+(await readFile('migrations/0004_cancel_keeps_stock.sql','utf8')).replace(/^--.*\n/,''));
   const db = await mf.getD1Database('DB');
   // Start with the old schema to exercise the upgrade path, then seed real D1.
   const schema = (await readFile('schema.sql','utf8')).replace(/^--.*$/gm,'').replace(/  time_zone TEXT[^\n]*\n/g,'').replace(/  allergens TEXT[^\n]*\n/g,'').replace(/  dietary_labels TEXT[^\n]*\n/g,'');
   const statements = schema.match(/CREATE TRIGGER[\s\S]*?\nEND;|CREATE TABLE[\s\S]*?;|INSERT[\s\S]*?;/g);
   for (const sql of statements) if (!/CREATE TRIGGER|CREATE TABLE IF NOT EXISTS (inventory_movements|reconciliations|order_requests)/.test(sql)) await db.prepare(sql).run();
+  // Databases created before cancelling stopped restocking still carry this trigger; the Worker must drop it.
+  await db.prepare("CREATE TRIGGER order_cancel_restore AFTER UPDATE OF status ON orders WHEN NEW.status = 'cancelled' BEGIN SELECT 1; END").run();
   await db.prepare("UPDATE settings SET telegram_bot_token='private-test-token', telegram_chat_id='private-chat', notify_sales=0,notify_shifts=0,notify_low_stock=0").run();
   check((await request('/api/orders')).status,401);
   check((await request('/api/admin/settings')).status,401);
@@ -68,6 +70,7 @@ try {
   check((await panelRequest('/api/auth/logout',{},panelCookie)).status,200);
   check((await panelRequest('/api/orders',undefined,panelCookie)).status,401);
   check((await request('/api/orders',undefined,true)).status,200);
+  check(await db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name='order_cancel_restore'").first(),null);
   const publicConfig = await (await request('/api/settings',undefined,true)).json();
   check(publicConfig.data.telegramBotToken,undefined); check(publicConfig.data.telegramChatId,undefined);
   check(publicConfig.data.timeZone,'Asia/Tehran');
@@ -113,14 +116,34 @@ try {
   check(Number((await db.prepare("SELECT quantity FROM stock_items WHERE id='stock-1'").first()).quantity),stockBefore-0.015);
   check((await request('/api/orders',matcha)).status,200);
   check(Number((await db.prepare("SELECT quantity FROM stock_items WHERE id='stock-1'").first()).quantity),stockBefore-0.015);
+  const stock1 = async () => Number(Number((await db.prepare("SELECT quantity FROM stock_items WHERE id='stock-1'").first()).quantity).toFixed(6));
+  const near = value => Number(value.toFixed(6));
+  // Cancelling keeps ingredients deducted, deleting returns them.
   check((await request(`/api/orders/${matchaOrder.id}/status`,{status:'cancelled'},true,'PUT')).status,200);
-  check(Number((await db.prepare("SELECT quantity FROM stock_items WHERE id='stock-1'").first()).quantity),stockBefore);
+  check(await stock1(),near(stockBefore-0.015));
   const prepared={...matcha,id:`public-${crypto.randomUUID()}`};
   const preparedOrder=(await (await request('/api/orders',prepared)).json()).data;
   check((await request(`/api/orders/${preparedOrder.id}/status`,{status:'preparing'},true,'PUT')).status,200);
   check((await request(`/api/orders/${preparedOrder.id}/status`,{status:'cancelled'},true,'PUT')).status,200);
-  check(Number((await db.prepare("SELECT quantity FROM stock_items WHERE id='stock-1'").first()).quantity),stockBefore-0.015);
-  check((await request(`/api/orders/${preparedOrder.id}`,undefined,true,'DELETE')).status,409);
+  check(await stock1(),near(stockBefore-0.03));
+  check((await request(`/api/orders/${preparedOrder.id}`,undefined,true,'DELETE')).status,200);
+  check(await stock1(),near(stockBefore-0.015));
+  check(await db.prepare('SELECT id FROM orders WHERE id=?').bind(preparedOrder.id).first(),null);
+  check(await db.prepare('SELECT id FROM order_items WHERE order_id=?').bind(preparedOrder.id).first(),null);
+  check((await request(`/api/orders/${preparedOrder.id}`,undefined,true,'DELETE')).status,404);
+  check(await stock1(),near(stockBefore-0.015));
+  check((await request(`/api/orders/${matchaOrder.id}`,undefined,true,'DELETE')).status,200);
+  check(await stock1(),near(stockBefore));
+  // An order cancelled under the old restock-on-cancel rule is not restocked twice.
+  const legacy={...matcha,id:`public-${crypto.randomUUID()}`};
+  const legacyOrder=(await (await request('/api/orders',legacy)).json()).data;
+  await db.prepare("INSERT INTO inventory_movements (id,stock_item_id,kind,quantity,notes,order_id,created_at) SELECT 'return-'||id,stock_item_id,'return',-quantity,'Cancelled before preparation',order_id,created_at FROM inventory_movements WHERE order_id=? AND kind='consumption'").bind(legacyOrder.id).run();
+  await db.prepare("UPDATE orders SET status='cancelled' WHERE id=?").bind(legacyOrder.id).run();
+  check(await stock1(),near(stockBefore));
+  check((await request(`/api/orders/${legacyOrder.id}`,undefined,true,'DELETE')).status,200);
+  check(await stock1(),near(stockBefore));
+  const staffCookie=(await panelRequest('/api/auth/login',{password:'test-panel-password'})).headers.get('set-cookie').split(';')[0];
+  check((await panelRequest(`/api/orders/${matchaOrder.id}`,undefined,staffCookie,'DELETE')).status,403);
   // Atomic rollback: no order survives when one ingredient is insufficient.
   const impossible={...matcha,id:`public-${crypto.randomUUID()}`,items:[{...matcha.items[0],quantity:100}]};
   await db.prepare("UPDATE stock_items SET quantity=0 WHERE id='stock-1'").run();

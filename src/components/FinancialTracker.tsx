@@ -38,6 +38,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
   const [salesLimit, setSalesLimit] = useState(10);
   const [expenseLimit, setExpenseLimit] = useState(10);
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'order' | 'expense'; id: string; label: string } | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<OrderSelect | null>(null);
 
   const analytics = store.getFinancialAnalytics();
   const completed = useMemo(() => orders.filter(o => o.status === 'completed'), [orders]);
@@ -108,6 +109,12 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
     if (!deleteTarget) return;
     if (deleteTarget.type === 'order') store.deleteOrder(deleteTarget.id);
     else store.deleteExpense(deleteTarget.id);
+    onFinancialsUpdated();
+  };
+
+  const confirmCancel = () => {
+    if (!cancelTarget) return;
+    store.updateOrderStatus(cancelTarget.id, 'cancelled');
     onFinancialsUpdated();
   };
 
@@ -235,7 +242,17 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
         </Card>
       </div>
 
-      <OrderDetailsDialog order={viewOrder} items={viewOrder ? store.getOrderItems(viewOrder.id) : []} currency={currency} taxRate={settings.taxRate} onClose={() => setViewOrder(null)} />
+      <OrderDetailsDialog
+        order={viewOrder}
+        items={viewOrder ? store.getOrderItems(viewOrder.id) : []}
+        currency={currency}
+        taxRate={settings.taxRate}
+        onClose={() => setViewOrder(null)}
+        actions={viewOrder && <span className="ws-spacer" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {['pending', 'preparing', 'ready'].includes(viewOrder.status) && <Button variant="danger-ghost" onClick={() => { setCancelTarget(viewOrder); setViewOrder(null); }}>Cancel order</Button>}
+          <Button variant="danger-ghost" icon={<Trash2 />} onClick={() => { setDeleteTarget({ type: 'order', id: viewOrder.id, label: viewOrder.orderNumber }); setViewOrder(null); }}>Delete</Button>
+        </span>}
+      />
       <ManualLogModal isOpen={manualLogOpen} onClose={() => setManualLogOpen(false)} settings={settings} onFinancialsUpdated={onFinancialsUpdated} />
       <QuickPOSModal isOpen={quickSaleOpen} onClose={() => setQuickSaleOpen(false)} categories={categories} menuItems={menuItems} settings={settings} onOrderCreated={onFinancialsUpdated} />
       <FinanceExportDialog open={exportOpen} onClose={() => setExportOpen(false)} orders={orders} expenses={expenses} currency={currency} />
@@ -245,8 +262,16 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
         onConfirm={confirmDelete}
         title={deleteTarget?.type === 'order' ? `Delete order ${deleteTarget.label}?` : 'Delete this expense?'}
         description={deleteTarget?.type === 'order'
-          ? 'The sale is removed from your revenue and reports. This cannot be undone.'
+          ? 'The sale is removed from your revenue and reports, and its ingredients go back into stock. This cannot be undone.'
           : <>“{deleteTarget?.label}” is removed from your expenses. This cannot be undone.</>}
+      />
+      <ConfirmDialog
+        open={!!cancelTarget}
+        onClose={() => setCancelTarget(null)}
+        onConfirm={confirmCancel}
+        title={`Cancel ${cancelTarget?.orderNumber || 'order'}?`}
+        confirmLabel="Cancel order"
+        description="The order stays in your history and its ingredients stay deducted from stock. Delete the order instead to return them."
       />
     </Page>
   );

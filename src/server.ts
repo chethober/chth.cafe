@@ -1191,13 +1191,23 @@ app.post('/api/orders', async (c) => {
 
 app.delete('/api/orders/:id', async (c) => {
   const id = c.req.param('id');
-  const movements = await c.env.DB.prepare('SELECT id FROM inventory_movements WHERE order_id = ? LIMIT 1').bind(id).first();
-  if (movements) return c.json({ success: false, message: 'Orders with inventory movements must be cancelled instead of deleted to preserve the audit trail.' }, 409);
   const deleted = store.deleteOrder(id);
 
   if (c.env?.DB) {
     try {
-      await c.env.DB.prepare('DELETE FROM orders WHERE id = ?').bind(id).run();
+      if (!await c.env.DB.prepare('SELECT id FROM orders WHERE id = ?').bind(id).first()) return c.json({ success: false, message: 'Order not found.' }, 404);
+      // Deleting returns whatever the order still holds (cancelling does not), netting out earlier returns.
+      // The movements keep the order ID as an audit trail after the order row is gone.
+      const now = new Date().toISOString();
+      await c.env.DB.batch([
+        c.env.DB.prepare(`INSERT INTO inventory_movements (id,stock_item_id,kind,quantity,notes,order_id,created_at)
+          SELECT 'delete-' || m.order_id || '-' || m.stock_item_id, m.stock_item_id, 'return', -SUM(m.quantity), 'Order deleted', m.order_id, ?
+          FROM inventory_movements m JOIN stock_items s ON s.id = m.stock_item_id
+          WHERE m.order_id = ? GROUP BY m.stock_item_id HAVING SUM(m.quantity) < -0.000001`).bind(now, id),
+        c.env.DB.prepare('DELETE FROM order_items WHERE order_id = ?').bind(id),
+        c.env.DB.prepare('DELETE FROM order_requests WHERE id = ?').bind(id),
+        c.env.DB.prepare('DELETE FROM orders WHERE id = ?').bind(id)
+      ]);
     } catch (e) {
       console.warn('D1 Delete Error (orders):', e);
       return c.json({ success: false, message: 'The change could not be saved. Please try again.' }, 503);

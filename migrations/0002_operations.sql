@@ -24,10 +24,6 @@ END;
 CREATE TRIGGER IF NOT EXISTS movement_apply AFTER INSERT ON inventory_movements BEGIN
   UPDATE stock_items SET quantity = MAX(0, quantity + NEW.quantity), total_price = MAX(0, quantity + NEW.quantity) * unit_cost, updated_at = NEW.created_at WHERE id = NEW.stock_item_id;
 END;
-CREATE TRIGGER IF NOT EXISTS order_cancel_restore AFTER UPDATE OF status ON orders WHEN NEW.status = 'cancelled' AND OLD.status = 'pending' BEGIN
-  INSERT INTO inventory_movements (id,stock_item_id,kind,quantity,notes,order_id,created_at)
-  SELECT 'return-' || id, stock_item_id, 'return', -quantity, 'Cancelled before preparation', order_id, strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM inventory_movements WHERE order_id = NEW.id AND kind = 'consumption';
-END;
 CREATE TRIGGER IF NOT EXISTS order_status_validate BEFORE UPDATE OF status ON orders WHEN NEW.status != OLD.status BEGIN
   SELECT CASE WHEN NOT (
     (OLD.status = 'pending' AND NEW.status IN ('preparing','cancelled')) OR

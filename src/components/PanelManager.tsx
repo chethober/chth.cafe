@@ -570,9 +570,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
         onConfirm={() => cancelTarget && updateOrderStatus(cancelTarget.id, 'cancelled')}
         title={`Cancel ${cancelTarget?.orderNumber || 'order'}?`}
         confirmLabel="Cancel order"
-        description={cancelTarget?.status === 'pending'
-          ? 'Reserved ingredients go back into stock.'
-          : 'Ingredients already used for this order stay deducted from stock.'}
+        description="Ingredients for this order stay deducted from stock. An admin can delete the order to return them."
       />
 
       <FormDialog

@@ -7,7 +7,7 @@ export function ensureFeatureTables(db: D1Database) {
   if (!pending) {
     pending = (async () => {
       // Split at statement boundaries, keeping trigger bodies intact.
-      const statements = migration.match(/CREATE TRIGGER[\s\S]*?\nEND;|CREATE (?:TABLE|INDEX)[\s\S]*?;/g) || [];
+      const statements = migration.match(/DROP TRIGGER[^;]*;|CREATE TRIGGER[\s\S]*?\nEND;|CREATE (?:TABLE|INDEX)[\s\S]*?;/g) || [];
       for (const sql of statements) {
         // Indexes only speed up reads; a database with older column names still serves requests without them.
         if (sql.startsWith('CREATE INDEX')) await db.prepare(sql).run().catch(error => console.warn('Index skipped:', error));
