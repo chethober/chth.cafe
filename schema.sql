@@ -325,4 +325,3 @@ CREATE TABLE IF NOT EXISTS customers (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
