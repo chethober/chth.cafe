@@ -41,13 +41,13 @@ interface IconButtonProps extends Omit<ButtonProps, 'icon' | 'children'> {
   label: string;
   children: React.ReactNode;
 }
-export function IconButton({ label, children, variant = 'ghost', size = 'sm', className, ...rest }: IconButtonProps) {
+export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton({ label, children, variant = 'ghost', size = 'sm', className, ...rest }, ref) {
   return (
-    <Button variant={variant} size={size} aria-label={label} title={label} className={cx('ws-icon-btn', className)} {...rest}>
+    <Button ref={ref} variant={variant} size={size} aria-label={label} title={label} className={cx('ws-icon-btn', className)} {...rest}>
       {children}
     </Button>
   );
-}
+});
 
 /* -------------------------------------------------------------------- Page */
 

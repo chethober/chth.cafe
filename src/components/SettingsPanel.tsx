@@ -22,7 +22,8 @@ const PRESET_ACCENTS = [
   { name: 'Espresso gold', hex: '#D97706' },
   { name: 'Teal', hex: '#14B8A6' }
 ];
-const SECTIONS = [
+/** The page's sections, listed under Settings in the sidebar. */
+export const SETTINGS_SECTIONS = [
   { id: 'details', label: 'Café details', icon: Store },
   { id: 'hours', label: 'Opening hours', icon: CalendarClock },
   { id: 'appearance', label: 'Appearance', icon: Palette },
@@ -145,12 +146,6 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
       <PageHeader title="Settings" description="Café details, the shared look of the menu and workspace, and Telegram alerts." />
 
       <div className="ws-settings-layout">
-        <nav className="ws-settings-nav" aria-label="Settings sections">
-          {SECTIONS.map(({ id, label, icon: Icon }) => (
-            <a key={id} href={`#settings-${id}`} className="ws-nav-item" style={{ whiteSpace: 'nowrap', width: 'auto' }}><Icon /><span>{label}</span></a>
-          ))}
-        </nav>
-
         <div className="ws-page" style={{ animation: 'none' }}>
           <form onSubmit={handleSubmit} className="ws-page" style={{ animation: 'none' }} aria-busy={saving}>
             <fieldset disabled={saving} className="ws-fieldset ws-page" style={{ animation: 'none' }}>

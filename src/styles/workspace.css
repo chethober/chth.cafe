@@ -65,7 +65,6 @@
   --ws-control: var(--workspace-control-height, 44px);
   --ws-sidebar: 256px;
   --ws-topbar: 60px;
-  --ws-tabbar: 64px;
   --ws-shadow: 0 1px 0 var(--ws-rule), 0 14px 30px -20px rgb(0 0 0 / .55);
   --ws-shadow-hover: 0 1px 0 var(--ws-rule), 0 24px 40px -22px rgb(0 0 0 / .6);
   --ws-shadow-lg: 0 24px 64px -16px color-mix(in srgb, #000 45%, transparent), 0 2px 6px color-mix(in srgb, #000 12%, transparent);
@@ -106,7 +105,32 @@ html.light .ws {
 
 /* ---------------------------------------------------------------- Shell */
 .ws-shell { display: grid; grid-template-columns: 1fr; min-height: 100dvh; }
-.ws-sidebar { display: none; }
+.ws-sidebar {
+  position: fixed; inset: 0 auto 0 0; z-index: 60; width: min(320px, 86vw);
+  display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 12px calc(16px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(var(--ws-sunken), var(--ws-sunken)) var(--ws-bg); border-right: 1px solid var(--ws-rule); box-shadow: var(--ws-shadow-lg);
+  transform: translateX(-102%); visibility: hidden;
+  transition: transform 280ms var(--ws-ease), visibility 0s linear 280ms;
+}
+.ws-shell[data-drawer] .ws-sidebar { transform: none; visibility: visible; transition: transform 280ms var(--ws-ease); }
+.ws-scrim {
+  position: fixed; inset: 0; z-index: 55; background: rgb(0 0 0 / .42);
+  opacity: 0; pointer-events: none; transition: opacity 240ms ease;
+}
+.ws-shell[data-drawer] .ws-scrim { opacity: 1; pointer-events: auto; }
+.ws-sidebar-brand { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 0 12px 8px; }
+.ws-sidebar-footer { margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--ws-rule); }
+.ws-menu-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--ws-count); box-shadow: 0 0 0 2px var(--ws-bg); }
+.ws-icon-btn { position: relative; }
+.ws-nav-sub { display: flex; flex-direction: column; gap: 1px; margin: 2px 0 6px 23px; padding-left: 12px; border-left: 1px solid var(--ws-rule); }
+.ws-nav-subitem {
+  display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; width: 100%;
+  border-radius: var(--ws-pill); color: var(--ws-muted); font-size: 14px; font-weight: 600; text-align: left;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+.ws-nav-subitem > svg { width: 16px; height: 16px; flex-shrink: 0; }
+.ws-nav-subitem > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ws-main { min-width: 0; display: flex; flex-direction: column; }
 .ws-topbar {
   position: sticky; top: 0; z-index: 40; height: var(--ws-topbar);
@@ -124,36 +148,13 @@ html.light .ws {
 .ws-topbar-title strong { font-family: var(--ws-display); font-size: 19px; font-weight: 600; letter-spacing: -.015em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ws-topbar-title span { font-size: 12px; color: var(--ws-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ws-topbar-actions { display: flex; align-items: center; gap: 4px; }
-.ws-content { flex: 1; width: 100%; max-width: 1240px; margin: 0 auto; padding: 20px 16px calc(var(--ws-tabbar) + 32px + env(safe-area-inset-bottom, 0px)); }
+.ws-content { flex: 1; width: 100%; max-width: 1240px; margin: 0 auto; padding: 20px 16px calc(32px + env(safe-area-inset-bottom, 0px)); }
 .ws-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .ws-brand-mark { width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--ws-ink); color: var(--ws-bg); overflow: hidden; }
 .ws-brand-mark img { width: 100%; height: 100%; object-fit: cover; }
 .ws-brand-text { min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
 .ws-brand-text strong { font-family: var(--ws-display); font-size: 16px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ws-brand-text span { font: 600 12px var(--font-sans); color: var(--ws-accent); letter-spacing: .02em; }
-
-.ws-tabbar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 45;
-  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px;
-  padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
-  background: var(--ws-material-heavy);
-  -webkit-backdrop-filter: blur(24px) saturate(170%); backdrop-filter: blur(24px) saturate(170%);
-  border-top: 1px solid var(--ws-rule);
-}
-.ws-tab {
-  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  min-height: 52px; border-radius: var(--ws-radius-sm); color: var(--ws-muted); font-size: 11px; font-weight: 600;
-  transition: color 150ms ease, transform 160ms var(--ws-ease);
-}
-.ws-tab:active { transform: scale(.94); }
-/* The active tab's icon sits in an ink pill, like the menu's category rail. */
-.ws-tab > svg {
-  width: 52px; height: 30px; padding: 5px 15px; border-radius: var(--ws-pill); overflow: visible;
-  transition: background-color 220ms ease, color 220ms ease, transform 300ms var(--ws-spring);
-}
-.ws-tab[aria-current='page'] { color: var(--ws-ink); }
-.ws-tab[aria-current='page'] > svg { background: var(--ws-ink); color: var(--ws-bg); transform: rotate(-6deg); }
-.ws-tab-badge { position: absolute; top: 2px; left: calc(50% + 10px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--ws-pill); background: var(--ws-count); color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--ws-bg); }
 
 .ws-nav-group { display: flex; flex-direction: column; gap: 2px; }
 .ws-nav-label { padding: 18px 14px 8px; font: 700 11px var(--font-sans); text-transform: uppercase; letter-spacing: .1em; color: var(--ws-faint); }
@@ -177,20 +178,19 @@ html.light .ws {
 @media (hover: hover) and (pointer: fine) {
   .ws-nav-item:hover:not([aria-current='page']) { color: var(--ws-ink); }
   .ws-nav-item:hover:not([aria-current='page']) > svg { transform: rotate(-10deg); }
-  .ws-tab:hover { color: var(--ws-ink); }
+  .ws-nav-subitem:hover { color: var(--ws-ink); background: var(--ws-hover); }
 }
 
 @media (min-width: 1024px) {
   .ws-shell { grid-template-columns: var(--ws-sidebar) minmax(0, 1fr); }
   .ws-sidebar {
-    display: flex; flex-direction: column; position: sticky; top: 0; height: 100dvh; padding: 20px 12px 16px;
-    background: var(--ws-sunken); border-right: 1px solid var(--ws-rule); overflow-y: auto;
+    position: sticky; top: 0; z-index: auto; width: auto; height: 100dvh; padding: 20px 12px 16px;
+    box-shadow: none; transform: none; visibility: visible; transition: none;
   }
+  .ws-scrim { display: none; }
   .ws-sidebar-brand { padding: 0 8px 12px; }
-  .ws-sidebar-footer { margin-top: auto; padding-top: 16px; display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--ws-rule); }
   .ws-topbar { padding: 0 32px; }
   .ws-topbar .ws-brand { display: none; }
-  .ws-tabbar { display: none; }
   .ws-content { padding: 28px 32px 64px; }
   .ws-hide-desktop { display: none !important; }
 }
@@ -719,17 +719,12 @@ button.ws-stat:active { transform: scale(.98); transition-duration: 160ms; }
 @media (hover: hover) and (pointer: fine) { .ws-person:hover:not(:active) { transform: translateY(-3px); box-shadow: var(--ws-shadow-hover); } }
 .ws-pin { text-align: center; font: 600 24px/1 var(--font-mono) !important; letter-spacing: .4em; min-height: 56px !important; }
 
-.ws-mobile-bar { position: sticky; bottom: calc(var(--ws-tabbar) + env(safe-area-inset-bottom, 0px) + 12px); z-index: 30; }
+.ws-mobile-bar { position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); z-index: 30; }
 @media (min-width: 1024px) { .ws-mobile-bar { display: none; } .ws-sticky-col { position: sticky; top: calc(var(--ws-topbar) + 20px); } }
 
-.ws-settings-layout { display: grid; gap: var(--ws-gap); grid-template-columns: minmax(0, 1fr); }
-.ws-settings-nav { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
-@media (min-width: 1100px) {
-  .ws-settings-layout { grid-template-columns: 200px minmax(0, 1fr); align-items: start; }
-  .ws-settings-nav { position: sticky; top: calc(var(--ws-topbar) + 20px); flex-direction: column; gap: 2px; }
-}
+.ws-settings-layout { display: grid; gap: var(--ws-gap); grid-template-columns: minmax(0, 1fr); max-width: 880px; }
 .ws-savebar {
-  position: sticky; bottom: calc(var(--ws-tabbar) + env(safe-area-inset-bottom, 0px) + 12px); z-index: 30;
+  position: sticky; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); z-index: 30;
   display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 12px 12px 18px;
   background: var(--ws-material-heavy); -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%);
   border: 1px solid var(--ws-rule-strong); border-radius: var(--ws-radius-xl); box-shadow: var(--ws-shadow-lg);
@@ -757,7 +752,7 @@ button.ws-stat:active { transform: scale(.98); transition-duration: 160ms; }
 }
 html[data-motion='reduced'] .ws *, html[data-motion='reduced'] .ws *::before, html[data-motion='reduced'] .ws *::after { animation-duration: 1ms !important; transition-duration: 1ms !important; }
 @media (prefers-reduced-transparency: reduce) {
-  .ws-topbar, .ws-tabbar, .ws-savebar { background: var(--ws-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .ws-topbar, .ws-sidebar, .ws-savebar { background: var(--ws-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (prefers-contrast: more) {
   .ws { --ws-rule: var(--menu-rule); --ws-muted: var(--menu-ink); }
@@ -781,4 +776,5 @@ html[data-motion='reduced'] .ws *, html[data-motion='reduced'] .ws *::before, ht
     background: var(--ws-accent); color: var(--ws-accent-ink); font-size: 10px; font-weight: 700; display: grid; place-items: center;
   }
   .ws-shell[data-collapsed] .ws-live { justify-content: center; padding: 8px 0; gap: 0; }
+  .ws-shell[data-collapsed] .ws-nav-sub { display: none; }
 }

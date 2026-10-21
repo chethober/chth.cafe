@@ -1,16 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, Coffee, LogOut, Moon, PanelLeftClose, PanelLeftOpen, RefreshCw, Sun } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AlertCircle, CheckCircle2, Coffee, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, RefreshCw, Sun, X } from 'lucide-react';
 import { IconButton, Notice, Button, PageContext } from './primitives';
+
+export interface NavSection {
+  /** Element id on the page to scroll to. */
+  anchor: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
 
 export interface NavItem<T extends string> {
   id: T;
   label: string;
-  short?: string;
   icon: React.ComponentType<{ className?: string }>;
   group?: string;
   badge?: number;
-  /** Shown in the mobile tab bar (others are reachable from the top bar). */
-  tab?: boolean;
+  /** Parts of the page, listed under the item while it is open; each jumps to its anchor. */
+  sections?: NavSection[];
 }
 
 interface WorkspaceShellProps<T extends string> {
@@ -26,8 +32,6 @@ interface WorkspaceShellProps<T extends string> {
   pendingSaves: number;
   saveError: string;
   onDismissError: () => void;
-  /** Mobile-only extra top bar actions (e.g. a Settings shortcut). */
-  mobileActions?: React.ReactNode;
   children: React.ReactNode;
 }
 
@@ -49,19 +53,22 @@ function SyncStatus({ pendingSaves, saveError }: { pendingSaves: number; saveErr
   return <span className="ws-sync" role="status"><CheckCircle2 width={14} height={14} />Saved</span>;
 }
 
+const MOBILE = '(max-width: 1023px)';
+
 /**
- * The frame both dashboards share: a sidebar on desktop, a translucent tab bar on
- * phones, and a sticky top bar that always says where you are and whether work is saved.
+ * The frame both dashboards share: a sidebar (docked on desktop, a slide-in drawer on
+ * phones) holding every page and control, and a sticky top bar that always says where
+ * you are and whether work is saved.
  */
 export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) {
-  const { kind, cafeName, logoUrl, nav, active, onNavigate, theme, onToggleTheme, onSignOut, pendingSaves, saveError, onDismissError, mobileActions, children } = props;
+  const { kind, cafeName, logoUrl, nav, active, onNavigate, theme, onToggleTheme, onSignOut, pendingSaves, saveError, onDismissError, children } = props;
   const current = nav.find(item => item.id === active);
   const groups = nav.reduce<Record<string, NavItem<T>[]>>((acc, item) => {
     const key = item.group || '';
     (acc[key] ||= []).push(item);
     return acc;
   }, {});
-  const tabs = nav.filter(item => item.tab !== false);
+  const navBadge = nav.reduce((sum, item) => sum + (item.badge || 0), 0);
   const ThemeIcon = theme === 'dark' ? Sun : Moon;
   const storageKey = `chth_sidebar_collapsed_${kind.toLowerCase()}`;
   const [collapsed, setCollapsed] = useState(() => {
@@ -77,6 +84,43 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   const SidebarIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
+
+  // Phones: the sidebar is a drawer. Escape closes it and focus returns to the menu button.
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const sidebar = useRef<HTMLElement>(null);
+  const closeDrawer = useCallback(() => {
+    setDrawerOpen(open => {
+      if (open) requestAnimationFrame(() => menuButton.current?.focus());
+      return false;
+    });
+  }, []);
+  useEffect(() => {
+    if (!drawerOpen) return;
+    sidebar.current?.querySelector<HTMLElement>('[aria-current="page"], .ws-nav-item')?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeDrawer(); };
+    const media = window.matchMedia(MOBILE);
+    const onResize = () => { if (!media.matches) setDrawerOpen(false); };
+    window.addEventListener('keydown', onKey);
+    media.addEventListener('change', onResize);
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      media.removeEventListener('change', onResize);
+      document.documentElement.style.overflow = '';
+    };
+  }, [drawerOpen, closeDrawer]);
+
+  const go = (id: T, anchor?: string) => {
+    onNavigate(id);
+    closeDrawer();
+    if (anchor) {
+      // Wait for the page to render before jumping to its section.
+      setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+    } else if (id !== active) {
+      window.scrollTo({ top: 0 });
+    }
+  };
   // Admin pages are labelled by their nav group; the daily panel by the day it is running.
   const page = current && {
     icon: current.icon,
@@ -84,19 +128,35 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
   };
 
   return (
-    <div className="ws ws-shell" data-kind={kind.toLowerCase()} data-collapsed={collapsed || undefined}>
-      <aside id="ws-sidebar" className="ws-sidebar" aria-label={`${kind} navigation`}>
-        <div className="ws-sidebar-brand"><Brand cafeName={cafeName} logoUrl={logoUrl} kind={kind} /></div>
+    <div className="ws ws-shell" data-kind={kind.toLowerCase()} data-collapsed={collapsed || undefined} data-drawer={drawerOpen || undefined}>
+      <div className="ws-scrim" aria-hidden="true" onClick={closeDrawer} />
+      <aside id="ws-sidebar" ref={sidebar} className="ws-sidebar" aria-label={`${kind} navigation`}>
+        <div className="ws-sidebar-brand">
+          <Brand cafeName={cafeName} logoUrl={logoUrl} kind={kind} />
+          <span className="ws-hide-desktop"><IconButton label="Close menu" onClick={closeDrawer}><X /></IconButton></span>
+        </div>
         <nav>
           {Object.entries(groups).map(([group, items]) => (
             <div key={group || 'main'} className="ws-nav-group">
               {group && <div className="ws-nav-label">{group}</div>}
-              {items.map(({ id, label, icon: Icon, badge }) => (
-                <button key={id} type="button" className="ws-nav-item" aria-current={active === id ? 'page' : undefined} onClick={() => onNavigate(id)} title={collapsed ? label : undefined} aria-label={collapsed ? `${label}${badge ? `, ${badge}` : ''}` : undefined}>
-                  <Icon />
-                  <span className="ws-nav-text">{label}</span>
-                  {!!badge && <span className="ws-nav-count">{badge}</span>}
-                </button>
+              {items.map(({ id, label, icon: Icon, badge, sections }) => (
+                <React.Fragment key={id}>
+                  <button type="button" className="ws-nav-item" aria-current={active === id ? 'page' : undefined} onClick={() => go(id)} title={collapsed ? label : undefined} aria-label={collapsed ? `${label}${badge ? `, ${badge}` : ''}` : undefined}>
+                    <Icon />
+                    <span className="ws-nav-text">{label}</span>
+                    {!!badge && <span className="ws-nav-count">{badge}</span>}
+                  </button>
+                  {active === id && sections && sections.length > 0 && (
+                    <div className="ws-nav-sub" role="group" aria-label={`${label} sections`}>
+                      {sections.map(({ anchor, label: sectionLabel, icon: SectionIcon }) => (
+                        <button key={anchor} type="button" className="ws-nav-subitem" onClick={() => go(id, anchor)}>
+                          <SectionIcon />
+                          <span>{sectionLabel}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </React.Fragment>
               ))}
             </div>
           ))}
@@ -110,22 +170,21 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
 
       <div className="ws-main">
         <header className="ws-topbar">
-          <span className="ws-hide-desktop"><Brand cafeName={cafeName} logoUrl={logoUrl} kind={kind} /></span>
+          <span className="ws-hide-desktop">
+            <IconButton ref={menuButton} label="Menu" aria-expanded={drawerOpen} aria-controls="ws-sidebar" onClick={() => setDrawerOpen(true)}>
+              <Menu />
+              {navBadge > 0 && <span className="ws-menu-dot" aria-hidden="true" />}
+            </IconButton>
+          </span>
           <span className="ws-hide-mobile">
             <IconButton label={collapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar (Ctrl+B)'} aria-expanded={!collapsed} aria-controls="ws-sidebar" onClick={() => setCollapsed(c => !c)}><SidebarIcon /></IconButton>
           </span>
-          <div className="ws-topbar-title ws-hide-mobile">
+          <div className="ws-topbar-title">
             <strong>{current?.label}</strong>
             <span>{cafeName} · {kind}</span>
           </div>
-          <span className="ws-hide-desktop" style={{ flex: 1 }} />
           <div className="ws-topbar-actions">
             <SyncStatus pendingSaves={pendingSaves} saveError={saveError} />
-            {mobileActions && <span className="ws-hide-desktop" style={{ display: 'contents' }}>{mobileActions}</span>}
-            <span className="ws-hide-desktop" style={{ display: 'contents' }}>
-              <IconButton label={theme === 'dark' ? 'Switch to light appearance' : 'Switch to dark appearance'} onClick={onToggleTheme}><ThemeIcon /></IconButton>
-              <IconButton label="Sign out" onClick={onSignOut}><LogOut /></IconButton>
-            </span>
           </div>
         </header>
 
@@ -139,15 +198,6 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
         </main>
       </div>
 
-      <nav className="ws-tabbar" aria-label={`${kind} sections`}>
-        {tabs.map(({ id, label, short, icon: Icon, badge }) => (
-          <button key={id} type="button" className="ws-tab" aria-current={active === id ? 'page' : undefined} onClick={() => onNavigate(id)}>
-            <Icon className="w-5 h-5" />
-            <span>{short || label}</span>
-            {!!badge && <span className="ws-tab-badge">{badge > 99 ? '99+' : badge}</span>}
-          </button>
-        ))}
-      </nav>
     </div>
   );
 }

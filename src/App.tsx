@@ -21,7 +21,7 @@ import { api } from './services/api';
 import { applyAppearance } from './utils/appearance';
 import { applyFavicon, brandTitle } from './utils/branding';
 import { PublicMenu } from './components/PublicMenu';
-import { SettingsPanel } from './components/SettingsPanel';
+import { SETTINGS_SECTIONS, SettingsPanel } from './components/SettingsPanel';
 import { TimeTracker } from './components/TimeTracker';
 import { FinancialTracker } from './components/FinancialTracker';
 import { MenuAdmin } from './components/MenuAdmin';
@@ -30,7 +30,7 @@ import { PanelManager, PanelSection } from './components/PanelManager';
 import { StockManagement } from './components/StockManagement';
 import { CustomerClub } from './components/CustomerClub';
 import { EventManager } from './components/EventManager';
-import { Button, Field, IconButton, Input, Notice, NavItem, WorkspaceShell } from './ui';
+import { Button, Field, Input, Notice, NavItem, WorkspaceShell } from './ui';
 
 type AdminTab = 'financials' | 'customers' | 'events' | 'tasks' | 'menu_admin' | 'stock' | 'staff' | 'settings';
 const ADMIN_TABS: AdminTab[] = ['financials', 'customers', 'events', 'tasks', 'menu_admin', 'stock', 'staff', 'settings'];
@@ -185,11 +185,11 @@ export const App: React.FC = () => {
       const openTasks = tasksList.filter(t => t.status !== 'completed').length;
       const panelNav: NavItem<PanelSection>[] = [
         { id: 'orders', label: 'Orders', icon: ShoppingBag, badge: liveOrders },
-        { id: 'pos', label: 'New order', short: 'New', icon: Plus },
-        { id: 'customers', label: 'Customer club', short: 'Club', icon: Contact },
+        { id: 'pos', label: 'New order', icon: Plus },
+        { id: 'customers', label: 'Customer club', icon: Contact },
         { id: 'events', label: 'Events', icon: CalendarDays },
         { id: 'tasks', label: 'Checklist', icon: CheckSquare, badge: openTasks },
-        { id: 'shifts', label: 'Clock in / out', short: 'Clock', icon: Clock }
+        { id: 'shifts', label: 'Clock in / out', icon: Clock }
       ];
       return (
         <WorkspaceShell kind="Panel" nav={panelNav} active={panelSection} onNavigate={setPanelSection} {...shellProps}>
@@ -215,13 +215,13 @@ export const App: React.FC = () => {
     const lowStock = stockItems.filter(i => i.quantity <= i.minThreshold).length;
     const adminNav: NavItem<AdminTab>[] = [
       { id: 'financials', label: 'Finances', icon: TrendingUp, group: 'Business' },
-      { id: 'customers', label: 'Customer club', short: 'Club', icon: Contact, group: 'Business' },
+      { id: 'customers', label: 'Customer club', icon: Contact, group: 'Business' },
       { id: 'events', label: 'Events', icon: CalendarDays, group: 'Business' },
       { id: 'menu_admin', label: 'Menu', icon: UtensilsCrossed, group: 'Catalogue' },
       { id: 'stock', label: 'Stock', icon: Boxes, group: 'Catalogue', badge: lowStock },
-      { id: 'staff', label: 'Staff & shifts', short: 'Staff', icon: Users, group: 'Team' },
-      { id: 'tasks', label: 'Checklist', short: 'Tasks', icon: CheckSquare, group: 'Team' },
-      { id: 'settings', label: 'Settings', icon: Settings, group: 'Café', tab: false }
+      { id: 'staff', label: 'Staff & shifts', icon: Users, group: 'Team' },
+      { id: 'tasks', label: 'Checklist', icon: CheckSquare, group: 'Team' },
+      { id: 'settings', label: 'Settings', icon: Settings, group: 'Café', sections: SETTINGS_SECTIONS.map(({ id, label, icon }) => ({ anchor: `settings-${id}`, label, icon })) }
     ];
     return (
       <WorkspaceShell
@@ -229,7 +229,6 @@ export const App: React.FC = () => {
         nav={adminNav}
         active={adminTab}
         onNavigate={setAdminTab}
-        mobileActions={<IconButton label="Settings" variant={adminTab === 'settings' ? 'tonal' : 'ghost'} onClick={() => setAdminTab('settings')}><Settings /></IconButton>}
         {...shellProps}
       >
         {adminTab === 'financials' && <FinancialTracker settings={settings} orders={orders} expenses={expenses} categories={categories} menuItems={menuItems} onFinancialsUpdated={refresh} />}
