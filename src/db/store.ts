@@ -19,8 +19,14 @@ import {
   initialMenuItems,
   initialMenuVariants
 } from './seed';
+import { deviceStore, type QueuedRequest } from './offline';
 
 const STORAGE_KEY = 'chth_cafe_settings_v1';
+
+/** fetch() itself failed: the device has no connection to the café API. */
+class OfflineError extends Error {
+  constructor() { super('No connection.'); }
+}
 
 const SYNC_CHANNEL =
   typeof window !== 'undefined' && 'BroadcastChannel' in window
@@ -57,6 +63,12 @@ class CafeStore {
   private mutationQueue: Promise<unknown> = Promise.resolve();
   private listeners: Set<() => void> = new Set();
   private lastSyncKey = '';
+  /** True when the last request could not reach the café API. */
+  public offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  /** Mirror of the device outbox: orders and status changes waiting for a connection. */
+  private queued: QueuedRequest[] = [];
+  private flushing: Promise<void> | null = null;
+  private syncedFromServer = false;
 
   constructor() {
     this.state = this.loadFromStorage();
@@ -70,9 +82,11 @@ class CafeStore {
         }
       });
 
-      if (SYNC_CHANNEL) SYNC_CHANNEL.onmessage = () => { void this.syncFromAPI(); };
-      // Asynchronously fetch latest records from backend D1 database API
-      this.syncFromAPI();
+      if (SYNC_CHANNEL) SYNC_CHANNEL.onmessage = () => { void this.reloadQueue().then(() => this.syncFromAPI()); };
+      window.addEventListener('online', () => { void this.syncFromAPI(); });
+      window.addEventListener('offline', () => { this.offline = true; this.notify(); });
+      // Show what this device last saw, then fetch the latest records from the API.
+      void this.restoreFromDevice().then(() => this.syncFromAPI());
     }
   }
 
@@ -96,20 +110,25 @@ class CafeStore {
     this.state.settings.telegramBotToken = ''; this.state.settings.telegramChatId = '';
     this.confirmedState.staff=[]; this.confirmedState.shifts=[]; this.confirmedState.orders=[]; this.confirmedState.orderItems=[]; this.confirmedState.expenses=[]; this.confirmedState.tasks=[]; this.confirmedState.stockItems=[]; this.confirmedState.recipes=[]; this.confirmedState.customers=[];
     this.confirmedState.settings.telegramBotToken=''; this.confirmedState.settings.telegramChatId='';
+    this.persistSnapshot();
     this.notify();
   }
   public dismissSaveError() { this.saveError = ''; this.notify(); }
-  private mutationFetch(url: string, options: RequestInit): Promise<Response> {
+  /** With `queueable`, a missing connection throws OfflineError and leaves local state for the caller to queue. */
+  private mutationFetch(url: string, options: RequestInit, queueable = false): Promise<Response> {
     this.pendingSaves++; this.notify();
     const request = this.mutationQueue.then(async () => {
       try {
-        const response = await fetch(url, options);
+        const response = await fetch(url, options).catch(() => { this.offline = true; throw new OfflineError(); });
+        this.offline = false;
         const result = await response.clone().json().catch(() => null) as { success?: boolean; message?: string } | null;
         if (!response.ok || result?.success === false) throw new Error(result?.message || 'The server did not save this change.');
         if (SYNC_CHANNEL) SYNC_CHANNEL.postMessage({ type: 'STORE_UPDATED' });
         return response;
       } catch (error) {
+        if (queueable && error instanceof OfflineError) throw error;
         this.state = structuredClone(this.confirmedState);
+        this.applyQueued();
         this.saveToStorage();
         this.saveError = `${error instanceof Error ? error.message : 'Network unavailable.'} Changes may not be saved. Review the refreshed data before retrying.`;
         throw error;
@@ -125,7 +144,18 @@ class CafeStore {
   public async syncFromAPI() {
     if (typeof window === 'undefined') return;
     try {
-      const session = await this.safeFetchJSON('/api/auth/session');
+      // Queued changes go first, so the data read below already includes them.
+      if (this.queuedCount) await this.flushQueue();
+      let session: any = null;
+      try {
+        const response = await fetch('/api/auth/session');
+        session = await response.json().catch(() => null);
+      } catch {
+        // No connection: keep showing what this device last synced.
+        if (!this.offline) { this.offline = true; this.notify(); }
+        return;
+      }
+      if (this.offline) { this.offline = false; this.notify(); }
       const managementView = /^(admin|panel)\./.test(window.location.hostname) || /^\/(admin|panel)(\/|$)/.test(window.location.pathname);
       const adminAccess = session?.authenticated && window.location.hostname.startsWith('admin.');
       // Nothing was written since the last complete sync for this access level, so skip re-reading every table.
@@ -215,7 +245,10 @@ class CafeStore {
       }
 
       if (hasChanges) {
+        this.syncedFromServer = true;
         this.confirmedState = structuredClone(this.state);
+        this.persistSnapshot();
+        this.applyQueued();
         this.saveToStorage();
         this.notify();
       }
@@ -223,6 +256,134 @@ class CafeStore {
     } catch (e) {
       console.warn('syncFromAPI error:', e);
     }
+  }
+
+  // --- Offline: the last sync and queued changes live in IndexedDB on this device. ---
+  public get queuedCount() { return this.queued.filter(entry => !entry.rejected).length; }
+  /** Queued changes the server refused when they were finally sent. */
+  public getRejectedChanges(): Array<{ seq: number; label: string; reason: string }> {
+    return this.queued.filter(entry => entry.rejected).map(entry => ({ seq: entry.seq!, label: this.describeQueued(entry), reason: entry.rejected! }));
+  }
+  public async dismissRejectedChanges() {
+    await Promise.all(this.queued.filter(entry => entry.rejected).map(entry => deviceStore.remove(entry.seq!))).catch(() => {});
+    await this.reloadQueue();
+    this.notify();
+  }
+  private describeQueued(entry: QueuedRequest): string {
+    const body = entry.body ? JSON.parse(entry.body) : {};
+    if (entry.url === '/api/orders') return `Order ${body.orderNumber} for ${body.customerName || 'walk-in'} (${body.totalAmount})`;
+    return 'An order status change';
+  }
+
+  private async restoreFromDevice() {
+    try {
+      const [snapshot, queued] = await Promise.all([deviceStore.readSnapshot<Omit<CafeState, 'kvCache'>>(), deviceStore.queued()]);
+      this.queued = queued;
+      // A sync that finished first is newer than anything stored on the device.
+      if (snapshot && !this.syncedFromServer) {
+        this.state = { ...this.state, ...snapshot, settings: { ...this.state.settings, ...snapshot.settings } };
+        this.confirmedState = structuredClone(this.state);
+      }
+      this.applyQueued();
+      this.refreshKVCache();
+      this.notify();
+    } catch {
+      // IndexedDB is unavailable (private window, blocked storage): the app works online only.
+    }
+  }
+
+  private async reloadQueue() {
+    try { this.queued = await deviceStore.queued(); } catch { /* storage unavailable */ }
+  }
+
+  /** Keeps the last server data on the device, without secrets or staff PINs. */
+  private persistSnapshot() {
+    if (typeof window === 'undefined') return;
+    const { kvCache, ...data } = this.confirmedState;
+    void deviceStore.writeSnapshot({
+      ...data,
+      settings: { ...data.settings, telegramBotToken: '', telegramChatId: '' },
+      staff: data.staff.map(member => ({ ...member, pin: '' }))
+    }).catch(() => {});
+  }
+
+  /** Lays queued orders and status changes over the server data, so the board shows them until they are sent. */
+  private applyQueued() {
+    for (const entry of this.queued) {
+      if (entry.rejected || !entry.body) continue;
+      const body = JSON.parse(entry.body);
+      if (entry.method === 'POST' && entry.url === '/api/orders') {
+        const { items, ...order } = body;
+        if (!this.state.orders.some(existing => existing.id === order.id)) this.putOrder(order, items);
+      }
+      const statusFor = entry.method === 'PUT' && entry.url.match(/^\/api\/orders\/([^/]+)\/status$/);
+      const order = statusFor && this.state.orders.find(existing => existing.id === decodeURIComponent(statusFor[1]));
+      if (order) order.status = body.status;
+    }
+  }
+
+  public isQueuedOrder(orderId: string): boolean {
+    return this.queued.some(entry => !entry.rejected && entry.url === '/api/orders' && entry.body?.includes(`"id":"${orderId}"`));
+  }
+
+  /**
+   * Sends a change now, or keeps it on this device when there is no connection.
+   * Resolves to null when the change was queued; local state is kept either way.
+   */
+  private async queueableMutation(url: string, options: RequestInit & { body?: string }): Promise<Response | null> {
+    // Behind changes already waiting, so the server receives them in the order they were made.
+    if (!this.queuedCount) {
+      try { return await this.mutationFetch(url, options, true); }
+      catch (error) { if (!(error instanceof OfflineError)) throw error; }
+    }
+    try {
+      await deviceStore.queue({ url, method: options.method || 'POST', body: options.body, queuedAt: new Date().toISOString() });
+      await this.reloadQueue();
+    } catch {
+      this.state = structuredClone(this.confirmedState);
+      this.applyQueued();
+      this.saveError = 'No connection, and this browser cannot keep changes offline. This change was not saved.';
+      this.notify();
+      throw new Error(this.saveError);
+    }
+    this.notify();
+    if (!this.offline) void this.syncFromAPI();
+    return null;
+  }
+
+  /** Sends queued changes in order. Web Locks keep two open tabs from sending the same change twice. */
+  public flushQueue(): Promise<void> {
+    this.flushing ||= (async () => {
+      const send = async () => {
+        let changed = false;
+        // Read the device copy: another tab may already have sent some of these.
+        for (const entry of await deviceStore.queued()) {
+          if (entry.rejected) continue;
+          let response: Response;
+          try {
+            response = await fetch(entry.url, { method: entry.method, headers: { 'Content-Type': 'application/json' }, body: entry.body });
+          } catch { this.offline = true; break; }
+          this.offline = false;
+          const result = await response.clone().json().catch(() => null) as { success?: boolean; message?: string } | null;
+          if (response.ok && result && result.success !== false) { await deviceStore.remove(entry.seq!); changed = true; continue; }
+          // Signed out, or the server is having trouble: keep everything and try again later.
+          if (response.status === 401 || response.status >= 500 || !result) break;
+          await deviceStore.replace({ ...entry, rejected: result.message || 'The server refused this change.' });
+          changed = true;
+        }
+        return changed;
+      };
+      try {
+        const changed = navigator.locks ? await navigator.locks.request('chth_outbox', send) : await send();
+        // Re-read everything, so sent orders come back from the server and refused ones leave the board.
+        if (changed) { this.lastSyncKey = ''; SYNC_CHANNEL?.postMessage({ type: 'STORE_UPDATED' }); }
+      } catch {
+        // Storage unavailable: nothing could have been queued.
+      }
+      await this.reloadQueue();
+      this.notify();
+    })().finally(() => { this.flushing = null; });
+    return this.flushing;
   }
 
   public syncFromStorage(externalState?: CafeState) {
@@ -845,6 +1006,12 @@ class CafeStore {
   }
 
   public recordConfirmedOrder(order: OrderSelect, items: Parameters<CafeStore['createOrder']>[0]['items']): void {
+    this.putOrder(order, items);
+    this.saveToStorage();
+    this.notify();
+  }
+
+  private putOrder(order: OrderSelect, items: Parameters<CafeStore['createOrder']>[0]['items']): void {
     this.state.orders = [order, ...this.state.orders.filter(existing => existing.id !== order.id)];
     this.state.orderItems = [
       ...items.map((item, index) => ({
@@ -856,8 +1023,6 @@ class CafeStore {
       })),
       ...this.state.orderItems.filter(item => item.orderId !== order.id)
     ];
-    this.saveToStorage();
-    this.notify();
   }
 
   public getOrderItems(orderId?: string): OrderItemSelect[] {
@@ -886,7 +1051,8 @@ class CafeStore {
     const signature = JSON.stringify({ ...orderInput, createdAt: undefined });
     const orderId = this.orderAttempts.get(signature) || `ord-${crypto.randomUUID()}`;
     this.orderAttempts.set(signature, orderId);
-    const orderNumber = `#${1000 + this.state.orders.length + 1}`;
+    // Known before the server answers, so an order taken offline keeps the number staff called out.
+    const orderNumber = `#${orderId.slice(4, 12).toUpperCase()}`;
     const subtotal = Number(
       orderInput.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toFixed(2)
     );
@@ -914,12 +1080,17 @@ class CafeStore {
     if (typeof window === 'undefined') {
       this.recordConfirmedOrder(newOrder, orderInput.items); return newOrder;
     }
-    const response = await this.mutationFetch('/api/orders', {
+    const response = await this.queueableMutation('/api/orders', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...newOrder, items: orderInput.items })
     });
-    const result = await response.json() as { data: OrderSelect };
     this.orderAttempts.delete(signature);
+    if (!response) {
+      // Kept on this device; it is sent, and checked by the server, once the connection is back.
+      this.recordConfirmedOrder(newOrder, orderInput.items);
+      return newOrder;
+    }
+    const result = await response.json() as { data: OrderSelect };
     return result.data;
   }
 
@@ -951,7 +1122,7 @@ class CafeStore {
       this.saveToStorage();
 
       if (typeof window !== 'undefined') {
-        this.mutationFetch(`/api/orders/${orderId}/status`, {
+        this.queueableMutation(`/api/orders/${orderId}/status`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ status })

@@ -204,6 +204,7 @@ html.light .ws {
 .ws-sync { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: var(--ws-pill); font-size: 12px; font-weight: 600; color: var(--ws-muted); background: var(--ws-hover); white-space: nowrap; }
 .ws-sync[data-state='saving'] { color: var(--ws-accent); background: var(--ws-accent-soft); }
 .ws-sync[data-state='error'] { color: var(--ws-danger); background: var(--ws-danger-soft); }
+.ws-sync[data-state='offline'] { color: var(--ws-warning); background: var(--ws-warning-soft); }
 .ws-spin { animation: ws-spin 900ms linear infinite; }
 @keyframes ws-spin { to { transform: rotate(360deg); } }
 

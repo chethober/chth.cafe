@@ -12,3 +12,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <App />
   </React.StrictMode>
 );
+
+// Production only: in development Vite serves source files that a cached copy would hide.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => { void navigator.serviceWorker.register('/sw.js').catch(() => {}); });
+}

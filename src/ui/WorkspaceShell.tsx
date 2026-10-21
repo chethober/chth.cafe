@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, Coffee, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, RefreshCw, Sun, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Coffee, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, RefreshCw, Sun, WifiOff, X } from 'lucide-react';
 import { IconButton, Notice, Button, PageContext } from './primitives';
 
 export interface NavSection {
@@ -32,6 +32,13 @@ interface WorkspaceShellProps<T extends string> {
   pendingSaves: number;
   saveError: string;
   onDismissError: () => void;
+  /** The café API could not be reached; orders are kept on this device. */
+  offline: boolean;
+  /** Changes on this device waiting to be sent. */
+  queuedChanges: number;
+  /** Queued changes the server refused once they were sent. */
+  rejectedChanges: Array<{ seq: number; label: string; reason: string }>;
+  onDismissRejected: () => void;
   children: React.ReactNode;
 }
 
@@ -47,8 +54,10 @@ function Brand({ cafeName, logoUrl, kind }: { cafeName: string; logoUrl?: string
   );
 }
 
-function SyncStatus({ pendingSaves, saveError }: { pendingSaves: number; saveError: string }) {
+function SyncStatus({ pendingSaves, saveError, offline, queuedChanges }: { pendingSaves: number; saveError: string; offline: boolean; queuedChanges: number }) {
   if (saveError) return <span className="ws-sync" data-state="error"><AlertCircle width={14} height={14} />Not saved</span>;
+  if (offline) return <span className="ws-sync" data-state="offline" role="status"><WifiOff width={14} height={14} />{queuedChanges ? `Offline · ${queuedChanges} waiting` : 'Offline'}</span>;
+  if (queuedChanges > 0) return <span className="ws-sync" data-state="saving" role="status"><RefreshCw width={14} height={14} className="ws-spin" />Sending {queuedChanges}…</span>;
   if (pendingSaves > 0) return <span className="ws-sync" data-state="saving" role="status"><RefreshCw width={14} height={14} className="ws-spin" />Saving {pendingSaves}…</span>;
   return <span className="ws-sync" role="status"><CheckCircle2 width={14} height={14} />Saved</span>;
 }
@@ -61,7 +70,7 @@ const MOBILE = '(max-width: 1023px)';
  * you are and whether work is saved.
  */
 export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) {
-  const { kind, cafeName, logoUrl, nav, active, onNavigate, theme, onToggleTheme, onSignOut, pendingSaves, saveError, onDismissError, children } = props;
+  const { kind, cafeName, logoUrl, nav, active, onNavigate, theme, onToggleTheme, onSignOut, pendingSaves, saveError, onDismissError, offline, queuedChanges, rejectedChanges, onDismissRejected, children } = props;
   const current = nav.find(item => item.id === active);
   const groups = nav.reduce<Record<string, NavItem<T>[]>>((acc, item) => {
     const key = item.group || '';
@@ -184,11 +193,28 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
             <span>{cafeName} · {kind}</span>
           </div>
           <div className="ws-topbar-actions">
-            <SyncStatus pendingSaves={pendingSaves} saveError={saveError} />
+            <SyncStatus pendingSaves={pendingSaves} saveError={saveError} offline={offline} queuedChanges={queuedChanges} />
           </div>
         </header>
 
         <main id="workspace-main" className="ws-content">
+          {offline && (
+            <div style={{ marginBottom: 20 }}>
+              <Notice tone="warning" role="status">
+                No connection. New orders and order status changes are kept on this device and sent when the connection is back; other changes need a connection.
+              </Notice>
+            </div>
+          )}
+          {rejectedChanges.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <Notice tone="danger" role="alert" action={<Button size="sm" variant="ghost" onClick={onDismissRejected}>Dismiss</Button>}>
+                {rejectedChanges.length === 1 ? 'A change made offline was refused when it was sent. Re-enter it if it is still needed:' : 'Changes made offline were refused when they were sent. Re-enter them if they are still needed:'}
+                <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                  {rejectedChanges.map(change => <li key={change.seq}>{change.label}: {change.reason}</li>)}
+                </ul>
+              </Notice>
+            </div>
+          )}
           {saveError && (
             <div style={{ marginBottom: 20 }}>
               <Notice tone="danger" action={<Button size="sm" variant="ghost" onClick={onDismissError}>Dismiss</Button>}>{saveError}</Notice>

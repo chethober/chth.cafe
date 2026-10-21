@@ -1,0 +1,13 @@
+{
+  "name": "CHTH Cafe",
+  "short_name": "CHTH",
+  "description": "Menu, orders, staff and finances for the café.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#241f19",
+  "theme_color": "#241f19",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

@@ -48,6 +48,16 @@ function usePersistentState<T extends string>(key: string, allowed: readonly T[]
   return [value, setValue] as const;
 }
 
+// Remembers that this device was signed in, so the workspace still opens without a connection.
+// The server checks the session on every request; this only decides which screen to show offline.
+const SIGNED_IN_KEY = 'chth_workspace_signed_in';
+function rememberSignIn(signedIn: boolean) {
+  try { if (signedIn) localStorage.setItem(SIGNED_IN_KEY, '1'); else localStorage.removeItem(SIGNED_IN_KEY); } catch { /* storage unavailable */ }
+}
+function wasSignedIn() {
+  try { return localStorage.getItem(SIGNED_IN_KEY) === '1'; } catch { return false; }
+}
+
 export const App: React.FC = () => {
   const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
   // Each SPA is selected only by its subdomain, including local development.
@@ -87,7 +97,13 @@ export const App: React.FC = () => {
   const [isAdminAuthed, setIsAdminAuthed] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   useEffect(() => {
-    const checkSession = () => fetch('/api/auth/session').then(res => res.json()).then(data => setIsAdminAuthed((data as { authenticated?: boolean }).authenticated === true)).catch(() => {});
+    const checkSession = () => fetch('/api/auth/session').then(
+      res => res.json().then(data => {
+        const signedIn = (data as { authenticated?: boolean }).authenticated === true;
+        setIsAdminAuthed(signedIn); rememberSignIn(signedIn);
+      }).catch(() => {}),
+      () => { if (wasSignedIn()) setIsAdminAuthed(true); }
+    );
     void checkSession().finally(() => setAuthLoading(false));
     // Hidden tabs stop polling and catch up as soon as they are shown again.
     const poll = () => { if (document.visibilityState === 'visible') { void store.syncFromAPI(); void checkSession(); } };
@@ -108,7 +124,7 @@ export const App: React.FC = () => {
     try {
       const result = await api<{ success?: boolean }>('/api/auth/login', { password: passwordInput });
       if (result.success !== true) throw new Error('The sign-in response was invalid. Check the café API.');
-      setIsAdminAuthed(true); setPasswordInput(''); await store.syncFromAPI();
+      setIsAdminAuthed(true); rememberSignIn(true); setPasswordInput(''); await store.syncFromAPI();
     } catch (error) { setAuthError(error instanceof Error ? error.message : 'Sign-in failed.'); }
     finally { setAuthLoading(false); }
   };
@@ -116,7 +132,7 @@ export const App: React.FC = () => {
     try {
       const response = await fetch('/api/auth/logout', { method: 'POST' });
       if (!response.ok) throw new Error('Sign-out failed. Please try again.');
-      setIsAdminAuthed(false); store.clearPrivateData(); window.history.replaceState({}, '', '/');
+      setIsAdminAuthed(false); rememberSignIn(false); store.clearPrivateData(); window.history.replaceState({}, '', '/');
     } catch (error) { setAuthError(error instanceof Error ? error.message : 'Sign-out failed.'); }
   };
 
@@ -177,7 +193,11 @@ export const App: React.FC = () => {
       onSignOut: handleAdminLogout,
       pendingSaves: store.pendingSaves,
       saveError: store.saveError,
-      onDismissError: () => store.dismissSaveError()
+      onDismissError: () => store.dismissSaveError(),
+      offline: store.offline,
+      queuedChanges: store.queuedCount,
+      rejectedChanges: store.getRejectedChanges(),
+      onDismissRejected: () => { void store.dismissRejectedChanges(); }
     };
 
     if (isPanelView) {

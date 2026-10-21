@@ -147,8 +147,9 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
     if (savingOrder || cart.length === 0) return;
     setOrderError('');
     setSavingOrder(true);
+    let placed;
     try {
-      await store.createOrder({
+      placed = await store.createOrder({
         customerName: posMember?.name || posCustomer.trim() || 'Walk-in',
         customerId: posMember?.id,
         orderType: posOrderType,
@@ -164,7 +165,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
     } finally {
       setSavingOrder(false);
     }
-    setOrderPlaced(`Order for ${posMember?.name || posCustomer.trim() || 'walk-in'} sent to the board.`);
+    setOrderPlaced(`Order for ${posMember?.name || posCustomer.trim() || 'walk-in'} ${store.isQueuedOrder(placed.id) ? 'kept on this device. It goes to the server when the connection is back.' : 'sent to the board.'}`);
     setCart([]);
     setPosCustomer('');
     setPosMember(null);
@@ -305,7 +306,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                             <div className="ws-ticket-head">
                               <div style={{ minWidth: 0 }}>
                                 <div className="ws-ticket-num">{order.orderNumber}</div>
-                                <div className="ws-hint ws-truncate">{order.customerName || 'Walk-in'} · {orderTypeLabel(order.orderType)}</div>
+                                <div className="ws-hint ws-truncate">{order.customerName || 'Walk-in'} · {orderTypeLabel(order.orderType)}{store.isQueuedOrder(order.id) && ' · on this device, not sent yet'}</div>
                               </div>
                               <span className="ws-ticket-age" data-late={lane.status !== 'ready' && age >= LATE_AFTER_MIN ? '' : undefined}>
                                 <Clock width={12} height={12} style={{ display: 'inline', verticalAlign: '-1px', marginRight: 4 }} />{ageLabel(age)}

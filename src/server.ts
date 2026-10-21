@@ -1148,7 +1148,8 @@ app.post('/api/orders', async (c) => {
   if (body.id && (typeof body.id !== 'string' || !/^[a-zA-Z0-9-]{16,100}$/.test(body.id))) return c.json({ success: false, message: 'Invalid order ID.' }, 400);
   const orderData = {
     id: body.id || `ord-${crypto.randomUUID()}`,
-    orderNumber: `#${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+    // Staff tills number orders themselves, so one taken offline keeps the number on its ticket.
+    orderNumber: authed && typeof body.orderNumber === 'string' && /^#[0-9A-F]{8}$/.test(body.orderNumber) ? body.orderNumber : `#${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
     customerName: member?.name || body.customerName || 'Guest Customer',
     customerId: member?.id || null,
     orderType: body.orderType || 'dine_in',
