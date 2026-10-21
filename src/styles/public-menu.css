@@ -136,7 +136,7 @@ html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !i
 
 /* ── Category rail ───────────────────────────────────────── */
 .pm-rail {
-  position: sticky; top: 64px; z-index: 30;
+  position: sticky; top: 0; z-index: 30;
   margin: -8px -16px; padding: 10px 4px;
   background: color-mix(in srgb, var(--menu-paper) 88%, transparent);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
