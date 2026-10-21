@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import {
-  Coffee,
   Settings,
   Clock,
   TrendingUp,
@@ -59,7 +59,6 @@ function wasSignedIn() {
 }
 
 export const App: React.FC = () => {
-  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
   // Each SPA is selected only by its subdomain, including local development.
   const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
   const isAdminView = hostname.startsWith('admin.');
@@ -88,7 +87,24 @@ export const App: React.FC = () => {
     try { localStorage.setItem('chth_theme', theme); } catch { /* storage unavailable */ }
   }, [theme]);
 
-  const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  // The new theme spreads out from the button in a circle. Without View Transitions,
+  // or with reduced motion, it switches at once.
+  const toggleTheme = (button: HTMLElement) => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    if (!document.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setTheme(next); return; }
+    const { left, top, width, height } = button.getBoundingClientRect();
+    const x = left + width / 2, y = top + height / 2;
+    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    const transition = document.startViewTransition(() => {
+      flushSync(() => setTheme(next));
+      document.documentElement.classList.toggle('light', next === 'light');
+      document.documentElement.classList.toggle('dark', next === 'dark');
+    });
+    void transition.ready.then(() => document.documentElement.animate(
+      { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
+      { duration: 400, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', pseudoElement: '::view-transition-new(root)' }
+    )).catch(() => {});
+  };
 
   const [, setStateVersion] = useState(0);
   const refresh = () => setStateVersion((v) => v + 1);
@@ -179,7 +195,7 @@ export const App: React.FC = () => {
               <Input id={id} type="password" autoComplete="current-password" autoFocus required value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} />
             )}</Field>
             <Button type="submit" variant="primary" size="lg" block loading={authLoading}>{authLoading ? 'Checking…' : 'Sign in'}</Button>
-            <Button variant="ghost" size="sm" onClick={toggleTheme} icon={theme === 'dark' ? <Sun /> : <Moon />}>{theme === 'dark' ? 'Light appearance' : 'Dark appearance'}</Button>
+            <Button variant="ghost" size="sm" onClick={e => toggleTheme(e.currentTarget)} icon={theme === 'dark' ? <Sun /> : <Moon />}>{theme === 'dark' ? 'Light appearance' : 'Dark appearance'}</Button>
           </form>
         </div>
       );
@@ -266,41 +282,11 @@ export const App: React.FC = () => {
   /* ---------------------------------------------------------- Public menu */
   return (
     <div className="app-shell app-menu min-h-dvh bg-zinc-950 text-zinc-100 flex flex-col justify-between selection:bg-amber-500 selection:text-zinc-950 font-sans antialiased">
-      <header className="sticky top-0 z-40 bg-zinc-950/80 backdrop-blur-2xl border-b border-zinc-800/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            {settings.logoUrl && failedLogoUrl !== settings.logoUrl ? (
-              <img
-                src={settings.logoUrl}
-                alt={settings.cafeName}
-                onError={() => setFailedLogoUrl(settings.logoUrl)}
-                className="w-9 h-9 rounded-xl object-cover ring-2 ring-amber-500/30 shadow-md"
-              />
-            ) : (
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center font-extrabold shadow-lg brand-bg">
-                <Coffee className="w-5 h-5 text-zinc-950" />
-              </div>
-            )}
-            <div>
-              <span className="font-black text-sm sm:text-base text-zinc-100 block leading-tight tracking-tight">{settings.cafeName}</span>
-              <span className="text-[10px] text-zinc-400 font-medium block">A little pause.</span>
-            </div>
-          </div>
-          <button
-            onClick={toggleTheme}
-            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            aria-label="Toggle Theme"
-            className="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-amber-400 border border-zinc-800 transition cursor-pointer shadow-sm flex items-center gap-1.5"
-          >
-            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
-          </button>
-        </div>
-      </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 w-full">
         {store.pendingSaves > 0 && <p role="status" className="mb-4 rounded-xl border border-amber-500/30 p-3 text-amber-400">Saving {store.pendingSaves} change(s)…</p>}
         {store.saveError && <div role="alert" className="mb-4 rounded-xl border border-rose-500/40 p-4 text-rose-300">{store.saveError}<button type="button" onClick={() => store.dismissSaveError()} className="ml-4 underline">Dismiss</button></div>}
-        <PublicMenu settings={settings} categories={categories} menuItems={menuItems} menuVariants={menuVariants} onOrderCreated={refresh} />
+        <PublicMenu settings={settings} categories={categories} menuItems={menuItems} menuVariants={menuVariants} onOrderCreated={refresh} theme={theme} onToggleTheme={toggleTheme} />
       </main>
 
       <footer className="bg-zinc-950 border-t border-zinc-900 py-5 text-center text-xs text-zinc-500 mt-8">

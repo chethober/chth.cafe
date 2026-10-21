@@ -6,6 +6,10 @@
   --default-transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+/* Theme switch: App clips the new page in as a growing circle, so the default crossfade is off. */
+::view-transition-old(root),
+::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+
 @layer base {
   :root {
     --brand-primary: #f59e0b;

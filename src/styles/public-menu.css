@@ -43,6 +43,22 @@
   content: ''; position: absolute; z-index: -1; right: -90px; bottom: -140px; width: 340px; height: 340px; border-radius: 50%;
   background: color-mix(in srgb, var(--menu-accent) 7%, transparent);
 }
+/* Theme toggle: the sun and moon trade places with a quarter turn. */
+.pm-theme-toggle {
+  position: absolute; top: clamp(14px, 2.4vw, 24px); right: clamp(14px, 2.4vw, 24px); z-index: 1;
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
+  border: 1px solid var(--pm-line); color: var(--menu-ink);
+  background: color-mix(in srgb, var(--menu-sheet) 72%, transparent);
+  transition: transform 160ms var(--ease-out), background-color 150ms ease;
+}
+.pm-theme-toggle:active { transform: scale(0.94); }
+.pm-theme-toggle svg { grid-area: 1 / 1; transition: transform 260ms var(--ease-out), opacity 180ms ease; }
+.pm-theme-sun { color: var(--menu-accent); }
+.pm-theme-toggle[data-theme='light'] .pm-theme-sun { opacity: 0; transform: rotate(90deg) scale(0.6); }
+.pm-theme-toggle[data-theme='dark'] .pm-theme-moon { opacity: 0; transform: rotate(-90deg) scale(0.6); }
+@media (hover: hover) and (pointer: fine) {
+  .pm-theme-toggle:hover { background: var(--pm-soft); }
+}
 .pm-eyebrow { display: inline-flex; align-items: center; gap: 8px; font: 600 13px var(--font-sans); letter-spacing: .02em; color: var(--menu-accent); }
 .pm-hero h1 { margin-top: 10px; font: 600 clamp(48px, 8vw, 108px)/.95 var(--pm-display); letter-spacing: -.035em; text-wrap: balance; }
 .pm-tagline { margin-top: 14px; font: italic 400 clamp(18px, 2vw, 23px)/1.3 var(--pm-display); color: var(--menu-muted); }
@@ -321,6 +337,7 @@ html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !i
   .pm { gap: 22px; }
   .pm-hero { grid-template-columns: 1fr; gap: 22px; border-radius: 26px; }
   .pm-hero h1 { font-size: clamp(44px, 13vw, 72px); }
+  .pm-eyebrow { padding-right: 52px; }
   .pm-hero-side { flex-direction: row; align-items: center; }
   .pm-cup, .pm-logo { width: 84px; height: auto; flex-shrink: 0; }
   .pm-logo { padding: 4px 4px 14px; }

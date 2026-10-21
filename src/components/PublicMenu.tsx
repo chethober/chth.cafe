@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Coffee, GlassWater, Leaf, Cake, Utensils, Search, Plus, Minus, ShoppingBag, CheckCircle2, X, MapPin, Phone, ChevronRight, Heart, ArrowUp, SlidersHorizontal, Sparkles, Shuffle, type LucideIcon } from 'lucide-react';
+import { Coffee, GlassWater, Leaf, Cake, Utensils, Search, Plus, Minus, ShoppingBag, CheckCircle2, X, MapPin, Phone, ChevronRight, Heart, ArrowUp, SlidersHorizontal, Sparkles, Shuffle, Sun, Moon, type LucideIcon } from 'lucide-react';
 import { CategorySelect, MenuItemSelect, MenuVariantSelect, SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { getOpeningStatus } from '../utils/openingHours';
@@ -14,6 +14,9 @@ interface PublicMenuProps {
   menuItems: MenuItemSelect[];
   menuVariants: MenuVariantSelect[];
   onOrderCreated?: () => void;
+  theme: 'dark' | 'light';
+  /** Switches the theme; the change spreads out from the button that was pressed. */
+  onToggleTheme: (button: HTMLElement) => void;
 }
 
 interface CartItem {
@@ -89,7 +92,7 @@ function Confetti({ burst }: { burst: number }) {
   </div>;
 }
 
-export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, menuItems, menuVariants, onOrderCreated }) => {
+export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, menuItems, menuVariants, onOrderCreated, theme, onToggleTheme }) => {
   const [receipt, setReceipt] = useState<OrderReceipt | null>(() => {
     try { const saved = JSON.parse(localStorage.getItem('chth_order_receipt') || 'null'); return saved?.id && saved?.token && saved?.number ? saved : null; } catch { return null; }
   });
@@ -380,6 +383,11 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
       <Confetti burst={confetti} />
 
       <section aria-label="Café information" className="pm-hero">
+        <button type="button" className="pm-theme-toggle" data-theme={theme} onClick={e => onToggleTheme(e.currentTarget)}
+          aria-label={theme === 'dark' ? 'Switch to light appearance' : 'Switch to dark appearance'}>
+          <Sun className="pm-theme-sun" size={19} aria-hidden="true" />
+          <Moon className="pm-theme-moon" size={19} aria-hidden="true" />
+        </button>
         <div className="pm-hero-copy">
           <p className="pm-eyebrow"><Sparkles size={14} />{greeting}</p>
           <h1>{settings.cafeName}</h1>

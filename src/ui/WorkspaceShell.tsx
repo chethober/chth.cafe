@@ -27,7 +27,8 @@ interface WorkspaceShellProps<T extends string> {
   active: T;
   onNavigate: (id: T) => void;
   theme: 'dark' | 'light';
-  onToggleTheme: () => void;
+  /** Switches the theme; the change spreads out from the button that was pressed. */
+  onToggleTheme: (button: HTMLElement) => void;
   onSignOut: () => void;
   pendingSaves: number;
   saveError: string;
@@ -172,7 +173,7 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
         </nav>
         <div className="ws-sidebar-footer">
           <span className="ws-live" title="Live · syncs every 15s"><span className="ws-live-dot" aria-hidden="true" /><span className="ws-nav-text">Live · syncs every 15s</span></span>
-          <button type="button" className="ws-nav-item" onClick={onToggleTheme} title={collapsed ? (theme === 'dark' ? 'Light appearance' : 'Dark appearance') : undefined}><ThemeIcon /><span className="ws-nav-text">{theme === 'dark' ? 'Light appearance' : 'Dark appearance'}</span></button>
+          <button type="button" className="ws-nav-item" onClick={e => onToggleTheme(e.currentTarget)} title={collapsed ? (theme === 'dark' ? 'Light appearance' : 'Dark appearance') : undefined}><ThemeIcon /><span className="ws-nav-text">{theme === 'dark' ? 'Light appearance' : 'Dark appearance'}</span></button>
           <button type="button" className="ws-nav-item" onClick={onSignOut} title={collapsed ? 'Sign out' : undefined}><LogOut /><span className="ws-nav-text">Sign out</span></button>
         </div>
       </aside>
