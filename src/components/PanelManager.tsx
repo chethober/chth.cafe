@@ -22,7 +22,7 @@ import {
 import { CustomerClub, CustomerPicker } from './CustomerClub';
 import { MenuPicker, OrderDetailsDialog, TaskFormDialog, TaskRow, TASK_CATEGORIES, TASK_CATEGORY_ICONS, nextTaskStatus } from './shared';
 
-export type PanelSection = 'orders' | 'pos' | 'customers' | 'tasks' | 'shifts';
+export type PanelSection = 'orders' | 'pos' | 'customers' | 'events' | 'tasks' | 'shifts';
 type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
 type OrderType = 'dine_in' | 'takeout' | 'pickup';
 

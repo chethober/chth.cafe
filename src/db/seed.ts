@@ -42,6 +42,10 @@ export const initialSettings: SettingsSelect = {
   notifyTasks: true,
   notifyDailyReport: true,
   notifyLowStock: true,
+  calendarSystem: 'gregory',
+  secondaryCalendar: '',
+  telegramEventsChatId: '',
+  notifyBookings: true,
   updatedAt: new Date().toISOString()
 };
 

@@ -1,12 +1,13 @@
 import { ImageUpload } from './ImageUpload';
 import React, { useEffect, useRef, useState } from 'react';
-import { Bot, Boxes, CalendarClock, CheckSquare, Clock, Database, Download, Eye, EyeOff, Link2Off, Palette, RefreshCw, Send, ShoppingCart, Store, UserCheck } from 'lucide-react';
+import { Bot, Boxes, CalendarClock, CalendarDays, CheckSquare, Clock, Database, Download, Eye, EyeOff, Link2Off, Palette, RefreshCw, Send, ShoppingCart, Store, UserCheck } from 'lucide-react';
 import { SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { AppearanceEditor } from './AppearanceEditor';
 import { OpeningHoursEditor, openingHoursErrors, parseOpeningHours } from './OpeningHoursEditor';
 import { AppearanceSettings, parseAppearance } from '../utils/appearance';
-import { Button, Card, ConfirmDialog, Field, IconButton, Input, Notice, Page, PageHeader, Segmented, ToggleRow, localDateKey } from '../ui';
+import { Button, Card, ConfirmDialog, Field, IconButton, Input, Notice, Page, PageHeader, Segmented, Select, ToggleRow, localDateKey } from '../ui';
+import { CALENDAR_SYSTEMS, calendarOf, cafeToday, formatDateKey } from '../utils/events';
 
 interface SettingsPanelProps {
   settings: SettingsSelect;
@@ -39,7 +40,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
     notifyShifts: settings.notifyShifts ?? true,
     notifyTasks: settings.notifyTasks ?? true,
     notifyDailyReport: settings.notifyDailyReport ?? true,
-    notifyLowStock: settings.notifyLowStock ?? true
+    notifyLowStock: settings.notifyLowStock ?? true,
+    notifyBookings: settings.notifyBookings ?? true
   });
   const [dirty, setDirty] = useState(false);
   const dirtyRef = useRef(false);
@@ -175,6 +177,19 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
                       <Field label="Tax rate (%)">{id => <Input id={id} type="number" inputMode="decimal" step="0.1" min="0" value={formData.taxRate} onChange={e => edit({ taxRate: parseFloat(e.target.value) || 0 })} />}</Field>
                       <Field label="Time zone" hint="IANA name, e.g. Asia/Tehran">{(id, hint) => <Input id={id} aria-describedby={hint} value={formData.timeZone || 'Asia/Tehran'} onChange={e => edit({ timeZone: e.target.value })} placeholder="Asia/Tehran" />}</Field>
                     </div>
+                    <div className="ws-form-row cols-2">
+                      <Field label="Calendar" hint={`Event dates read like ${formatDateKey(cafeToday(formData.timeZone || 'Asia/Tehran'), calendarOf(formData.calendarSystem))}`}>{(id, hint) => (
+                        <Select id={id} aria-describedby={hint} value={calendarOf(formData.calendarSystem)} onChange={e => edit({ calendarSystem: e.target.value, secondaryCalendar: formData.secondaryCalendar === e.target.value ? '' : formData.secondaryCalendar })}>
+                          {CALENDAR_SYSTEMS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                        </Select>
+                      )}</Field>
+                      <Field label="Second calendar" optional hint="Shown smaller beside each date">{(id, hint) => (
+                        <Select id={id} aria-describedby={hint} value={formData.secondaryCalendar || ''} onChange={e => edit({ secondaryCalendar: e.target.value })}>
+                          <option value="">None</option>
+                          {CALENDAR_SYSTEMS.filter(c => c.id !== calendarOf(formData.calendarSystem)).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                        </Select>
+                      )}</Field>
+                    </div>
                   </div>
                 </Card>
               </section>
@@ -208,7 +223,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
               </section>
 
               <section id="settings-notifications" className="ws-section" aria-label="Notifications">
-                <Card title="Telegram" description="Get sales, shifts, checklist and stock alerts, plus a financial summary at midnight.">
+                <Card title="Telegram" description="Get sales, shifts, checklist, booking and stock alerts, plus a financial summary at midnight. Event announcements go to a separate events chat.">
                   <div className="ws-form">
                     <div className="ws-form-row cols-2">
                       <Field label="Bot token" hint="Create a bot with @BotFather">{(id, hint) => (
@@ -219,6 +234,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
                       )}</Field>
                       <Field label="Chat or channel ID" hint="Your user, group, or channel ID">{(id, hint) => <Input id={id} aria-describedby={hint} className="mono" value={formData.telegramChatId || ''} onChange={e => edit({ telegramChatId: e.target.value })} placeholder="-100123456789" />}</Field>
                     </div>
+                    <Field label="Events chat" optional hint="A customer group or channel for event announcements, with the bot as an admin. Staff alerts never go here.">{(id, hint) => (
+                      <Input id={id} aria-describedby={hint} className="mono" value={formData.telegramEventsChatId || ''} onChange={e => edit({ telegramEventsChatId: e.target.value })} placeholder="@yourcafe or -100123456789" />
+                    )}</Field>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                       <Button size="sm" icon={<Send />} loading={testLoading} disabled={!telegramReady}
                         onClick={() => postTelegram('/api/telegram/test', { botToken: formData.telegramBotToken, chatId: formData.telegramChatId }, 'Test message sent.', setTestFeedback, setTestLoading)}>
@@ -256,6 +274,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
                   <ToggleRow icon={<UserCheck width={18} height={18} />} title="Clock in and out" description="Who, how long, and the wage for the shift" checked={!!formData.notifyShifts} onChange={v => edit({ notifyShifts: v })} />
                   <ToggleRow icon={<CheckSquare width={18} height={18} />} title="Checklist completed" description="Task, priority, category, and assignee" checked={!!formData.notifyTasks} onChange={v => edit({ notifyTasks: v })} />
                   <ToggleRow icon={<Clock width={18} height={18} />} title="Daily summary at midnight" description="Yesterday’s revenue, expenses, profit, payment mix and top sellers" checked={!!formData.notifyDailyReport} onChange={v => edit({ notifyDailyReport: v })} />
+                  <ToggleRow icon={<CalendarDays width={18} height={18} />} title="Event bookings" description="New and cancelled bookings, with the guest, seats and code" checked={formData.notifyBookings !== false} onChange={v => edit({ notifyBookings: v })} />
                   <ToggleRow icon={<Boxes width={18} height={18} />} title="Low stock" description="When a material reaches its reorder level, plus a 9:00 morning check" checked={!!formData.notifyLowStock} onChange={v => edit({ notifyLowStock: v })} />
                 </Card>
               </section>

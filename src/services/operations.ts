@@ -32,7 +32,7 @@ export function bumpDataVersion(db: D1Database) {
   return db.prepare('INSERT INTO sync_state (id, version) VALUES (1, 1) ON CONFLICT(id) DO UPDATE SET version = version + 1').run();
 }
 export function publicSettings(config: Record<string, unknown>) {
-  const keys = ['id','cafeName','logoUrl','brandPrimary','brandSecondary','appearance','currency','taxRate','openHours','timeZone','contactPhone','address','updatedAt'];
+  const keys = ['id','cafeName','logoUrl','brandPrimary','brandSecondary','appearance','currency','taxRate','openHours','timeZone','calendarSystem','secondaryCalendar','contactPhone','address','updatedAt'];
   return Object.fromEntries(keys.map(key => [key, config[key]]));
 }
 export async function trackingToken(id: string, secret?: string) {

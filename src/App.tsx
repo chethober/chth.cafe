@@ -13,7 +13,8 @@ import {
   ShoppingBag,
   Plus,
   Users,
-  Contact
+  Contact,
+  CalendarDays
 } from 'lucide-react';
 import { store } from './db/store';
 import { api } from './services/api';
@@ -28,11 +29,12 @@ import { TaskManager } from './components/TaskManager';
 import { PanelManager, PanelSection } from './components/PanelManager';
 import { StockManagement } from './components/StockManagement';
 import { CustomerClub } from './components/CustomerClub';
+import { EventManager } from './components/EventManager';
 import { Button, Field, IconButton, Input, Notice, NavItem, WorkspaceShell } from './ui';
 
-type AdminTab = 'financials' | 'customers' | 'tasks' | 'menu_admin' | 'stock' | 'staff' | 'settings';
-const ADMIN_TABS: AdminTab[] = ['financials', 'customers', 'tasks', 'menu_admin', 'stock', 'staff', 'settings'];
-const PANEL_SECTIONS: PanelSection[] = ['orders', 'pos', 'customers', 'tasks', 'shifts'];
+type AdminTab = 'financials' | 'customers' | 'events' | 'tasks' | 'menu_admin' | 'stock' | 'staff' | 'settings';
+const ADMIN_TABS: AdminTab[] = ['financials', 'customers', 'events', 'tasks', 'menu_admin', 'stock', 'staff', 'settings'];
+const PANEL_SECTIONS: PanelSection[] = ['orders', 'pos', 'customers', 'events', 'tasks', 'shifts'];
 
 function usePersistentState<T extends string>(key: string, allowed: readonly T[], fallback: T) {
   const [value, setValue] = useState<T>(() => {
@@ -185,12 +187,13 @@ export const App: React.FC = () => {
         { id: 'orders', label: 'Orders', icon: ShoppingBag, badge: liveOrders },
         { id: 'pos', label: 'New order', short: 'New', icon: Plus },
         { id: 'customers', label: 'Customer club', short: 'Club', icon: Contact },
+        { id: 'events', label: 'Events', icon: CalendarDays },
         { id: 'tasks', label: 'Checklist', icon: CheckSquare, badge: openTasks },
         { id: 'shifts', label: 'Clock in / out', short: 'Clock', icon: Clock }
       ];
       return (
         <WorkspaceShell kind="Panel" nav={panelNav} active={panelSection} onNavigate={setPanelSection} {...shellProps}>
-          <PanelManager
+          {panelSection === 'events' ? <EventManager settings={settings} mode="panel" /> : <PanelManager
             section={panelSection}
             onNavigate={setPanelSection}
             settings={settings}
@@ -204,7 +207,7 @@ export const App: React.FC = () => {
             menuVariants={menuVariants}
             customers={customers}
             onStateChange={refresh}
-          />
+          />}
         </WorkspaceShell>
       );
     }
@@ -213,6 +216,7 @@ export const App: React.FC = () => {
     const adminNav: NavItem<AdminTab>[] = [
       { id: 'financials', label: 'Finances', icon: TrendingUp, group: 'Business' },
       { id: 'customers', label: 'Customer club', short: 'Club', icon: Contact, group: 'Business' },
+      { id: 'events', label: 'Events', icon: CalendarDays, group: 'Business' },
       { id: 'menu_admin', label: 'Menu', icon: UtensilsCrossed, group: 'Catalogue' },
       { id: 'stock', label: 'Stock', icon: Boxes, group: 'Catalogue', badge: lowStock },
       { id: 'staff', label: 'Staff & shifts', short: 'Staff', icon: Users, group: 'Team' },
@@ -230,6 +234,7 @@ export const App: React.FC = () => {
       >
         {adminTab === 'financials' && <FinancialTracker settings={settings} orders={orders} expenses={expenses} categories={categories} menuItems={menuItems} onFinancialsUpdated={refresh} />}
         {adminTab === 'customers' && <CustomerClub settings={settings} customers={customers} orders={orders} orderItems={orderItems} canDelete onChanged={refresh} />}
+        {adminTab === 'events' && <EventManager settings={settings} mode="admin" />}
         {adminTab === 'tasks' && <TaskManager tasks={tasksList} staffList={staffList} onTasksUpdated={refresh} />}
         {adminTab === 'menu_admin' && <MenuAdmin settings={settings} categories={categories} menuItems={menuItems} menuVariants={menuVariants} onMenuUpdated={refresh} />}
         {adminTab === 'stock' && <StockManagement settings={settings} stockItems={stockItems} onStockUpdated={refresh} />}

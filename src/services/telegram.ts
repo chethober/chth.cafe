@@ -1,4 +1,6 @@
-export type TelegramNotificationType = 'sales' | 'shifts' | 'tasks' | 'dailyReport' | 'lowStock';
+import { calendarOf, describeOccurrence, describeRecurrence, type CafeEvent, type EventBooking } from '../utils/events';
+
+export type TelegramNotificationType = 'sales' | 'shifts' | 'tasks' | 'dailyReport' | 'lowStock' | 'bookings';
 
 export interface TelegramConfig {
   botToken: string;
@@ -8,6 +10,11 @@ export interface TelegramConfig {
   notifyTasks: boolean;
   notifyDailyReport: boolean;
   notifyLowStock: boolean;
+  notifyBookings: boolean;
+  /** Customer-facing group or channel for event announcements; never falls back to the staff chat. */
+  eventsChatId: string;
+  calendarSystem: string;
+  secondaryCalendar: string;
   cafeName: string;
   currency: string;
   timeZone: string;
@@ -36,6 +43,10 @@ export async function getTelegramConfig(env: any): Promise<TelegramConfig> {
     notifyTasks: true,
     notifyDailyReport: true,
     notifyLowStock: true,
+    notifyBookings: true,
+    eventsChatId: '',
+    calendarSystem: 'gregory',
+    secondaryCalendar: '',
     cafeName: 'CHTH',
     currency: '₹',
     timeZone: 'Asia/Tehran',
@@ -53,6 +64,10 @@ export async function getTelegramConfig(env: any): Promise<TelegramConfig> {
           notifyTasks: row.notify_tasks !== 0 && row.notify_tasks !== false,
           notifyDailyReport: row.notify_daily_report !== 0 && row.notify_daily_report !== false,
           notifyLowStock: row.notify_low_stock !== 0 && row.notify_low_stock !== false,
+          notifyBookings: row.notify_bookings !== 0 && row.notify_bookings !== false,
+          eventsChatId: String(row.telegram_events_chat_id || ''),
+          calendarSystem: String(row.calendar_system || 'gregory'),
+          secondaryCalendar: String(row.secondary_calendar || ''),
           cafeName: (row.cafe_name as string) || config.cafeName,
           currency: (row.currency as string) || config.currency,
           timeZone: (row.time_zone as string) || config.timeZone,
@@ -75,6 +90,21 @@ export async function callTelegram<T = any>(botToken: string, method: string, pa
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
+    const data = await response.json() as any;
+    if (data.ok) return { success: true, result: data.result };
+    console.warn(`[Telegram API Error] ${method}:`, data);
+    return { success: false, error: data.description || 'Telegram API returned error' };
+  } catch (err: any) {
+    console.error('[Telegram Exception]:', err);
+    return { success: false, error: err.message || 'Failed to reach Telegram API' };
+  }
+}
+
+/** Call a Bot API method with a multipart body, for uploading files such as event photos. */
+export async function callTelegramForm<T = any>(botToken: string, method: string, form: FormData): Promise<{ success: boolean; result?: T; error?: string }> {
+  if (!botToken) return { success: false, error: 'Telegram Bot Token is missing' };
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/${method}`, { method: 'POST', body: form });
     const data = await response.json() as any;
     if (data.ok) return { success: true, result: data.result };
     console.warn(`[Telegram API Error] ${method}:`, data);
@@ -108,6 +138,7 @@ const notificationEnabled = (config: TelegramConfig, type: TelegramNotificationT
   tasks: config.notifyTasks,
   dailyReport: config.notifyDailyReport,
   lowStock: config.notifyLowStock,
+  bookings: config.notifyBookings,
 })[type];
 
 /**
@@ -116,7 +147,7 @@ const notificationEnabled = (config: TelegramConfig, type: TelegramNotificationT
  */
 export async function sendTelegramNotification(
   env: any,
-  message: string | TelegramMessage | ((ctx: FormatContext) => string | TelegramMessage),
+  message: string | TelegramMessage | ((ctx: TelegramConfig) => string | TelegramMessage),
   type: TelegramNotificationType,
   overrideConfig?: { botToken?: string; chatId?: string }
 ): Promise<{ success: boolean; error?: string }> {
@@ -317,4 +348,40 @@ export function escapeHtml(str: unknown): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+// --- Events ---
+
+/** Customer-facing announcement of a public event; a photo caption is capped at 1024 characters. */
+export function formatEventPost(event: CafeEvent, config: Pick<TelegramConfig, 'cafeName' | 'calendarSystem' | 'secondaryCalendar'>, link: string, maxLength = 4096): string {
+  const calendar = calendarOf(config.calendarSystem);
+  const secondary = config.secondaryCalendar ? calendarOf(config.secondaryCalendar) : '';
+  const recurrence = describeRecurrence(event, calendar);
+  const when = describeOccurrence(event, event.startDate, calendar, secondary);
+  const title = event.status === 'cancelled' ? `❌ <b>CANCELLED</b> · <s>${escapeHtml(event.title)}</s>` : `🎉 <b>${escapeHtml(event.title)}</b>`;
+  const details = [
+    `📅 ${escapeHtml(recurrence ? `${recurrence} · from ${when}` : when)}`,
+    event.location && `📍 ${escapeHtml(event.location)}`,
+    event.priceNote && `🎟 ${escapeHtml(event.priceNote)}`
+  ].filter(Boolean).join('\n');
+  const action = `👉 <a href="${escapeHtml(link)}">${event.bookingEnabled && event.status === 'published' ? 'Book your seat' : 'Details'}</a>`;
+  const tail = `${details}\n\n${action}\n\n<i>${escapeHtml(config.cafeName)}</i>`;
+  // The description sits under the title, trimmed so the whole post fits.
+  const room = maxLength - title.length - tail.length - 4;
+  let description = event.status === 'cancelled' ? '' : event.description.trim();
+  if (description.length > room) description = room > 20 ? `${description.slice(0, room - 1).trimEnd()}…` : '';
+  return [title, escapeHtml(description), tail].filter(Boolean).join('\n\n');
+}
+
+export function formatBookingMessage(action: 'new' | 'cancelled', booking: EventBooking, event: CafeEvent, config: Pick<TelegramConfig, 'cafeName' | 'calendarSystem'>): string {
+  const when = describeOccurrence(event, booking.occurrenceDate, calendarOf(config.calendarSystem));
+  return `${action === 'new' ? '🎟 <b>NEW BOOKING</b>' : '🚫 <b>BOOKING CANCELLED</b>'}
+
+<b>Event:</b> ${escapeHtml(event.title)}
+<b>When:</b> ${escapeHtml(when)}
+<b>Guest:</b> ${escapeHtml(booking.name)} · ${escapeHtml(booking.phone)}
+<b>Seats:</b> ${booking.seats}
+<b>Code:</b> <code>${escapeHtml(booking.code)}</code>${booking.note ? `\n<b>Note:</b> ${escapeHtml(booking.note)}` : ''}
+
+<i>${escapeHtml(config.cafeName)} · Events</i>`;
 }

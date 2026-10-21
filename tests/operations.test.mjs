@@ -19,12 +19,12 @@ try {
     }
   }
   const embeddedMigration = await readFile('src/services/operationsMigration.ts','utf8');
-  check(embeddedMigration.slice(embeddedMigration.indexOf('`')+1,embeddedMigration.lastIndexOf('`')),await readFile('migrations/0002_operations.sql','utf8')+(await readFile('migrations/0003_sync_and_indexes.sql','utf8')).replace(/^--.*\n/,'')+(await readFile('migrations/0004_cancel_keeps_stock.sql','utf8')).replace(/^--.*\n/,'')+(await readFile('migrations/0005_customers.sql','utf8')).replace(/^--.*\n/,''));
+  check(embeddedMigration.slice(embeddedMigration.indexOf('`')+1,embeddedMigration.lastIndexOf('`')),await readFile('migrations/0002_operations.sql','utf8')+(await readFile('migrations/0003_sync_and_indexes.sql','utf8')).replace(/^--.*\n/,'')+(await readFile('migrations/0004_cancel_keeps_stock.sql','utf8')).replace(/^--.*\n/,'')+(await readFile('migrations/0005_customers.sql','utf8')).replace(/^--.*\n/,'')+(await readFile('migrations/0006_events.sql','utf8')).replace(/^--.*\n/,''));
   const db = await mf.getD1Database('DB');
   // Start with the old schema to exercise the upgrade path, then seed real D1.
   const schema = (await readFile('schema.sql','utf8')).replace(/^--.*$/gm,'').replace(/  time_zone TEXT[^\n]*\n/g,'').replace(/  allergens TEXT[^\n]*\n/g,'').replace(/  dietary_labels TEXT[^\n]*\n/g,'').replace(/  customer_id TEXT[^\n]*\n/g,'');
   const statements = schema.match(/CREATE TRIGGER[\s\S]*?\nEND;|CREATE TABLE[\s\S]*?;|INSERT[\s\S]*?;/g);
-  for (const sql of statements) if (!/CREATE TRIGGER|CREATE TABLE IF NOT EXISTS (inventory_movements|reconciliations|order_requests|customers)/.test(sql)) await db.prepare(sql).run();
+  for (const sql of statements) if (!/CREATE TRIGGER|CREATE TABLE IF NOT EXISTS (inventory_movements|reconciliations|order_requests|customers|events|event_bookings)/.test(sql)) await db.prepare(sql).run();
   // Databases created before cancelling stopped restocking still carry this trigger; the Worker must drop it.
   await db.prepare("CREATE TRIGGER order_cancel_restore AFTER UPDATE OF status ON orders WHEN NEW.status = 'cancelled' BEGIN SELECT 1; END").run();
   await db.prepare("UPDATE settings SET telegram_bot_token='private-test-token', telegram_chat_id='private-chat', notify_sales=0,notify_shifts=0,notify_low_stock=0").run();

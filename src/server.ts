@@ -14,6 +14,8 @@ import {
 } from './services/telegram';
 import { registerTelegramBot, runScheduledTelegram, sendDailyReport } from './services/telegramBot';
 import { registerCustomers } from './services/customers';
+import { registerEvents } from './services/events';
+import { calendarOf, isCalendarSystem } from './utils/events';
 
 export type Env = {
   Variables: { authed: boolean; workspace: 'admin' | 'panel' };
@@ -47,6 +49,7 @@ function mapRow(row: Record<string, unknown>): Record<string, unknown> {
   if ('notifyTasks' in mapped) mapped.notifyTasks = mapped.notifyTasks === 1 || mapped.notifyTasks === true;
   if ('notifyDailyReport' in mapped) mapped.notifyDailyReport = mapped.notifyDailyReport === 1 || mapped.notifyDailyReport === true;
   if ('notifyLowStock' in mapped) mapped.notifyLowStock = mapped.notifyLowStock === 1 || mapped.notifyLowStock === true;
+  if ('notifyBookings' in mapped) mapped.notifyBookings = mapped.notifyBookings === 1 || mapped.notifyBookings === true;
   return mapped;
 }
 
@@ -77,7 +80,11 @@ function ensureSettingsColumns(db: D1Database) {
       'ALTER TABLE settings ADD COLUMN notify_shifts INTEGER NOT NULL DEFAULT 1',
       'ALTER TABLE settings ADD COLUMN notify_tasks INTEGER NOT NULL DEFAULT 1',
       'ALTER TABLE settings ADD COLUMN notify_daily_report INTEGER NOT NULL DEFAULT 1',
-      'ALTER TABLE settings ADD COLUMN notify_low_stock INTEGER NOT NULL DEFAULT 1'
+      'ALTER TABLE settings ADD COLUMN notify_low_stock INTEGER NOT NULL DEFAULT 1',
+      `ALTER TABLE settings ADD COLUMN calendar_system TEXT NOT NULL DEFAULT 'gregory'`,
+      `ALTER TABLE settings ADD COLUMN secondary_calendar TEXT NOT NULL DEFAULT ''`,
+      `ALTER TABLE settings ADD COLUMN telegram_events_chat_id TEXT NOT NULL DEFAULT ''`,
+      'ALTER TABLE settings ADD COLUMN notify_bookings INTEGER NOT NULL DEFAULT 1'
     ];
     const table = alterStatements[0].split(' ')[2];
     const { results } = await db.prepare(`PRAGMA table_info(${table})`).all();
@@ -174,11 +181,12 @@ app.use('/api/*', async (c, next) => {
   const path = c.req.path;
   const publicRead = c.req.method === 'GET' && ['/api/settings', '/api/menu', '/api/auth/session'].includes(path);
   const publicWrite = c.req.method === 'POST' && ['/api/auth/login', '/api/orders'].includes(path);
-  const tracking = c.req.method === 'GET' && /^\/api\/orders\/[^/]+\/tracking$/.test(path);
+  const tracking = (c.req.method === 'GET' && /^\/api\/(orders\/[^/]+\/tracking|events\/public|event-bookings\/[^/]+\/status)$/.test(path))
+    || (c.req.method === 'POST' && /^\/api\/(events\/[^/]+\/bookings|event-bookings\/[^/]+\/cancel)$/.test(path));
   if (!authed && !publicRead && !publicWrite && !tracking) return c.json({ success: false, message: 'Please sign in.' }, 401);
-  const panelAccess = (c.req.method === 'GET' && ['/api/orders', '/api/order-items', '/api/tasks', '/api/staff', '/api/staff/shifts', '/api/stock', '/api/recipes', '/api/customers'].includes(path))
+  const panelAccess = (c.req.method === 'GET' && ['/api/orders', '/api/order-items', '/api/tasks', '/api/staff', '/api/staff/shifts', '/api/stock', '/api/recipes', '/api/customers', '/api/events', '/api/event-bookings'].includes(path))
     || (c.req.method === 'POST' && ['/api/tasks', '/api/staff/clock-in', '/api/staff/clock-out', '/api/customers'].includes(path))
-    || (c.req.method === 'PUT' && /^\/api\/(orders\/[^/]+\/status|tasks\/[^/]+\/status|menu\/items\/[^/]+\/stock|customers\/[^/]+)$/.test(path))
+    || (c.req.method === 'PUT' && /^\/api\/(orders\/[^/]+\/status|tasks\/[^/]+\/status|menu\/items\/[^/]+\/stock|customers\/[^/]+|event-bookings\/[^/]+)$/.test(path))
     || (c.req.method === 'GET' && /^\/api\/menu\/[^/]+\/recipe$/.test(path));
   if (workspace === 'panel' && !publicRead && !publicWrite && !tracking && !path.startsWith('/api/auth/') && !panelAccess) {
     return c.json({ success: false, message: 'This action requires the admin workspace.' }, 403);
@@ -245,6 +253,7 @@ app.post('/api/auth/logout', async c => {
 registerOperations(app);
 registerTelegramBot(app);
 registerCustomers(app);
+registerEvents(app);
 
 // --- 1. Settings & Branding Routes ---
 const getSettings = async (c: Context<Env>) => {
@@ -269,6 +278,8 @@ app.get('/api/admin/settings', getSettings);
 app.put('/api/settings', async (c) => {
   const body = await c.req.json();
   if (body.timeZone) { try { new Intl.DateTimeFormat('en', { timeZone: body.timeZone }); } catch { return c.json({ success: false, message: 'Invalid café timezone.' }, 400); } }
+  if (body.calendarSystem !== undefined && !isCalendarSystem(body.calendarSystem)) return c.json({ success: false, message: 'Choose a supported calendar.' }, 400);
+  if (body.secondaryCalendar !== undefined && body.secondaryCalendar !== '' && !isCalendarSystem(body.secondaryCalendar)) return c.json({ success: false, message: 'Choose a supported secondary calendar.' }, 400);
   const current = c.env?.DB ? await c.env.DB.prepare('SELECT * FROM settings WHERE id = ?').bind('cafe_config').first() : null;
   const savedSettings = { ...store.getSettings(), ...(current ? mapRow(current as Record<string, unknown>) : {}) };
   const updated = { ...savedSettings, ...body, appearance: JSON.stringify(parseAppearance(body.appearance ?? savedSettings.appearance)), updatedAt: new Date().toISOString() };
@@ -277,7 +288,7 @@ app.put('/api/settings', async (c) => {
     await ensureSettingsColumns(c.env.DB);
     try {
       await c.env.DB.prepare(
-        `UPDATE settings SET cafe_name = ?, logo_url = ?, brand_primary = ?, brand_secondary = ?, currency = ?, tax_rate = ?, open_hours = ?, contact_phone = ?, address = ?, telegram_bot_token = ?, telegram_chat_id = ?, notify_sales = ?, notify_shifts = ?, notify_tasks = ?, notify_daily_report = ?, notify_low_stock = ?, appearance = ?, time_zone = ?, updated_at = ? WHERE id = ?`
+        `UPDATE settings SET cafe_name = ?, logo_url = ?, brand_primary = ?, brand_secondary = ?, currency = ?, tax_rate = ?, open_hours = ?, contact_phone = ?, address = ?, telegram_bot_token = ?, telegram_chat_id = ?, notify_sales = ?, notify_shifts = ?, notify_tasks = ?, notify_daily_report = ?, notify_low_stock = ?, notify_bookings = ?, calendar_system = ?, secondary_calendar = ?, telegram_events_chat_id = ?, appearance = ?, time_zone = ?, updated_at = ? WHERE id = ?`
       ).bind(
         updated.cafeName,
         updated.logoUrl,
@@ -295,6 +306,10 @@ app.put('/api/settings', async (c) => {
         updated.notifyTasks ? 1 : 0,
         updated.notifyDailyReport ? 1 : 0,
         updated.notifyLowStock ? 1 : 0,
+        updated.notifyBookings === false ? 0 : 1,
+        calendarOf(updated.calendarSystem),
+        isCalendarSystem(updated.secondaryCalendar) && updated.secondaryCalendar !== calendarOf(updated.calendarSystem) ? updated.secondaryCalendar : '',
+        String(updated.telegramEventsChatId || '').trim(),
         updated.appearance,
         updated.timeZone || 'Asia/Tehran',
         updated.updatedAt,

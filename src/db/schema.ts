@@ -29,6 +29,10 @@ export const settings = sqliteTable('settings', {
   notifyTasks: integer('notify_tasks', { mode: 'boolean' }).notNull().default(true),
   notifyDailyReport: integer('notify_daily_report', { mode: 'boolean' }).notNull().default(true),
   notifyLowStock: integer('notify_low_stock', { mode: 'boolean' }).notNull().default(true),
+  calendarSystem: text('calendar_system').notNull().default('gregory'), // Intl calendar id, see utils/events
+  secondaryCalendar: text('secondary_calendar').notNull().default(''), // Shown alongside, or '' for none
+  telegramEventsChatId: text('telegram_events_chat_id').notNull().default(''), // Customer-facing group or channel for event posts
+  notifyBookings: integer('notify_bookings', { mode: 'boolean' }).notNull().default(true),
   updatedAt: text('updated_at').notNull()
 });
 
@@ -175,7 +179,8 @@ export const customers = sqliteTable('customers', {
 });
 
 // Types exported for frontend & backend consumption
-export type SettingsSelect = Omit<typeof settings.$inferSelect, 'timeZone'> & { timeZone?: string };
+export type SettingsSelect = Omit<typeof settings.$inferSelect, 'timeZone' | 'calendarSystem' | 'secondaryCalendar' | 'telegramEventsChatId' | 'notifyBookings'>
+  & { timeZone?: string; calendarSystem?: string; secondaryCalendar?: string; telegramEventsChatId?: string; notifyBookings?: boolean };
 export type CategorySelect = typeof categories.$inferSelect;
 export type MenuItemSelect = Omit<typeof menuItems.$inferSelect, 'allergens' | 'dietaryLabels'> & { allergens?: string; dietaryLabels?: string };
 export type MenuVariantSelect = typeof menuVariants.$inferSelect;

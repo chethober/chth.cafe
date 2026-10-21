@@ -1,0 +1,156 @@
+/* Events: the shared month calendar, the public "What's on" strip and sheets, and admin agenda details.
+   The calendar reads --evcal-* tokens: menu tokens by default, workspace tokens inside the workspace. */
+.evcal {
+  --evcal-ink: var(--menu-ink);
+  --evcal-muted: var(--menu-muted);
+  --evcal-line: color-mix(in srgb, var(--menu-rule) 55%, transparent);
+  --evcal-soft: color-mix(in srgb, var(--menu-ink) 7%, transparent);
+  --evcal-accent: var(--menu-accent);
+  --evcal-paper: var(--menu-paper);
+  --evcal-internal: var(--status-info, #3b82f6);
+  --evcal-danger: var(--status-danger, #e5484d);
+  display: grid; gap: 10px; color: var(--evcal-ink);
+}
+.ws .evcal {
+  --evcal-ink: var(--ws-ink);
+  --evcal-muted: var(--ws-muted);
+  --evcal-line: var(--ws-rule);
+  --evcal-soft: var(--ws-soft);
+  --evcal-accent: var(--ws-accent);
+  --evcal-paper: var(--ws-surface);
+  --evcal-danger: var(--ws-danger);
+}
+.evcal-head { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; }
+.evcal-title { display: grid; justify-items: center; text-align: center; line-height: 1.2; }
+.evcal-title strong { font-size: 16px; font-weight: 700; }
+.evcal-title small { font-size: 12px; color: var(--evcal-muted); }
+.evcal-nav { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px !important; border: 1px solid var(--evcal-line); color: var(--evcal-ink); transition: transform 140ms ease-out, background-color 150ms ease; }
+.evcal-nav:active { transform: scale(.92); }
+.evcal-today { justify-self: center; min-height: 32px; padding: 0 12px; border-radius: 999px !important; background: var(--evcal-soft); color: var(--evcal-ink); font-size: 12px; font-weight: 600; }
+.evcal-grid { display: grid; gap: 4px; }
+.evcal-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.evcal-weekday { padding: 4px 0; text-align: center; font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--evcal-muted); }
+.evcal-day {
+  position: relative; display: grid; align-content: start; justify-items: center; gap: 2px; width: 100%; min-height: 52px; padding: 6px 2px 18px;
+  border-radius: 12px !important; color: var(--evcal-ink); font-variant-numeric: tabular-nums;
+  transition: background-color 150ms ease, transform 120ms ease-out;
+}
+.evcal-day:active { transform: scale(.95); }
+.evcal-num { font-size: 14px; font-weight: 600; line-height: 1.2; }
+.evcal-alt { font-size: 10px; color: var(--evcal-muted); line-height: 1; }
+.evcal-day.is-outside { opacity: .38; }
+.evcal-day.is-past .evcal-num { color: var(--evcal-muted); }
+.evcal-day.is-today .evcal-num { display: grid; place-items: center; min-width: 26px; height: 26px; margin-top: -3px; border-radius: 999px; background: var(--evcal-ink); color: var(--evcal-paper); }
+.evcal-day.is-selected { background: var(--evcal-soft); box-shadow: inset 0 0 0 2px var(--evcal-accent); }
+.evcal-marks { position: absolute; left: 0; right: 0; bottom: 6px; display: flex; justify-content: center; align-items: center; gap: 3px; }
+.evcal-marks i { width: 6px; height: 6px; border-radius: 999px; background: var(--evcal-accent); }
+.evcal-marks i.is-internal { background: var(--evcal-internal); }
+.evcal-marks i.is-draft { background: transparent; box-shadow: inset 0 0 0 1.5px var(--evcal-muted); }
+.evcal-marks i.is-cancelled { background: var(--evcal-danger); opacity: .6; }
+.evcal-marks b { font-size: 9px; font-weight: 700; color: var(--evcal-muted); }
+@media (hover: hover) and (pointer: fine) {
+  .evcal-day:hover:not(.is-selected) { background: var(--evcal-soft); }
+  .evcal-nav:hover { background: var(--evcal-soft); }
+}
+
+/* ── Public: What's on ───────────────────────────────────── */
+.pm-events { display: grid; gap: 14px; }
+.pm-events-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.pm-events-head h2 { display: inline-flex; align-items: center; gap: 10px; font: 600 clamp(22px, 3vw, 28px) var(--pm-display); letter-spacing: -.01em; }
+.pm-events-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.pm-events-none { padding: 18px; border-radius: 18px; border: 2px dashed var(--pm-line, var(--menu-rule)); color: var(--menu-muted); font-size: 14px; text-align: center; }
+/* A horizontal shelf on phones; wraps into a grid on wider screens. */
+.pm-events-strip {
+  display: grid; grid-auto-flow: column; grid-auto-columns: minmax(250px, 78%); gap: 12px;
+  margin: 0 -16px; padding: 2px 16px 8px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none;
+}
+.pm-events-strip::-webkit-scrollbar { display: none; }
+.pm-events-strip > li { scroll-snap-align: start; display: grid; }
+@media (min-width: 720px) {
+  .pm-events-strip { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); margin: 0; padding: 0; overflow: visible; }
+}
+.pm-ev-card {
+  display: grid; width: 100%; overflow: hidden; text-align: left; color: var(--menu-ink);
+  border-radius: 20px; border: 1px solid color-mix(in srgb, var(--menu-rule) 55%, transparent); background: var(--menu-sheet);
+  transition: transform 160ms var(--ease-out), box-shadow 200ms ease;
+}
+.pm-ev-card:active { transform: scale(.98); }
+@media (hover: hover) and (pointer: fine) { .pm-ev-card:hover { box-shadow: 0 14px 30px -22px rgb(0 0 0 / .6); } }
+.pm-ev-art {
+  position: relative; display: grid; place-items: center; aspect-ratio: 16 / 7; overflow: hidden;
+  background: linear-gradient(135deg, hsl(var(--pm-hue) 45% 42%), hsl(calc(var(--pm-hue) + 40) 50% 30%)); color: rgb(255 255 255 / .85);
+}
+.pm-ev-art img { width: 100%; height: 100%; object-fit: cover; }
+.pm-ev-body { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 14px; }
+.pm-ev-date {
+  display: grid; justify-items: center; align-content: center; width: 48px; height: 52px; border-radius: 14px;
+  background: var(--menu-paper); border: 1px solid color-mix(in srgb, var(--menu-rule) 55%, transparent); line-height: 1;
+}
+.pm-ev-date b { font: 700 20px var(--font-sans); font-variant-numeric: tabular-nums; }
+.pm-ev-date small { margin-top: 3px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--menu-accent); }
+.pm-ev-text { display: grid; gap: 3px; min-width: 0; }
+.pm-ev-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 700; }
+.pm-ev-meta { display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--menu-muted); }
+.pm-ev-meta svg { flex-shrink: 0; }
+.pm-ev-status { padding: 5px 10px; border-radius: 999px; background: color-mix(in srgb, var(--menu-ink) 8%, transparent); font-size: 11px; font-weight: 700; white-space: nowrap; color: var(--menu-muted); }
+.pm-ev-status.is-open { background: var(--menu-ink); color: var(--menu-paper); }
+.pm-ev-card.is-cancelled .pm-ev-text strong { text-decoration: line-through; color: var(--menu-muted); }
+.pm-ev-card.is-cancelled .pm-ev-status { color: var(--status-danger, #e5484d); }
+.pm-ev-card.is-compact { border-radius: 16px; }
+.pm-ev-more { display: grid; place-items: center; grid-auto-flow: column; gap: 4px; width: 100%; min-height: 80px; border-radius: 20px; border: 2px dashed color-mix(in srgb, var(--menu-rule) 55%, transparent); color: var(--menu-muted); font-weight: 600; font-size: 14px; }
+
+/* ── Public sheets (inside the shared paper dialog) ──────── */
+.pm-ev-sheet { display: grid; gap: 16px; font-size: 14px; }
+.pm-ev-day { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font: 600 16px var(--font-sans); }
+.pm-ev-day small { font-size: 12px; font-weight: 500; color: var(--menu-muted); }
+.pm-ev-daylist, .pm-ev-mine { display: grid; gap: 8px; }
+.pm-ev-hero { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 16px; }
+.pm-ev-description { white-space: pre-wrap; line-height: 1.55; color: var(--menu-muted); }
+.pm-ev-cancelled, .pm-ev-closed { padding: 12px 14px; border-radius: 14px; border: 1px dashed var(--menu-rule); color: var(--menu-muted); }
+.pm-ev-cancelled { border-color: var(--status-danger, #e5484d); color: var(--menu-ink); }
+.pm-ev-form fieldset { display: grid; gap: 12px; min-width: 0; }
+.pm-ev-form legend { margin-bottom: 4px; font: 600 18px var(--pm-display, var(--menu-serif)); }
+.pm-ev-form { display: grid; gap: 12px; }
+.pm-ev-field { display: grid; gap: 6px; font-weight: 600; }
+.pm-ev-field small { font-weight: 400; color: var(--menu-muted); }
+.pm-ev-field :is(input, select, textarea) {
+  width: 100%; min-height: 48px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--menu-rule);
+  background: var(--menu-sheet); color: var(--menu-ink); font: 400 16px var(--font-sans);
+}
+.pm-ev-field textarea { min-height: 72px; resize: vertical; }
+.pm-ev-field :is(input, select, textarea):focus-visible { outline: 2px solid var(--menu-accent); outline-offset: 2px; }
+/* Off-screen rather than display:none, which some bots skip. */
+.pm-ev-trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.pm-ev-seats { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-weight: 600; }
+.menu-paper-dialog .pm-ev-sheet .pm-stepper { margin-left: 0; animation: none; }
+.menu-paper-dialog .pm-ev-sheet .pm-stepper button { width: 44px; border-radius: 999px; }
+.menu-paper-dialog .pm-ev-sheet .pm-ev-submit { width: 100%; min-height: 50px; border-radius: 999px; }
+.menu-paper-dialog .pm-ev-sheet :is(.pm-ev-card, .pm-chip, .pm-icon-button) { border-radius: 16px; }
+.menu-paper-dialog .pm-ev-sheet .pm-icon-button { border-radius: 999px; }
+.menu-paper-dialog .pm-ev-sheet .evcal-day { border-radius: 12px; }
+.pm-ev-error { color: var(--status-danger, #e5484d); font-weight: 600; }
+.pm-ev-fine { font-size: 12px; color: var(--menu-muted); }
+.pm-ev-done { display: grid; justify-items: center; gap: 10px; padding: 20px 16px; border-radius: 18px; background: var(--menu-sheet); text-align: center; animation: pm-pop-in 320ms var(--pm-spring, cubic-bezier(0.34, 1.56, 0.64, 1)); }
+.pm-ev-done svg { color: var(--status-positive, #16a34a); }
+.pm-ev-done small { color: var(--menu-muted); }
+.pm-ev-code { padding: 8px 16px; border-radius: 12px; border: 2px dashed var(--menu-ink); font: 700 24px var(--menu-mono, ui-monospace, monospace); letter-spacing: .18em; }
+.pm-ev-code.is-small { padding: 1px 6px; border-width: 1px; border-radius: 6px; font-size: 12px; letter-spacing: .1em; }
+.pm-ev-mine li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px; border-radius: 16px; background: var(--menu-sheet); }
+.pm-ev-mine li > div { display: grid; gap: 3px; min-width: 0; }
+.pm-ev-mine li span { font-size: 12px; color: var(--menu-muted); }
+
+/* ── Admin agenda ────────────────────────────────────────── */
+.ev-admin-agenda { display: grid; gap: 16px; padding: 0 var(--ws-pad) var(--ws-pad); }
+.ev-admin-day { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 8px; font-size: 13px; font-weight: 700; color: var(--ws-ink); }
+.ev-admin-day small { font-weight: 500; color: var(--ws-muted); }
+.ev-admin-mark { display: block; width: 4px; height: 36px; border-radius: 999px; background: var(--ws-accent); }
+.ev-admin-mark.is-internal { background: var(--status-info, #3b82f6); }
+.ev-admin-mark.is-draft { background: transparent; box-shadow: inset 0 0 0 2px var(--ws-muted); }
+.ev-admin-mark.is-cancelled { background: var(--ws-danger); opacity: .6; }
+.ev-admin-month { display: grid; gap: 20px; padding: 0 var(--ws-pad) var(--ws-pad); }
+@media (min-width: 900px) { .ev-admin-month { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); align-items: start; } }
+.ev-admin-phone { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.ev-admin-image { width: 100%; max-height: 220px; object-fit: cover; border-radius: var(--ws-radius-lg, 16px); }
+@media (prefers-reduced-motion: reduce) {
+  .evcal-day, .evcal-nav, .pm-ev-card, .pm-ev-done { transition: none; animation: none; }
+}

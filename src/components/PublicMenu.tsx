@@ -5,6 +5,7 @@ import { store } from '../db/store';
 import { getOpeningStatus } from '../utils/openingHours';
 import { OrderTracking, OrderReceipt } from './OrderTracking';
 import { Modal } from './Modal';
+import { PublicEvents } from './PublicEvents';
 import { reducedMotion } from '../ui';
 
 interface PublicMenuProps {
@@ -412,6 +413,8 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
       </section>
 
       {receipt && <OrderTracking receipt={receipt} onDismiss={() => { setReceipt(null); try { localStorage.removeItem('chth_order_receipt'); } catch {} }} />}
+
+      <PublicEvents settings={settings} />
 
       <div className="pm-tools">
         <div className="pm-search">
