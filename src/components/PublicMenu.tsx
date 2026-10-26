@@ -560,7 +560,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
               {cart.map(line => {
                 const available = menuItems.find(item => item.id === line.item.id)?.isInStock;
                 return <li key={line.id} className="pm-checkout-line" data-unavailable={!available || undefined}>
-                  <div><b>{line.item.name}</b>
+                  <div className="pm-checkout-line-text"><b>{line.item.name}</b>
                     {!!line.variants.length && <small>{line.variants.map(variant => `${variant.groupName}: ${variant.name}`).join(', ')}</small>}
                     {!available && <small className="pm-checkout-warn">Sold out · please remove this item</small>}
                     <span className="pm-price">{money(line.unitPrice * line.quantity)}</span>
