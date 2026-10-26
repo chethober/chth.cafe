@@ -553,46 +553,46 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
       </Modal>
 
       <Modal appearance="paper" isOpen={isCartOpen} closeDisabled={isSubmitting} onClose={() => { if (!submittingRef.current) setIsCartOpen(false); }} title={<span className="text-lg font-semibold flex items-center gap-2"><ShoppingBag size={20} />Your order</span>} maxWidth="max-w-lg">
-        {!cart.length ? <div className="py-10 text-center text-sm text-zinc-400">Your order is empty. Choose something from the menu.</div> : <form onSubmit={handlePlaceOrder} className="public-menu menu-checkout space-y-5 text-sm">
-          <fieldset disabled={isSubmitting} className="space-y-5 min-w-0">
+        {!cart.length ? <div className="pm-checkout-empty"><ShoppingBag aria-hidden="true" /><p>Your order is empty. Choose something from the menu.</p></div> : <form onSubmit={handlePlaceOrder} className="public-menu pm-checkout">
+          <fieldset disabled={isSubmitting} className="pm-checkout-fields">
             <legend className="sr-only">Order details</legend>
-            <div className="space-y-3">
+            <ul className="pm-checkout-lines">
               {cart.map(line => {
                 const available = menuItems.find(item => item.id === line.item.id)?.isInStock;
-                return <div key={line.id} className="rounded-xl border border-zinc-800 p-3 flex flex-wrap justify-between items-center gap-3">
-                  <div className="flex-1 min-w-0"><span className="font-semibold text-zinc-100">{line.item.name}</span>
-                    {!!line.variants.length && <p className="text-xs text-zinc-400 mt-1">{line.variants.map(variant => `${variant.groupName}: ${variant.name}`).join(', ')}</p>}
-                    {!available && <p className="text-xs text-rose-400 mt-1">Sold out · please remove this item</p>}
-                    <span className="block brand-text font-semibold mt-1">{money(line.unitPrice * line.quantity)}</span>
+                return <li key={line.id} className="pm-checkout-line" data-unavailable={!available || undefined}>
+                  <div><b>{line.item.name}</b>
+                    {!!line.variants.length && <small>{line.variants.map(variant => `${variant.groupName}: ${variant.name}`).join(', ')}</small>}
+                    {!available && <small className="pm-checkout-warn">Sold out · please remove this item</small>}
+                    <span className="pm-price">{money(line.unitPrice * line.quantity)}</span>
                   </div>
-                  <div className="flex items-center rounded-xl border border-zinc-800">
-                    <button type="button" aria-label={`Remove one ${line.item.name}`} onClick={() => updateQuantity(line.id, -1)} className="w-11 h-11 flex items-center justify-center text-zinc-300"><Minus size={16} /></button>
-                    <span className="min-w-5 text-center font-semibold text-zinc-100">{line.quantity}</span>
-                    <button type="button" disabled={!available} aria-label={`Add one ${line.item.name}`} onClick={() => updateQuantity(line.id, 1)} className="w-11 h-11 flex items-center justify-center text-zinc-300"><Plus size={16} /></button>
+                  <div className="pm-stepper">
+                    <button type="button" aria-label={`Remove one ${line.item.name}`} onClick={() => updateQuantity(line.id, -1)}><Minus size={16} /></button>
+                    <span>{line.quantity}</span>
+                    <button type="button" disabled={!available} aria-label={`Add one ${line.item.name}`} onClick={() => updateQuantity(line.id, 1)}><Plus size={16} /></button>
                   </div>
-                </div>;
+                </li>;
               })}
-            </div>
-            <fieldset><legend className="mb-2 font-semibold text-zinc-300">Order type</legend>
-              <div className="grid grid-cols-3 gap-2">{([['dine_in', 'Dine-in'], ['takeout', 'Takeaway'], ['pickup', 'Pickup']] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={orderType === value} onClick={() => { setOrderType(value); setOrderError(''); }} className={`min-h-11 rounded-xl border font-semibold ${orderType === value ? 'bg-amber-500/20 border-amber-500/40 brand-text' : 'bg-zinc-900 border-zinc-800 text-zinc-300'}`}>{label}</button>)}</div>
+            </ul>
+            <fieldset className="pm-checkout-group"><legend>Order type</legend>
+              <div className="pm-checkout-choices" style={{ '--cols': 3 } as React.CSSProperties}>{([['dine_in', 'Dine-in'], ['takeout', 'Takeaway'], ['pickup', 'Pickup']] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={orderType === value} onClick={() => { setOrderType(value); setOrderError(''); }} className="pm-chip">{label}</button>)}</div>
             </fieldset>
-            <div><label htmlFor="order-identity" className="block mb-2 font-semibold text-zinc-300">{orderType === 'dine_in' ? 'Table number' : 'Your name'}</label>
-              <input id="order-identity" type="text" autoComplete={orderType === 'dine_in' ? 'off' : 'name'} required maxLength={100} placeholder={orderType === 'dine_in' ? 'e.g. 04' : 'Your name'} value={orderType === 'dine_in' ? tableNumber : customerName} onChange={event => { if (orderType === 'dine_in') setTableNumber(event.target.value); else setCustomerName(event.target.value); setOrderError(''); }} className="w-full min-h-12 rounded-xl bg-zinc-900 border border-zinc-800 px-3 text-base text-zinc-100" />
-            </div>
-            <fieldset><legend className="mb-2 font-semibold text-zinc-300">Pay at the café</legend>
-              <div className="grid grid-cols-2 gap-2">{(['card', 'cash'] as const).map(value => <button type="button" key={value} aria-pressed={paymentMethod === value} onClick={() => setPaymentMethod(value)} className={`min-h-11 rounded-xl border font-semibold ${paymentMethod === value ? 'bg-amber-500/20 border-amber-500/40 brand-text' : 'bg-zinc-900 border-zinc-800 text-zinc-300'}`}>{value === 'card' ? 'Card' : 'Cash'}</button>)}</div>
-              <p className="text-xs text-zinc-400 mt-2">Payment is collected at the café when you receive your order.</p>
+            <label className="pm-checkout-field"><span>{orderType === 'dine_in' ? 'Table number' : 'Your name'}</span>
+              <input id="order-identity" type="text" autoComplete={orderType === 'dine_in' ? 'off' : 'name'} required maxLength={100} placeholder={orderType === 'dine_in' ? 'e.g. 04' : 'Your name'} value={orderType === 'dine_in' ? tableNumber : customerName} onChange={event => { if (orderType === 'dine_in') setTableNumber(event.target.value); else setCustomerName(event.target.value); setOrderError(''); }} />
+            </label>
+            <fieldset className="pm-checkout-group"><legend>Pay at the café</legend>
+              <div className="pm-checkout-choices">{(['card', 'cash'] as const).map(value => <button type="button" key={value} aria-pressed={paymentMethod === value} onClick={() => setPaymentMethod(value)} className="pm-chip">{value === 'card' ? 'Card' : 'Cash'}</button>)}</div>
+              <p className="pm-checkout-fine">Payment is collected at the café when you receive your order.</p>
             </fieldset>
           </fieldset>
-          <div className="rounded-xl bg-zinc-900 p-4 space-y-2">
-            <div className="flex justify-between text-zinc-400"><span>Subtotal</span><span>{money(subtotal)}</span></div>
-            {settings.taxRate > 0 && <div className="flex justify-between text-zinc-400"><span>Tax ({settings.taxRate}%)</span><span>{money(tax)}</span></div>}
-            <div className="flex justify-between text-base font-semibold text-zinc-100 border-t border-zinc-800 pt-3"><span>Total</span><span className="brand-text">{money(total)}</span></div>
-          </div>
-          {!opening.isOpen && <p className="text-sm text-zinc-300 rounded-xl border border-zinc-800 p-3">{opening.label}. {opening.detail} You can keep browsing and order when we’re open.</p>}
-          {unavailableInCart && <p className="text-sm text-rose-400">Please remove unavailable items or options before placing your order.</p>}
-          {orderError && <p role="alert" className="text-sm text-rose-400">{orderError}</p>}
-          <button type="submit" disabled={isSubmitting || !opening.isOpen || unavailableInCart} aria-busy={isSubmitting} className="w-full min-h-12 rounded-xl btn-brand text-zinc-950 font-semibold px-4">{isSubmitting ? 'Sending your order…' : `Place order · ${money(total)}`}</button>
+          <dl className="pm-checkout-totals">
+            <div><dt>Subtotal</dt><dd>{money(subtotal)}</dd></div>
+            {settings.taxRate > 0 && <div><dt>Tax ({settings.taxRate}%)</dt><dd>{money(tax)}</dd></div>}
+            <div className="is-total"><dt>Total</dt><dd>{money(total)}</dd></div>
+          </dl>
+          {!opening.isOpen && <p className="pm-checkout-note">{opening.label}. {opening.detail} You can keep browsing and order when we’re open.</p>}
+          {unavailableInCart && <p className="pm-checkout-error">Please remove unavailable items or options before placing your order.</p>}
+          {orderError && <p role="alert" className="pm-checkout-error">{orderError}</p>}
+          <button type="submit" disabled={isSubmitting || !opening.isOpen || unavailableInCart} aria-busy={isSubmitting} className="pm-button pm-checkout-submit">{isSubmitting ? 'Sending your order…' : `Place order · ${money(total)}`}</button>
         </form>}
       </Modal>
     </div>

@@ -80,16 +80,16 @@ export const Modal: React.FC<ModalProps> = ({
         aria-labelledby={titleId}
         aria-busy={closeDisabled}
         tabIndex={-1}
-        className={`${appearance === 'paper' ? 'menu-paper-dialog' : 'glass-panel-classy'} p-5 sm:p-6 rounded-3xl ${maxWidth} w-full max-h-[85dvh] overflow-y-auto overscroll-contain space-y-4 border border-zinc-800/90 animate-scale-up shadow-2xl relative text-xs my-auto`}
+        className={`${appearance === 'paper' ? 'menu-paper-dialog' : 'glass-panel-classy p-5 sm:p-6 rounded-3xl border border-zinc-800/90 shadow-2xl text-xs'} ${maxWidth} w-full max-h-[85dvh] overflow-y-auto overscroll-contain space-y-4 animate-scale-up relative my-auto`}
       >
-        <div className="flex justify-between items-center text-sm font-bold text-zinc-100 border-b border-zinc-800 pb-3">
+        <div className={appearance === 'paper' ? 'menu-dialog-head' : 'flex justify-between items-center text-sm font-bold text-zinc-100 border-b border-zinc-800 pb-3'}>
           <div id={titleId} className="flex items-center gap-2 font-black">{title}</div>
           <button
             type="button"
             onClick={onClose}
             disabled={closeDisabled}
             aria-label="Close dialog"
-            className="min-h-11 min-w-11 flex items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-zinc-100 border border-zinc-800 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500"
+            className={appearance === 'paper' ? 'menu-dialog-close' : 'min-h-11 min-w-11 flex items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-zinc-100 border border-zinc-800 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500'}
             title="Close (Esc)"
           >
             <X className="w-4 h-4" />

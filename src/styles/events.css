@@ -125,8 +125,7 @@
 .menu-paper-dialog .pm-ev-sheet .pm-stepper { margin-left: 0; animation: none; }
 .menu-paper-dialog .pm-ev-sheet .pm-stepper button { width: 44px; border-radius: 999px; }
 .menu-paper-dialog .pm-ev-sheet .pm-ev-submit { width: 100%; min-height: 50px; border-radius: 999px; }
-.menu-paper-dialog .pm-ev-sheet :is(.pm-ev-card, .pm-chip, .pm-icon-button) { border-radius: 16px; }
-.menu-paper-dialog .pm-ev-sheet .pm-icon-button { border-radius: 999px; }
+.menu-paper-dialog .pm-ev-sheet .pm-ev-card { border-radius: 16px; }
 .menu-paper-dialog .pm-ev-sheet .evcal-day { border-radius: 12px; }
 .pm-ev-error { color: var(--status-danger, #e5484d); font-weight: 600; }
 .pm-ev-fine { font-size: 12px; color: var(--menu-muted); }

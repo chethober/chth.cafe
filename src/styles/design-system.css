@@ -45,7 +45,7 @@ html .app-shell.app-shell > header {
 .app-shell > header img { border-radius: 50%; box-shadow: none; --tw-ring-color: transparent; filter: saturate(.6); }
 .app-shell > header button { border-radius: 3px; box-shadow: none; }
 html .app-shell.app-shell > footer { background: var(--menu-paper) !important; border-color: var(--menu-rule) !important; }
-.cafe-footer-note { font: italic 18px var(--menu-serif); color: var(--menu-muted); }
+.cafe-footer-note { font: italic 18px 'Fraunces', var(--menu-serif); color: var(--menu-muted); }
 html :is(.app-shell, .menu-paper-dialog) :is(.text-zinc-100, .text-zinc-200, .text-zinc-300) { color: var(--menu-ink) !important; }
 html :is(.app-shell, .menu-paper-dialog) :is(.text-zinc-400, .text-zinc-500, .text-zinc-600) { color: var(--menu-muted) !important; }
 html :is(.app-shell, .menu-paper-dialog) .brand-text { color: var(--menu-accent) !important; }
@@ -59,13 +59,10 @@ html :is(.app-shell, .menu-paper-dialog) :is(.bg-zinc-900, .bg-zinc-800) { backg
 .public-menu button { cursor: pointer; }
 .public-menu button:disabled { cursor: not-allowed; opacity: .45; }
 .public-menu :is(button, input, a):focus-visible, .menu-paper-dialog button:focus-visible { outline: 2px solid var(--menu-accent); outline-offset: 4px; }
-html .menu-paper-dialog { background: var(--menu-paper) !important; border: 1px solid var(--menu-rule); border-top: 4px solid var(--menu-ink); border-radius: 2px; color: var(--menu-ink); font-family: var(--font-sans); }
-.menu-paper-dialog > div:first-child > div { font-family: var(--menu-serif); }
-.menu-paper-dialog :is(input[type='text'], button, label.rounded-xl, div.rounded-xl) { border-radius: 2px; }
-html .menu-paper-dialog .btn-brand { background: var(--menu-ink) !important; color: var(--menu-paper) !important; border-radius: 2px; box-shadow: none; }
+html .menu-paper-dialog { background: var(--menu-paper) !important; color: var(--menu-ink); font-family: var(--font-sans); }
 html .menu-paper-dialog :is(input[type='text'], input[type='radio']) { accent-color: var(--menu-accent); }
 html .menu-paper-dialog input[type='text'] { background: var(--menu-sheet) !important; border-color: var(--menu-rule) !important; }
-html .menu-paper-dialog :is([aria-pressed='true'], label:has(input:checked)) { background: var(--menu-sheet) !important; color: var(--menu-accent) !important; border-color: var(--menu-accent) !important; }
+html .menu-paper-dialog :is([aria-pressed='true']:not(.pm-chip), label:has(input:checked)) { background: var(--menu-sheet) !important; color: var(--menu-accent) !important; border-color: var(--menu-accent) !important; }
 @media (prefers-reduced-motion: reduce) {
   .menu-paper-dialog, .menu-paper-dialog * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
@@ -155,7 +152,6 @@ html .app-shell .app-view-stamp { background: transparent !important; border: 1p
 html .menu-modal-backdrop.menu-modal-backdrop { background: #191410a6 !important; backdrop-filter: none; }
 
 .image-upload-preview { width: 96px; height: 96px; object-fit: contain; border: 1px solid var(--menu-rule); border-radius: var(--control-radius); background: var(--menu-sheet); }
-html .menu-paper-dialog, html .menu-paper-dialog :is(input, button, label.rounded-xl, div.rounded-xl),
 .appearance-preview-ticket { border-radius: var(--control-radius); }
 
 

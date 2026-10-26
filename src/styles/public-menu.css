@@ -1,6 +1,7 @@
 /* Public menu: a playful, photo-first café menu.
    Built on the shared --menu-* tokens, so admin appearance settings and light/dark still apply. */
-.pm {
+/* Sheets portal out of .pm, so they carry the same tokens. */
+.pm, .menu-paper-dialog {
   --pm-display: 'Fraunces', var(--menu-serif);
   --pm-radius: 22px;
   --pm-heart: #e5484d;
@@ -9,6 +10,8 @@
   --pm-soft: color-mix(in srgb, var(--menu-ink) 8%, transparent);
   --pm-line: color-mix(in srgb, var(--menu-rule) 55%, transparent);
   --pm-shadow: 0 1px 0 var(--pm-line), 0 14px 30px -20px rgb(0 0 0 / .55);
+}
+.pm {
   display: flex; flex-direction: column; gap: 28px;
   padding-bottom: 7rem;
   color: var(--menu-ink);
@@ -296,6 +299,28 @@ html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !i
 .pm-confetti { position: fixed; z-index: 10001; left: 50%; top: 42%; width: 0; height: 0; pointer-events: none; }
 .pm-confetti i { position: absolute; width: 8px; height: 12px; border-radius: 2px; background: hsl(var(--h) 80% 60%); animation: pm-confetti 1200ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
 
+/* ── Sheets: the shared dialog, shaped like the menu's cards ── */
+html .menu-paper-dialog {
+  padding: 18px 22px 24px; border-radius: 28px; border: 1px solid var(--pm-line);
+  box-shadow: 0 40px 80px -32px rgb(0 0 0 / .7);
+}
+.menu-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.menu-dialog-head > div { min-width: 0; }
+.menu-dialog-head > div > span { font: 600 24px/1.15 var(--pm-display) !important; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.menu-dialog-close {
+  display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%;
+  border: 1px solid var(--pm-line); color: var(--menu-muted);
+  transition: transform 160ms var(--ease-out), background-color 150ms ease, color 150ms ease;
+}
+.menu-dialog-close:active:not(:disabled) { transform: scale(0.92); }
+.menu-dialog-close:disabled { opacity: .45; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) { .menu-dialog-close:hover:not(:disabled) { background: var(--pm-soft); color: var(--menu-ink); } }
+/* Phones: a bottom sheet that rises from the edge, like the order bar it opens from. */
+@media (max-width: 639px) {
+  html .menu-modal-backdrop.menu-modal-backdrop { align-items: flex-end; padding: 0; }
+  html .menu-paper-dialog { max-height: 92dvh; margin: 0; border-bottom: 0; border-radius: 28px 28px 0 0; padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); animation: pm-sheet-up 320ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+}
+
 /* ── Item detail sheet (inside the shared paper dialog) ──── */
 .pm-detail-art { aspect-ratio: 16 / 10; overflow: hidden; border-radius: 18px; }
 .pm-detail-art :is(.pm-art-photo, .pm-art-swatch) { width: 100%; height: 100%; object-fit: cover; }
@@ -306,13 +331,51 @@ html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !i
 .pm-detail-facts dd { color: var(--menu-muted); }
 .pm-detail-foot { display: flex; align-items: center; gap: 12px; padding-top: 4px; }
 .pm-detail-soldout { padding: 12px 14px; border-radius: 14px; border: 1px dashed var(--menu-rule); color: var(--menu-muted); }
-/* The paper dialog squares off every button; the sheet's own controls stay round. */
+/* Sizes the menu's own controls up for the sheet. */
 .menu-paper-dialog .pm-detail .pm-button { flex: 1; min-height: 50px; border-radius: 999px; background: var(--menu-ink) !important; color: var(--menu-paper) !important; }
 .menu-paper-dialog .pm-detail .pm-stepper { margin-left: 0; height: 50px; border-radius: 999px; }
 .menu-paper-dialog .pm-detail label.rounded-xl { border-radius: 16px; }
 .menu-paper-dialog .pm-detail .pm-stepper button { width: 44px; height: 50px; border-radius: 999px; }
 
+/* ── Checkout sheet ──────────────────────────────────────── */
+.pm-checkout, .pm-checkout-fields { display: grid; gap: 22px; min-width: 0; font-size: 14px; }
+.pm-checkout-lines { display: grid; gap: 8px; }
+.pm-checkout-line { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px; border-radius: 18px; background: var(--menu-sheet); }
+.pm-checkout-line[data-unavailable] { box-shadow: inset 0 0 0 1px var(--status-danger); }
+.pm-checkout-line > div { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.pm-checkout-line b { font-weight: 600; overflow-wrap: anywhere; }
+.pm-checkout-line small { font-size: 12px; color: var(--menu-muted); }
+.pm-checkout-line .pm-checkout-warn { color: var(--status-danger); font-weight: 600; }
+.pm-checkout-line .pm-price { margin-top: 2px; }
+.menu-paper-dialog .pm-checkout .pm-stepper { margin-left: 0; flex-shrink: 0; animation: none; }
+.menu-paper-dialog .pm-checkout .pm-stepper button { width: 40px; border-radius: 999px; }
+.pm-checkout-group > legend, .pm-checkout-field > span { display: block; margin-bottom: 10px; font: 600 18px var(--pm-display); }
+.pm-checkout-choices { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 8px; }
+.pm-checkout-choices .pm-chip { justify-content: center; min-height: 46px; padding: 0 8px; font-size: 14px; }
+.pm-checkout-field { display: block; }
+.pm-checkout-field input { width: 100%; min-height: 52px; padding: 0 20px; border-radius: 999px; border: 1px solid; font-size: 16px; transition: border-color 150ms ease, box-shadow 150ms ease; }
+html .menu-paper-dialog .pm-checkout-field input:focus { border-color: var(--menu-accent) !important; box-shadow: 0 0 0 4px color-mix(in srgb, var(--menu-accent) 22%, transparent); outline: none; }
+.pm-checkout-fine { margin-top: 8px; font-size: 12px; color: var(--menu-muted); }
+.pm-checkout-totals { display: grid; gap: 8px; padding: 14px 16px; border-radius: 18px; border: 1.5px dashed var(--pm-line); font-variant-numeric: tabular-nums; }
+.pm-checkout-totals div { display: flex; justify-content: space-between; gap: 12px; color: var(--menu-muted); }
+.pm-checkout-totals .is-total { padding-top: 10px; border-top: 1px solid var(--pm-line); color: var(--menu-ink); font: 700 18px var(--font-sans); }
+.pm-checkout-note { padding: 12px 14px; border-radius: 14px; border: 1px dashed var(--menu-rule); color: var(--menu-muted); }
+.pm-checkout-error { color: var(--status-danger); font-weight: 600; }
+.pm-checkout-empty { display: grid; justify-items: center; gap: 12px; padding: 32px 8px 8px; text-align: center; color: var(--menu-muted); font-size: 14px; }
+.pm-checkout-empty svg { width: 52px; height: 52px; padding: 13px; border-radius: 16px; background: var(--pm-soft); color: var(--menu-ink); transform: rotate(-6deg); }
+.menu-paper-dialog .pm-checkout-submit { width: 100%; min-height: 54px; border-radius: 999px; background: var(--menu-ink) !important; color: var(--menu-paper) !important; font-size: 15px; }
+
+/* ── Order receipt ───────────────────────────────────────── */
+.pm-receipt { display: grid; gap: 12px; padding: 20px 22px; border-radius: var(--pm-radius); border: 1px solid var(--pm-line); background: var(--menu-sheet); box-shadow: var(--pm-shadow); }
+.pm-receipt-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.pm-receipt h2 { font: 600 22px var(--pm-display); }
+.pm-receipt-status { font-weight: 600; color: var(--status-positive); }
+.pm-receipt-status[data-status='cancelled'] { color: var(--status-danger); }
+.pm-receipt-fine { font-size: 12px; color: var(--menu-muted); }
+.pm-receipt-error { font-size: 13px; color: var(--menu-accent); }
+
 /* ── Motion ──────────────────────────────────────────────── */
+@keyframes pm-sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @keyframes pm-pulse { from { transform: scale(1); opacity: .6; } to { transform: scale(2.8); opacity: 0; } }
 @keyframes pm-steam { 0% { opacity: 0; transform: translateY(6px); } 35% { opacity: 1; } 100% { opacity: 0; transform: translateY(-10px); } }
 @keyframes pm-reel-tick { from { transform: translateY(-75%); opacity: .2; } to { transform: translateY(0); opacity: 1; } }
@@ -354,7 +417,7 @@ html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !i
 
 /* Reduced motion: keep colour and opacity feedback, drop movement. */
 @media (prefers-reduced-motion: reduce) {
-  .pm *, .pm-detail * { animation: none !important; }
-  .pm *, .pm-detail * { transition-property: color, background-color, border-color, opacity !important; }
+  .pm *, .pm-detail *, .pm-checkout * { animation: none !important; }
+  .pm *, .pm-detail *, .pm-checkout * { transition-property: color, background-color, border-color, opacity !important; }
   .pm-spin { transform: none; }
 }
