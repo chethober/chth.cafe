@@ -182,7 +182,7 @@ export const FinancialDashboard: React.FC<FinancialDashboardProps> = ({ settings
 
         <ChartCard
           title="Top products"
-          subtitle={data.productCount > data.products.length ? `Item sales before tax and discounts · top ${data.products.length} of ${data.productCount}` : 'Item sales before tax and discounts'}
+          subtitle={data.productCount > data.products.length ? `Item sales after item discounts, before tax and order discounts · top ${data.products.length} of ${data.productCount}` : 'Item sales after item discounts, before tax and order discounts'}
           table={
             <table className="viz-table">
               <thead><tr><th scope="col">Product</th><th scope="col">Sales</th><th scope="col">Qty</th><th scope="col">Share</th></tr></thead>

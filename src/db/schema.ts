@@ -33,6 +33,7 @@ export const settings = sqliteTable('settings', {
   secondaryCalendar: text('secondary_calendar').notNull().default(''), // Shown alongside, or '' for none
   telegramEventsChatId: text('telegram_events_chat_id').notNull().default(''), // Customer-facing group or channel for event posts
   notifyBookings: integer('notify_bookings', { mode: 'boolean' }).notNull().default(true),
+  stockCategories: text('stock_categories'), // JSON list of material categories, or null for the defaults
   updatedAt: text('updated_at').notNull()
 });
 
@@ -101,7 +102,7 @@ export const orders = sqliteTable('orders', {
   orderType: text('order_type').notNull().default('dine_in'), // 'dine_in', 'takeout', 'pickup'
   subtotal: real('subtotal').notNull(),
   taxAmount: real('tax_amount').notNull(),
-  discountAmount: real('discount_amount').notNull().default(0.0),
+  discountAmount: real('discount_amount').notNull().default(0.0), // Every line discount plus any discount on the whole order
   totalAmount: real('total_amount').notNull(),
   paymentMethod: text('payment_method').notNull().default('card'), // 'cash', 'card', 'qr_pay'
   status: text('status').notNull().default('completed'), // 'completed', 'pending', 'cancelled'
@@ -117,7 +118,8 @@ export const orderItems = sqliteTable('order_items', {
   quantity: integer('quantity').notNull().default(1),
   unitPrice: real('unit_price').notNull(),
   variantsJson: text('variants_json').default('[]'), // Stringified JSON array of selected variants
-  itemTotal: real('item_total').notNull()
+  discountAmount: real('discount_amount').notNull().default(0.0), // This line's discount; the order's discountAmount includes it
+  itemTotal: real('item_total').notNull() // quantity × unitPrice − discountAmount
 });
 
 // 9. Manual Expenses & Cash Outflow
@@ -179,8 +181,8 @@ export const customers = sqliteTable('customers', {
 });
 
 // Types exported for frontend & backend consumption
-export type SettingsSelect = Omit<typeof settings.$inferSelect, 'timeZone' | 'calendarSystem' | 'secondaryCalendar' | 'telegramEventsChatId' | 'notifyBookings'>
-  & { timeZone?: string; calendarSystem?: string; secondaryCalendar?: string; telegramEventsChatId?: string; notifyBookings?: boolean };
+export type SettingsSelect = Omit<typeof settings.$inferSelect, 'timeZone' | 'calendarSystem' | 'secondaryCalendar' | 'telegramEventsChatId' | 'notifyBookings' | 'stockCategories'>
+  & { timeZone?: string; calendarSystem?: string; secondaryCalendar?: string; telegramEventsChatId?: string; notifyBookings?: boolean; stockCategories?: string | null };
 export type CategorySelect = typeof categories.$inferSelect;
 export type MenuItemSelect = Omit<typeof menuItems.$inferSelect, 'allergens' | 'dietaryLabels'> & { allergens?: string; dietaryLabels?: string };
 export type MenuVariantSelect = typeof menuVariants.$inferSelect;

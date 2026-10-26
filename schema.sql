@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS settings (
   secondary_calendar TEXT NOT NULL DEFAULT '',
   telegram_events_chat_id TEXT NOT NULL DEFAULT '',
   notify_bookings INTEGER NOT NULL DEFAULT 1,
+  stock_categories TEXT, -- JSON list of material categories, NULL for the defaults
   updated_at TEXT NOT NULL
 );
 
@@ -122,6 +123,7 @@ CREATE TABLE IF NOT EXISTS order_items (
   quantity INTEGER NOT NULL DEFAULT 1,
   unit_price REAL NOT NULL,
   variants_json TEXT DEFAULT '[]',
+  discount_amount REAL NOT NULL DEFAULT 0, -- Discount on this line, also counted in the order discount_amount
   item_total REAL NOT NULL
 );
 

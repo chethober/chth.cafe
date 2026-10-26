@@ -1,13 +1,14 @@
 import { InventoryMovements } from './InventoryMovements';
 import React, { useMemo, useState } from 'react';
-import { AlertTriangle, Boxes, Download, Package, Pencil, Plus, Trash2, Wallet, XCircle } from 'lucide-react';
+import { AlertTriangle, Boxes, Check, Download, Package, Pencil, Plus, Tags, Trash2, Wallet, X, XCircle } from 'lucide-react';
 import { StockItemSelect, SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { copyCSVToClipboard, downloadCSV, downloadJSON, downloadStyledExcel } from '../utils/exportUtils';
 import {
-  AffixInput, Badge, Button, Card, Checkbox, Chips, ConfirmDialog, EmptyState, ExportDialog, Field, FormDialog, IconButton, Input, List, ListItem,
-  Notice, Page, PageHeader, Progress, SearchInput, Segmented, Select, SortFilter, Stat, StatGrid, Stepper, localDateKey, money, slug
+  AffixInput, Badge, Button, Card, Checkbox, Chips, ConfirmDialog, Dialog, EmptyState, ExportDialog, Field, FormDialog, IconButton, Input, List, ListItem,
+  Notice, Page, PageHeader, Progress, SearchInput, Segmented, Select, SortFilter, Stat, StatGrid, Stepper, localDateKey, money, plural, slug
 } from '../ui';
+import { MAX_STOCK_CATEGORY_LENGTH } from '../utils/stockCategories';
 
 interface StockManagementProps {
   settings: SettingsSelect;
@@ -15,7 +16,7 @@ interface StockManagementProps {
   onStockUpdated: () => void;
 }
 
-const STOCK_CATEGORIES = ['Tea & Coffee', 'Dairy & Milk', 'Syrups & Flavors', 'Bakery & Flour', 'Produce', 'Packaging', 'Other'];
+const NEW_CATEGORY = '__new__';
 const MEASUREMENT_UNITS = ['kg', 'g', 'liters', 'ml', 'units', 'bags', 'packs'];
 type Level = 'in_stock' | 'low_stock' | 'out_of_stock';
 type SortField = 'quantity' | 'unitCost' | 'totalValuation' | 'name' | 'category';
@@ -34,17 +35,19 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
   const [level, setLevel] = useState<'all' | Level>('all');
   const [exportOpen, setExportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<StockItemSelect | null>(null);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const stockCategories = store.getStockCategories();
 
   /* ------------------------------------------------------- Add / edit */
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<StockItemSelect | null>(null);
-  const [form, setForm] = useState({ name: '', category: STOCK_CATEGORIES[0], quantity: '', unit: 'kg', unitCost: '', minThreshold: '5' });
+  const [form, setForm] = useState({ name: '', category: '', newCategory: '', quantity: '', unit: 'kg', unitCost: '', minThreshold: '5' });
   const [formError, setFormError] = useState('');
   const openForm = (item?: StockItemSelect) => {
     setEditing(item || null);
     setForm(item
-      ? { name: item.name, category: item.category, quantity: String(item.quantity), unit: item.unit, unitCost: String(item.unitCost), minThreshold: String(item.minThreshold) }
-      : { name: '', category: STOCK_CATEGORIES[0], quantity: '', unit: 'kg', unitCost: '', minThreshold: '5' });
+      ? { name: item.name, category: item.category, newCategory: '', quantity: String(item.quantity), unit: item.unit, unitCost: String(item.unitCost), minThreshold: String(item.minThreshold) }
+      : { name: '', category: category !== 'all' ? category : stockCategories[0] || NEW_CATEGORY, newCategory: '', quantity: '', unit: 'kg', unitCost: '', minThreshold: '5' });
     setFormError('');
     setFormOpen(true);
   };
@@ -57,9 +60,18 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
     if (Number.isNaN(quantity) || quantity < 0) return setFormError('Quantity must be zero or more.');
     if (Number.isNaN(unitCost) || unitCost < 0) return setFormError('Unit cost must be zero or more.');
     if (Number.isNaN(minThreshold) || minThreshold < 0) return setFormError('Low-stock level must be zero or more.');
-    const data = { name: form.name.trim(), category: form.category, quantity, unit: form.unit, unitCost, minThreshold };
+    const typed = form.newCategory.trim().replace(/\s+/g, ' ');
+    if (form.category === NEW_CATEGORY && !typed) return setFormError('Name the new category.');
+    // A typed name that matches an existing category, in any case, files the material there.
+    const materialCategory = form.category !== NEW_CATEGORY ? form.category
+      : stockCategories.find(c => c.toLowerCase() === typed.toLowerCase()) || typed;
+    const data = { name: form.name.trim(), category: materialCategory, quantity, unit: form.unit, unitCost, minThreshold };
     if (editing) store.updateStockItem(editing.id, data);
     else store.addStockItem(data);
+    if (!stockCategories.includes(materialCategory)) {
+      // The material already shows under it; this keeps the category once the material moves on.
+      store.saveStockCategories([...stockCategories, materialCategory]).catch(() => {});
+    }
     setFormOpen(false);
     onStockUpdated();
   };
@@ -121,6 +133,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
         description="Raw materials, what they're worth, and what needs reordering. Orders deduct recipes automatically."
         actions={<>
           <Button icon={<Download />} onClick={() => setExportOpen(true)}>Export</Button>
+          <Button icon={<Tags />} onClick={() => setCategoriesOpen(true)}>Categories</Button>
           <Button variant="primary" icon={<Plus />} onClick={() => openForm()}>Add material</Button>
         </>}
       />
@@ -144,7 +157,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
         </div>
         <Chips label="Material category" value={category} onChange={setCategory} options={[
           { value: 'all', label: 'All categories' },
-          ...STOCK_CATEGORIES.map(c => ({ value: c, label: c, count: stockItems.filter(i => i.category === c).length }))
+          ...stockCategories.map(c => ({ value: c, label: c, count: stockItems.filter(i => i.category === c).length }))
         ]} />
       </div>
 
@@ -195,7 +208,8 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
         <div className="ws-form-row cols-2">
           <Field label="Category">{id => (
             <Select id={id} value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
-              {STOCK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              {stockCategories.map(c => <option key={c} value={c}>{c}</option>)}
+              <option value={NEW_CATEGORY}>New category…</option>
             </Select>
           )}</Field>
           <Field label="Unit">{id => (
@@ -204,6 +218,9 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
             </Select>
           )}</Field>
         </div>
+        {form.category === NEW_CATEGORY && (
+          <Field label="New category name">{id => <Input id={id} autoFocus required maxLength={MAX_STOCK_CATEGORY_LENGTH} value={form.newCategory} onChange={e => setForm({ ...form, newCategory: e.target.value })} placeholder="e.g. Cleaning supplies" />}</Field>
+        )}
         <div className="ws-form-row cols-3">
           <Field label="On hand">{id => <Input id={id} type="number" inputMode="decimal" step="any" min="0" required value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} placeholder="0" />}</Field>
           <Field label="Cost per unit">{id => <AffixInput id={id} affix={currency} type="number" inputMode="decimal" step="any" min="0" required value={form.unitCost} onChange={e => setForm({ ...form, unitCost: e.target.value })} placeholder="0.00" />}</Field>
@@ -214,6 +231,14 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
           <strong className="tabular">{fmt((parseFloat(form.quantity) || 0) * (parseFloat(form.unitCost) || 0))}</strong>
         </div>
       </FormDialog>
+
+      <StockCategoriesDialog
+        open={categoriesOpen}
+        onClose={() => setCategoriesOpen(false)}
+        categories={stockCategories}
+        stockItems={stockItems}
+        onChanged={(from, to) => { if (category === from) setCategory(to ?? 'all'); onStockUpdated(); }}
+      />
 
       <ConfirmDialog
         open={!!deleteTarget}
@@ -275,7 +300,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
             <Field label="Category">{id => (
               <Select id={id} value={xCategory} onChange={e => setXCategory(e.target.value)}>
                 <option value="all">All categories</option>
-                {STOCK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {stockCategories.map(c => <option key={c} value={c}>{c}</option>)}
               </Select>
             )}</Field>
             <Field label="Stock level">{id => (
@@ -294,3 +319,84 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
     </Page>
   );
 };
+
+
+/** Add, rename and remove material categories. Renaming moves the materials along; a category with materials cannot be removed. */
+function StockCategoriesDialog({ open, onClose, categories, stockItems, onChanged }: {
+  open: boolean; onClose: () => void; categories: string[]; stockItems: StockItemSelect[];
+  /** `to` is the new name after a rename, or undefined when the category was removed. */
+  onChanged: (from: string, to?: string) => void;
+}) {
+  const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null);
+  const [newName, setNewName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const countOf = (name: string) => stockItems.filter(i => i.category === name).length;
+
+  const run = async (action: () => Promise<unknown>) => {
+    setBusy(true); setError('');
+    try { await action(); return true; }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'The categories could not be saved.'); return false; }
+    finally { setBusy(false); }
+  };
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = newName.trim();
+    if (!name) return;
+    if (categories.some(c => c.toLowerCase() === name.toLowerCase())) return setError(`“${name}” is already a category.`);
+    if (await run(() => store.saveStockCategories([...categories, name]))) setNewName('');
+  };
+  const rename = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!renaming) return;
+    const to = renaming.to.trim();
+    if (!to || to === renaming.from) { setRenaming(null); return; }
+    let saved = '';
+    if (await run(async () => { saved = await store.renameStockCategory(renaming.from, to); })) { onChanged(renaming.from, saved); setRenaming(null); }
+  };
+  const remove = async (name: string) => {
+    if (await run(() => store.saveStockCategories(categories.filter(c => c !== name)))) onChanged(name);
+  };
+
+  return (
+    <Dialog open={open} onClose={() => { setRenaming(null); setError(''); onClose(); }} busy={busy} title="Material categories"
+      description="Rename a category to move its materials along. Renaming onto an existing category merges the two."
+      footer={<Button variant="primary" onClick={() => { setRenaming(null); setError(''); onClose(); }}>Done</Button>}>
+      <div className="ws-form">
+        {error && <Notice tone="danger">{error}</Notice>}
+        <ul className="ws-list" style={{ margin: '0 -24px' }} aria-label="Categories">
+          {categories.map(name => {
+            const count = countOf(name);
+            if (renaming?.from === name) return (
+              <li key={name} className="ws-list-item">
+                <form style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }} onSubmit={rename}>
+                  <Input aria-label={`New name for ${name}`} autoFocus required maxLength={MAX_STOCK_CATEGORY_LENGTH} value={renaming.to} disabled={busy}
+                    onChange={e => setRenaming({ from: name, to: e.target.value })} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setRenaming(null); } }} />
+                  <IconButton type="submit" label={`Save ${name}`} disabled={busy}><Check /></IconButton>
+                  <IconButton label="Cancel rename" onClick={() => setRenaming(null)} disabled={busy}><X /></IconButton>
+                </form>
+              </li>
+            );
+            return (
+              <ListItem
+                key={name}
+                title={<span className="ws-truncate">{name}</span>}
+                subtitle={<span>{count ? plural(count, 'material') : 'No materials'}</span>}
+                actions={<>
+                  <IconButton label={`Rename ${name}`} disabled={busy} onClick={() => { setError(''); setRenaming({ from: name, to: name }); }}><Pencil /></IconButton>
+                  <IconButton label={count ? `${name} has materials. Move them before removing it` : `Remove ${name}`} variant="danger-ghost" disabled={busy || count > 0} onClick={() => remove(name)}><Trash2 /></IconButton>
+                </>}
+              />
+            );
+          })}
+        </ul>
+        <form style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }} onSubmit={add}>
+          <Field label="New category" className="ws-grow">{id => (
+            <Input id={id} maxLength={MAX_STOCK_CATEGORY_LENGTH} value={newName} disabled={busy} onChange={e => { setNewName(e.target.value); setError(''); }} placeholder="e.g. Cleaning supplies" />
+          )}</Field>
+          <Button type="submit" icon={<Plus />} disabled={busy || !newName.trim()}>Add</Button>
+        </form>
+      </div>
+    </Dialog>
+  );
+}

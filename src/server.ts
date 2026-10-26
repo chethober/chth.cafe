@@ -15,6 +15,7 @@ import {
 import { registerTelegramBot, runScheduledTelegram, sendDailyReport } from './services/telegramBot';
 import { registerCustomers } from './services/customers';
 import { registerEvents } from './services/events';
+import { registerStockCategories } from './services/stockCategories';
 import { calendarOf, isCalendarSystem } from './utils/events';
 
 export type Env = {
@@ -84,7 +85,8 @@ function ensureSettingsColumns(db: D1Database) {
       `ALTER TABLE settings ADD COLUMN calendar_system TEXT NOT NULL DEFAULT 'gregory'`,
       `ALTER TABLE settings ADD COLUMN secondary_calendar TEXT NOT NULL DEFAULT ''`,
       `ALTER TABLE settings ADD COLUMN telegram_events_chat_id TEXT NOT NULL DEFAULT ''`,
-      'ALTER TABLE settings ADD COLUMN notify_bookings INTEGER NOT NULL DEFAULT 1'
+      'ALTER TABLE settings ADD COLUMN notify_bookings INTEGER NOT NULL DEFAULT 1',
+      'ALTER TABLE settings ADD COLUMN stock_categories TEXT'
     ];
     const table = alterStatements[0].split(' ')[2];
     const { results } = await db.prepare(`PRAGMA table_info(${table})`).all();
@@ -186,7 +188,7 @@ app.use('/api/*', async (c, next) => {
   if (!authed && !publicRead && !publicWrite && !tracking) return c.json({ success: false, message: 'Please sign in.' }, 401);
   const panelAccess = (c.req.method === 'GET' && ['/api/orders', '/api/order-items', '/api/tasks', '/api/staff', '/api/staff/shifts', '/api/stock', '/api/recipes', '/api/customers', '/api/events', '/api/event-bookings'].includes(path))
     || (c.req.method === 'POST' && ['/api/tasks', '/api/staff/clock-in', '/api/staff/clock-out', '/api/customers'].includes(path))
-    || (c.req.method === 'PUT' && /^\/api\/(orders\/[^/]+\/status|tasks\/[^/]+\/status|menu\/items\/[^/]+\/stock|customers\/[^/]+|event-bookings\/[^/]+)$/.test(path))
+    || (c.req.method === 'PUT' && /^\/api\/(orders\/[^/]+|orders\/[^/]+\/status|tasks\/[^/]+\/status|menu\/items\/[^/]+\/stock|customers\/[^/]+|event-bookings\/[^/]+)$/.test(path))
     || (c.req.method === 'GET' && /^\/api\/menu\/[^/]+\/recipe$/.test(path));
   if (workspace === 'panel' && !publicRead && !publicWrite && !tracking && !path.startsWith('/api/auth/') && !panelAccess) {
     return c.json({ success: false, message: 'This action requires the admin workspace.' }, 403);
@@ -254,6 +256,7 @@ registerOperations(app);
 registerTelegramBot(app);
 registerCustomers(app);
 registerEvents(app);
+registerStockCategories(app);
 
 // --- 1. Settings & Branding Routes ---
 const getSettings = async (c: Context<Env>) => {
@@ -648,8 +651,13 @@ app.delete('/api/stock/:id', async (c) => {
   if (c.env?.DB) {
     await ensureStockTables(c.env.DB);
     try {
-      await c.env.DB.prepare('DELETE FROM stock_items WHERE id = ?').bind(id).run();
-      await c.env.DB.prepare('DELETE FROM recipes WHERE stock_item_id = ?').bind(id).run();
+      // Its movements reference it without ON DELETE, so they go first or D1's foreign key check refuses the delete.
+      // One batch, so a failure leaves the material, its recipes and its history as they were.
+      await c.env.DB.batch([
+        c.env.DB.prepare('DELETE FROM recipes WHERE stock_item_id = ?').bind(id),
+        c.env.DB.prepare('DELETE FROM inventory_movements WHERE stock_item_id = ?').bind(id),
+        c.env.DB.prepare('DELETE FROM stock_items WHERE id = ?').bind(id)
+      ]);
     } catch (e) {
       console.warn('D1 Delete Error (stock):', e);
       return c.json({ success: false, message: 'The change could not be saved. Please try again.' }, 503);
@@ -1082,14 +1090,82 @@ app.get('/api/order-items', async (c) => {
   return c.json({ source: 'store', data: orderItems });
 });
 
+const ORDER_TYPES = ['dine_in', 'takeout', 'pickup'];
+const STAFF_PAYMENT_METHODS = ['cash', 'card', 'qr_pay', 'google_pay', 'online', 'bank_transfer'];
+const round2 = (value: number) => Number(value.toFixed(2));
+
+/**
+ * Checks order lines against the menu and prices them from it, in place. Staff may add custom lines and discount single lines;
+ * the public pays menu prices and picks an option from every group. When an order is edited, its `existing` lines may stay
+ * even if the item has since sold out or left the menu.
+ */
+async function priceOrderItems(c: Context<Env>, items: any[], authed: boolean, existing = new Set<string>()): Promise<{ error: Response } | { subtotal: number; lineDiscounts: number }> {
+  const fail = (message: string, status: 400 | 409 = 400) => ({ error: c.json({ success: false, message }, status) });
+  if (!Array.isArray(items) || items.length === 0 || items.some((item: any) =>
+    !item || typeof item.menuItemId !== 'string' || !item.menuItemId || !Number.isInteger(item.quantity) || item.quantity < 1 ||
+    !Number.isFinite(item.unitPrice) || item.unitPrice < 0 || !Array.isArray(item.variants) ||
+    (item.discountAmount !== undefined && !Number.isFinite(item.discountAmount))
+  )) return fail('Please check the items in your order.');
+  if (items.length > 100) return fail('Invalid order details.');
+  for (const item of items) {
+    if (item.quantity > 100) return fail('Maximum quantity is 100.');
+    const row = await c.env.DB.prepare('SELECT * FROM menu_items WHERE id = ?').bind(item.menuItemId).first();
+    if (!row && authed && (/^(custom-|manual-inc-)/.test(item.menuItemId) || existing.has(item.menuItemId))) {
+      if (typeof item.itemName !== 'string' || !item.itemName.trim() || item.itemName.length > 200) return fail('Please check the items in your order.');
+      continue;
+    }
+    if (!row || (!row.is_in_stock && !existing.has(item.menuItemId))) return fail('An item is no longer available.', 409);
+    const { results } = await c.env.DB.prepare('SELECT * FROM menu_variants WHERE menu_item_id = ?').bind(item.menuItemId).all();
+    const groups = new Set<string>();
+    const selected = [];
+    for (const requested of item.variants) {
+      const variant = results.find(v => v.id === requested?.id || (typeof requested === 'string' && (v.id === requested || v.name === requested || `${v.group_name}: ${v.name}` === requested)));
+      if (!variant || groups.has(String(variant.group_name))) return fail('Invalid item options.');
+      groups.add(String(variant.group_name)); selected.push(mapRow(variant));
+    }
+    if (!authed) for (const variant of results) if (!groups.has(String(variant.group_name))) return fail('Please select an option from each group.');
+    const submittedPrice = item.unitPrice;
+    item.itemName = row.name;
+    item.unitPrice = round2(Number(row.base_price) + selected.reduce((sum, v) => sum + Number(v.priceModifier), 0));
+    if (!authed && Math.abs(submittedPrice - item.unitPrice) > 0.005) return fail('Prices have changed. Review your order and try again.', 409);
+    item.variants = selected;
+  }
+  // A line discount is for the whole line, not each unit, and never more than the line.
+  for (const item of items) {
+    const discount = authed ? round2(Number(item.discountAmount || 0)) : 0;
+    if (discount < 0 || discount > round2(item.unitPrice * item.quantity)) return fail(`The discount on ${item.itemName} is more than the item costs.`);
+    item.discountAmount = discount;
+  }
+  return {
+    subtotal: round2(items.reduce((sum: number, item: any) => sum + item.unitPrice * item.quantity, 0)),
+    lineDiscounts: round2(items.reduce((sum: number, item: any) => sum + item.discountAmount, 0))
+  };
+}
+
+/**
+ * Totals for priced lines. `discountAmount` is the order's whole discount: every line discount, plus any taken off the whole order.
+ * Orders without line discounts send the same value as before line discounts existed.
+ */
+function orderTotals(c: Context<Env>, priced: { subtotal: number; lineDiscounts: number }, discountInput: unknown, taxRate: number) {
+  const discountAmount = round2(Number(discountInput || 0));
+  if (!Number.isFinite(discountAmount) || discountAmount < priced.lineDiscounts || discountAmount > priced.subtotal) return { error: c.json({ success: false, message: 'Invalid discount.' }, 400) };
+  const taxAmount = round2(Math.max(0, priced.subtotal - discountAmount) * taxRate / 100);
+  if (!Number.isFinite(taxAmount) || taxAmount < 0) throw new Error('Invalid configured tax rate');
+  return { subtotal: priced.subtotal, discountAmount, taxAmount, totalAmount: round2(priced.subtotal - discountAmount + taxAmount) };
+}
+
+const insertOrderItems = (db: D1Database, orderId: string, items: any[]) => items.map((item, index) => db.prepare(
+  `INSERT INTO order_items (id, order_id, menu_item_id, item_name, quantity, unit_price, variants_json, discount_amount, item_total)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+).bind(
+  `${orderId}-item-${index}`, orderId, item.menuItemId, item.itemName,
+  item.quantity, item.unitPrice, JSON.stringify(item.variants), item.discountAmount,
+  round2(item.unitPrice * item.quantity - item.discountAmount)
+));
+
 app.post('/api/orders', async (c) => {
   const body = await c.req.json();
-  if (!Array.isArray(body.items) || body.items.length === 0 || body.items.some((item: any) =>
-    !item || typeof item.menuItemId !== 'string' || !item.menuItemId || !Number.isInteger(item.quantity) || item.quantity < 1 ||
-    !Number.isFinite(item.unitPrice) || item.unitPrice < 0 || !Array.isArray(item.variants)
-  )) {
-    return c.json({ success: false, message: 'Please check the items in your order.' }, 400);
-  }
+  if (!Array.isArray(body.items) || body.items.length === 0) return c.json({ success: false, message: 'Please check the items in your order.' }, 400);
 
   if (!c.env.SESSION_SECRET) return c.json({ success: false, message: 'Ordering is not configured.' }, 503);
   const authed = c.get('authed');
@@ -1112,34 +1188,13 @@ app.post('/api/orders', async (c) => {
   if (!authed && !getOpeningStatus(String(config.openHours), new Date(), String(config.timeZone || 'Asia/Tehran')).isOpen) {
     return c.json({ success: false, message: 'The café is closed. Please order during opening hours.' }, 409);
   }
-  if (body.items.length > 100 || !['dine_in', 'takeout', 'pickup'].includes(body.orderType) || !(authed ? ['cash','card','qr_pay','google_pay','online','bank_transfer'] : ['cash','card']).includes(body.paymentMethod)) {
+  if (!ORDER_TYPES.includes(body.orderType) || !(authed ? STAFF_PAYMENT_METHODS : ['cash','card']).includes(body.paymentMethod)) {
     return c.json({ success: false, message: 'Invalid order details.' }, 400);
   }
-  for (const item of body.items) {
-    if (item.quantity > 100) return c.json({ success: false, message: 'Maximum quantity is 100.' }, 400);
-    const row = await c.env.DB.prepare('SELECT * FROM menu_items WHERE id = ?').bind(item.menuItemId).first();
-    if (!row && authed && /^(custom-|manual-inc-)/.test(item.menuItemId)) continue;
-    if (!row || !row.is_in_stock) return c.json({ success: false, message: 'An item is no longer available.' }, 409);
-    const { results } = await c.env.DB.prepare('SELECT * FROM menu_variants WHERE menu_item_id = ?').bind(item.menuItemId).all();
-    const groups = new Set<string>();
-    const selected = [];
-    for (const requested of item.variants) {
-      const variant = results.find(v => v.id === requested?.id || (typeof requested === 'string' && (v.id === requested || v.name === requested || `${v.group_name}: ${v.name}` === requested)));
-      if (!variant || groups.has(String(variant.group_name))) return c.json({ success: false, message: 'Invalid item options.' }, 400);
-      groups.add(String(variant.group_name)); selected.push(mapRow(variant));
-    }
-    if (!authed) for (const variant of results) if (!groups.has(String(variant.group_name))) return c.json({ success: false, message: 'Please select an option from each group.' }, 400);
-    const submittedPrice = item.unitPrice;
-    item.itemName = row.name;
-    item.unitPrice = Number((Number(row.base_price) + selected.reduce((sum, v) => sum + Number(v.priceModifier), 0)).toFixed(2));
-    if (!authed && Math.abs(submittedPrice - item.unitPrice) > 0.005) return c.json({ success: false, message: 'Prices have changed. Review your order and try again.' }, 409);
-    item.variants = selected;
-  }
-  const subtotal = Number(body.items.reduce((sum: number, item: any) => sum + item.unitPrice * item.quantity, 0).toFixed(2));
-  const discountAmount = authed ? Number(body.discountAmount || 0) : 0;
-  if (!Number.isFinite(discountAmount) || discountAmount < 0 || discountAmount > subtotal) return c.json({ success: false, message: 'Invalid discount.' }, 400);
-  const taxAmount = Number(((subtotal - discountAmount) * Number(config.taxRate) / 100).toFixed(2));
-  if (!Number.isFinite(taxAmount) || taxAmount < 0) throw new Error('Invalid configured tax rate');
+  const priced = await priceOrderItems(c, body.items, authed);
+  if ('error' in priced) return priced.error;
+  const totals = orderTotals(c, priced, authed ? body.discountAmount : 0, Number(config.taxRate));
+  if ('error' in totals) return totals.error;
   if (body.customerName && (typeof body.customerName !== 'string' || body.customerName.length > 100)) return c.json({ success: false, message: 'Customer name is too long.' }, 400);
   if (authed && body.createdAt && !Number.isFinite(Date.parse(body.createdAt))) return c.json({ success: false, message: 'Invalid order date.' }, 400);
   // Only staff link orders to club members; the order keeps the member's name as it was at the time.
@@ -1153,8 +1208,7 @@ app.post('/api/orders', async (c) => {
     customerName: member?.name || body.customerName || 'Guest Customer',
     customerId: member?.id || null,
     orderType: body.orderType || 'dine_in',
-    subtotal, taxAmount, discountAmount,
-    totalAmount: Number((subtotal - discountAmount + taxAmount).toFixed(2)),
+    ...totals,
     paymentMethod: body.paymentMethod || 'card',
     status: authed && body.status === 'completed' ? 'completed' : 'pending',
     createdAt: authed && body.createdAt ? new Date(body.createdAt).toISOString() : new Date().toISOString()
@@ -1173,16 +1227,7 @@ app.post('/api/orders', async (c) => {
         orderData.subtotal, orderData.taxAmount, orderData.discountAmount,
         orderData.totalAmount, orderData.paymentMethod, orderData.status, orderData.createdAt
       )];
-      body.items.forEach((item: any, index: number) => {
-        statements.push(c.env.DB.prepare(
-          `INSERT INTO order_items (id, order_id, menu_item_id, item_name, quantity, unit_price, variants_json, item_total)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-        ).bind(
-          `${orderData.id}-item-${index}`, orderData.id, item.menuItemId, item.itemName,
-          item.quantity, item.unitPrice, JSON.stringify(item.variants),
-          Number((item.unitPrice * item.quantity).toFixed(2))
-        ));
-      });
+      statements.push(...insertOrderItems(c.env.DB, orderData.id, body.items));
       statements.push(c.env.DB.prepare('INSERT INTO order_requests (id,fingerprint) VALUES (?,?)').bind(orderData.id,fingerprint));
       statements.push(c.env.DB.prepare(`INSERT INTO inventory_movements (id,stock_item_id,kind,quantity,notes,order_id,created_at)
         SELECT ? || '-' || r.stock_item_id, r.stock_item_id, 'consumption', -SUM(r.quantity_required * oi.quantity), 'Order ingredients', ?, ?
@@ -1237,6 +1282,63 @@ app.delete('/api/orders/:id', async (c) => {
   }
 
   return c.json({ success: c.env?.DB ? true : deleted });
+});
+
+// Staff change an order's lines, discounts and details at any stage before it is cancelled; the panel only until it is completed.
+// Ingredients follow the change: a bigger order takes more from stock, a smaller one returns the difference.
+app.put('/api/orders/:id', async c => {
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id = ?').bind(id).first<Record<string, unknown>>();
+  if (!order) return c.json({ success: false, message: 'Order not found.' }, 404);
+  if (order.status === 'cancelled') return c.json({ success: false, message: 'A cancelled order cannot be changed.' }, 409);
+  if (order.status === 'completed' && c.get('workspace') === 'panel') return c.json({ success: false, message: 'Only an admin can change a completed order.' }, 403);
+  if (!ORDER_TYPES.includes(body.orderType) || !STAFF_PAYMENT_METHODS.includes(body.paymentMethod)) return c.json({ success: false, message: 'Invalid order details.' }, 400);
+  if (body.customerName !== undefined && (typeof body.customerName !== 'string' || body.customerName.length > 100)) return c.json({ success: false, message: 'Customer name is too long.' }, 400);
+  const { results: currentItems } = await c.env.DB.prepare('SELECT menu_item_id FROM order_items WHERE order_id = ?').bind(id).all<{ menu_item_id: string }>();
+  const priced = await priceOrderItems(c, body.items, true, new Set(currentItems.map(item => item.menu_item_id)));
+  if ('error' in priced) return priced.error;
+  const config = await c.env.DB.prepare('SELECT tax_rate FROM settings WHERE id = ?').bind('cafe_config').first<{ tax_rate: number }>();
+  if (!config) return c.json({ success: false, message: 'Café settings are unavailable.' }, 503);
+  const totals = orderTotals(c, priced, body.discountAmount, Number(config.tax_rate));
+  if ('error' in totals) return totals.error;
+  const member = body.customerId ? await c.env.DB.prepare('SELECT id, name FROM customers WHERE id = ?').bind(String(body.customerId)).first<{ id: string; name: string }>() : null;
+  if (body.customerId && !member) return c.json({ success: false, message: 'This club member no longer exists. Pick them again.' }, 400);
+  const updated = {
+    ...mapRow(order),
+    customerName: member?.name || body.customerName?.trim() || 'Walk-in',
+    customerId: member?.id || null,
+    orderType: body.orderType,
+    paymentMethod: body.paymentMethod,
+    ...totals
+  };
+  const now = new Date().toISOString();
+  try {
+    await c.env.DB.batch([
+      c.env.DB.prepare('UPDATE orders SET customer_name = ?, customer_id = ?, order_type = ?, payment_method = ?, subtotal = ?, tax_amount = ?, discount_amount = ?, total_amount = ? WHERE id = ?')
+        .bind(updated.customerName, updated.customerId, updated.orderType, updated.paymentMethod, totals.subtotal, totals.taxAmount, totals.discountAmount, totals.totalAmount, id),
+      c.env.DB.prepare('DELETE FROM order_items WHERE order_id = ?').bind(id),
+      ...insertOrderItems(c.env.DB, id, body.items),
+      // What the new lines need, less what the order already holds: negative takes more stock, positive returns some.
+      // Materials deleted since are skipped, as when an order is deleted.
+      c.env.DB.prepare(`INSERT INTO inventory_movements (id,stock_item_id,kind,quantity,notes,order_id,created_at)
+        SELECT ? || '-' || d.stock_item_id, d.stock_item_id, CASE WHEN d.delta < 0 THEN 'consumption' ELSE 'return' END, d.delta, 'Order edited', ?, ?
+        FROM (
+          SELECT u.stock_item_id, SUM(u.quantity) AS delta FROM (
+            SELECT r.stock_item_id, -r.quantity_required * oi.quantity AS quantity FROM recipes r JOIN order_items oi ON oi.menu_item_id = r.menu_item_id
+              WHERE oi.order_id = ? AND r.quantity_required > 0
+            UNION ALL
+            SELECT m.stock_item_id, -m.quantity FROM inventory_movements m WHERE m.order_id = ?
+          ) u JOIN stock_items s ON s.id = u.stock_item_id
+          GROUP BY u.stock_item_id HAVING ABS(SUM(u.quantity)) > 0.000001
+        ) d`).bind(`edit-${crypto.randomUUID()}`, id, now, id, id)
+    ]);
+  } catch (error) {
+    if (String(error).includes('Insufficient stock')) return c.json({ success: false, message: 'There are not enough ingredients for this change. Nothing was changed.' }, 409);
+    throw error;
+  }
+  const { results: items } = await c.env.DB.prepare('SELECT * FROM order_items WHERE order_id = ?').bind(id).all();
+  return c.json({ success: true, data: { order: updated, items: mapRows(items as Record<string, unknown>[]) } });
 });
 
 app.put('/api/orders/:id/status', async (c) => {

@@ -1,6 +1,6 @@
 import { Reconciliation } from './Reconciliation';
 import React, { useMemo, useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, Download, PenLine, Percent, Plus, Receipt, ShoppingBag, Trash2, Wallet } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Download, PenLine, Pencil, Percent, Plus, Receipt, ShoppingBag, Trash2, Wallet } from 'lucide-react';
 import { CategorySelect, OrderSelect, ExpenseSelect, SettingsSelect, MenuItemSelect } from '../db/schema';
 import { store } from '../db/store';
 import {
@@ -9,7 +9,7 @@ import {
 } from '../ui';
 import { ManualLogModal } from './ManualLogModal';
 import { QuickPOSModal } from './QuickPOSModal';
-import { OrderDetailsDialog } from './shared';
+import { OrderDetailsDialog, OrderEditDialog } from './shared';
 import { FinanceExportDialog } from './exports/FinanceExport';
 
 interface FinancialTrackerProps {
@@ -39,6 +39,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
   const [expenseLimit, setExpenseLimit] = useState(10);
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'order' | 'expense'; id: string; label: string } | null>(null);
   const [cancelTarget, setCancelTarget] = useState<OrderSelect | null>(null);
+  const [editTarget, setEditTarget] = useState<OrderSelect | null>(null);
 
   const analytics = store.getFinancialAnalytics();
   const completed = useMemo(() => orders.filter(o => o.status === 'completed'), [orders]);
@@ -211,7 +212,10 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
                     title={<><span className="mono">{o.orderNumber}</span><span className="ws-truncate muted" style={{ fontWeight: 400 }}>{o.customerName || 'Walk-in'}</span></>}
                     subtitle={<><span>{formatDate(o.createdAt)}</span><span>{paymentLabel(o.paymentMethod)}</span>{o.status !== 'completed' && <span>{o.status}</span>}</>}
                     trail={<Amount tone={o.status === 'completed' ? 'positive' : undefined}>{fmt(o.totalAmount)}</Amount>}
-                    actions={<IconButton label={`Delete order ${o.orderNumber}`} variant="danger-ghost" onClick={() => setDeleteTarget({ type: 'order', id: o.id, label: o.orderNumber })}><Trash2 /></IconButton>}
+                    actions={<>
+                      {o.status !== 'cancelled' && !store.isQueuedOrder(o.id) && <IconButton label={`Edit order ${o.orderNumber}`} onClick={() => setEditTarget(o)}><Pencil /></IconButton>}
+                      <IconButton label={`Delete order ${o.orderNumber}`} variant="danger-ghost" onClick={() => setDeleteTarget({ type: 'order', id: o.id, label: o.orderNumber })}><Trash2 /></IconButton>
+                    </>}
                   />
                 ))}
               </List>
@@ -251,7 +255,18 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
         actions={viewOrder && <span className="ws-spacer" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {['pending', 'preparing', 'ready'].includes(viewOrder.status) && <Button variant="danger-ghost" onClick={() => { setCancelTarget(viewOrder); setViewOrder(null); }}>Cancel order</Button>}
           <Button variant="danger-ghost" icon={<Trash2 />} onClick={() => { setDeleteTarget({ type: 'order', id: viewOrder.id, label: viewOrder.orderNumber }); setViewOrder(null); }}>Delete</Button>
+          {/* Orders still on this device are edited once they reach the server. */}
+          {viewOrder.status !== 'cancelled' && !store.isQueuedOrder(viewOrder.id) && <Button icon={<Pencil />} onClick={() => { setEditTarget(viewOrder); setViewOrder(null); }}>Edit</Button>}
         </span>}
+      />
+      <OrderEditDialog
+        order={editTarget}
+        items={editTarget ? store.getOrderItems(editTarget.id) : []}
+        settings={settings}
+        categories={categories}
+        menuItems={menuItems}
+        onClose={() => setEditTarget(null)}
+        onSaved={onFinancialsUpdated}
       />
       <ManualLogModal isOpen={manualLogOpen} onClose={() => setManualLogOpen(false)} settings={settings} onFinancialsUpdated={onFinancialsUpdated} />
       <QuickPOSModal isOpen={quickSaleOpen} onClose={() => setQuickSaleOpen(false)} categories={categories} menuItems={menuItems} settings={settings} onOrderCreated={onFinancialsUpdated} />

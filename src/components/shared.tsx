@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Boxes, Cake, CheckCircle2, ChevronDown, Circle, Coffee, GlassWater, Leaf, Moon, PlayCircle, Plus, Sparkles, Sun, Trash2, User, Utensils, Wrench } from 'lucide-react';
-import { CategorySelect, MenuItemSelect, OrderItemSelect, OrderSelect, StaffSelect, TaskSelect } from '../db/schema';
-import { store } from '../db/store';
+import { Boxes, Cake, CheckCircle2, ChevronDown, Circle, Coffee, GlassWater, Leaf, Moon, Percent, PlayCircle, Plus, Sparkles, Sun, Trash2, User, Utensils, Wrench } from 'lucide-react';
+import { CategorySelect, CustomerSelect, MenuItemSelect, OrderItemSelect, OrderSelect, SettingsSelect, StaffSelect, TaskSelect } from '../db/schema';
+import { store, orderAmounts, type OrderLineInput } from '../db/store';
 import {
-  Badge, Button, Dialog, EmptyState, Field, FormDialog, IconButton, Input, KeyValue, ListItem, Select,
-  formatDateTime, plural, localDateKey, money, orderStatusTone, orderTypeLabel, paymentLabel, ORDER_STATUS_LABELS
+  AffixInput, Badge, Button, Dialog, EmptyState, Field, FormDialog, IconButton, Input, KeyValue, ListItem, Notice, SearchInput, Segmented, Select, Stepper,
+  formatDateTime, plural, localDateKey, money, orderStatusTone, orderTypeLabel, paymentLabel, ORDER_PAYMENT_METHODS, ORDER_STATUS_LABELS
 } from '../ui';
+import { CustomerPicker } from './CustomerClub';
 
 /* --------------------------------------------------------------- Menu */
 
@@ -171,6 +172,210 @@ export function TaskFormDialog({ open, onClose, staffList, onCreated }: { open: 
 
 /* ----------------------------------------------------------------- Orders */
 
+/** A line being entered or edited. The discount is typed as a percentage or an amount for the whole line. */
+export interface EditableLine {
+  key: string;
+  menuItemId: string;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
+  variants: string[];
+  /** Chosen options, shown under the name. */
+  variantLabel?: string;
+  discount: string;
+  discountType: 'percent' | 'fixed';
+}
+export type DiscountType = EditableLine['discountType'];
+
+/** What a typed discount takes off `gross`, never more than all of it. */
+export const discountOff = (gross: number, value: string, type: DiscountType) => {
+  const typed = Math.max(0, parseFloat(value) || 0);
+  return Number(Math.min(gross, type === 'percent' ? (gross * typed) / 100 : typed).toFixed(2));
+};
+export const lineDiscount = (line: EditableLine) => discountOff(line.unitPrice * line.quantity, line.discount, line.discountType);
+export const toOrderLines = (lines: EditableLine[]): OrderLineInput[] => lines.map(line => ({
+  menuItemId: line.menuItemId, itemName: line.itemName, quantity: line.quantity, unitPrice: line.unitPrice, variants: line.variants, discountAmount: lineDiscount(line)
+}));
+/** One more of a menu item: onto its plain line if there is one, else a new line. */
+export const addMenuItem = (lines: EditableLine[], item: MenuItemSelect): EditableLine[] =>
+  lines.some(l => l.menuItemId === item.id && !l.variants.length)
+    ? lines.map(l => l.menuItemId === item.id && !l.variants.length ? { ...l, quantity: l.quantity + 1 } : l)
+    : [...lines, { key: crypto.randomUUID(), menuItemId: item.id, itemName: item.name, quantity: 1, unitPrice: item.basePrice, variants: [], discount: '', discountType: 'percent' }];
+export const lineQuantities = (lines: EditableLine[]) =>
+  lines.reduce<Record<string, number>>((all, l) => ({ ...all, [l.menuItemId]: (all[l.menuItemId] || 0) + l.quantity }), {});
+
+/** The lines of an order being built or edited: quantity, optional price, a discount per line, and removal. */
+export function OrderLinesEditor({ lines, onChange, currency, editablePrice, flush }: {
+  lines: EditableLine[]; onChange: (update: (lines: EditableLine[]) => EditableLine[]) => void; currency: string;
+  editablePrice?: boolean;
+  /** Bleed the rows to the edges of a card. */
+  flush?: boolean;
+}) {
+  const fmt = (v: number) => money(v, currency);
+  const [discountOpen, setDiscountOpen] = useState<string[]>([]);
+  // Immutable updates: StrictMode double-invokes updaters, so mutating would double-count.
+  const update = (key: string, change: Partial<EditableLine>) => onChange(prev => prev.map(l => l.key === key ? { ...l, ...change } : l));
+  const changeQty = (key: string, delta: number) =>
+    onChange(prev => prev.flatMap(l => l.key !== key ? [l] : l.quantity + delta > 0 ? [{ ...l, quantity: l.quantity + delta }] : []));
+  return (
+    <ul className="ws-list" style={flush ? { margin: '0 calc(var(--ws-pad) * -1)' } : undefined} aria-label="Order lines">
+      {lines.map(line => {
+        const gross = line.unitPrice * line.quantity;
+        const off = lineDiscount(line);
+        const showDiscount = discountOpen.includes(line.key) || line.discount !== '';
+        return (
+          <li key={line.key} className="ws-list-item" style={{ flexWrap: 'wrap', gap: 8, ...(flush ? {} : { paddingInline: 0 }) }}>
+            <div className="ws-list-main" style={{ flexBasis: '100%' }}>
+              <div className="ws-list-title"><span className="ws-truncate">{line.itemName}</span></div>
+              {(line.variantLabel || !editablePrice) && <div className="ws-list-sub">
+                {line.variantLabel && <span>{line.variantLabel}</span>}
+                {!editablePrice && <span className="tabular">{fmt(line.unitPrice)} each</span>}
+              </div>}
+            </div>
+            <Stepper label={`${line.itemName} quantity`} value={line.quantity} onDecrement={() => changeQty(line.key, -1)} onIncrement={() => changeQty(line.key, 1)} />
+            {editablePrice && (
+              <div style={{ width: 104 }}>
+                <AffixInput affix={currency} aria-label={`${line.itemName} unit price`} type="number" inputMode="decimal" step="any" min="0" value={line.unitPrice}
+                  onChange={e => update(line.key, { unitPrice: Math.max(0, parseFloat(e.target.value) || 0) })} style={{ minHeight: 36, paddingRight: 6 }} />
+              </div>
+            )}
+            <IconButton label={showDiscount ? `Remove discount on ${line.itemName}` : `Discount ${line.itemName}`} variant={showDiscount ? 'secondary' : 'ghost'} aria-pressed={showDiscount}
+              onClick={() => {
+                if (showDiscount) { update(line.key, { discount: '' }); setDiscountOpen(open => open.filter(k => k !== line.key)); }
+                else setDiscountOpen(open => [...open, line.key]);
+              }}><Percent /></IconButton>
+            <span style={{ marginLeft: 'auto', textAlign: 'right' }}>
+              <span className="ws-amount" style={{ display: 'block' }}>{fmt(gross - off)}</span>
+              {off > 0 && <span className="ws-hint tabular" style={{ textDecoration: 'line-through' }}>{fmt(gross)}</span>}
+            </span>
+            <IconButton label={`Remove ${line.itemName}`} variant="danger-ghost" onClick={() => onChange(prev => prev.filter(l => l.key !== line.key))}><Trash2 /></IconButton>
+            {showDiscount && (
+              <div style={{ flexBasis: '100%', display: 'flex', gap: 8, alignItems: 'center' }}>
+                <Input aria-label={`Discount on ${line.itemName}`} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" autoFocus={line.discount === ''}
+                  value={line.discount} onChange={e => update(line.key, { discount: e.target.value })} style={{ minHeight: 36, flex: 1 }} />
+                <Segmented label={`Discount type for ${line.itemName}`} value={line.discountType} onChange={discountType => update(line.key, { discountType })}
+                  options={[{ value: 'percent', label: '%' }, { value: 'fixed', label: currency }]} />
+                {off > 0 && <span className="ws-amount" data-tone="positive">−{fmt(off)}</span>}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Change an open order (or, for an admin, a completed one): lines, line discounts, the order discount and its details. */
+export function OrderEditDialog({ order, items, settings, categories, menuItems, onClose, onSaved }: {
+  order: OrderSelect | null; items: OrderItemSelect[]; settings: SettingsSelect; categories: CategorySelect[]; menuItems: MenuItemSelect[];
+  onClose: () => void; onSaved?: (order: OrderSelect) => void;
+}) {
+  const currency = settings.currency;
+  const fmt = (v: number) => money(v, currency);
+  const [lines, setLines] = useState<EditableLine[]>([]);
+  const [customer, setCustomer] = useState('');
+  const [member, setMember] = useState<CustomerSelect | null>(null);
+  const [orderType, setOrderType] = useState<'dine_in' | 'takeout' | 'pickup'>('dine_in');
+  const [payment, setPayment] = useState('card');
+  const [discount, setDiscount] = useState('');
+  const [discountType, setDiscountType] = useState<DiscountType>('fixed');
+  const [search, setSearch] = useState('');
+  const [openCategories, setOpenCategories] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!order) return;
+    const editable = items.map<EditableLine>(item => {
+      let chosen: unknown[] = [];
+      try { chosen = JSON.parse(item.variantsJson || '[]'); } catch { /* unreadable options: keep the line without them */ }
+      const variants = chosen.map(v => typeof v === 'string' ? v : (v as { id?: string })?.id || '').filter(Boolean);
+      const variantLabel = chosen.map(v => typeof v === 'string' ? v : (v as { name?: string })?.name || '').filter(Boolean).join(', ');
+      const off = item.discountAmount || 0;
+      return { key: item.id, menuItemId: item.menuItemId, itemName: item.itemName, quantity: item.quantity, unitPrice: item.unitPrice, variants, variantLabel, discount: off ? String(off) : '', discountType: 'fixed' };
+    });
+    // Whatever the order's discount is beyond its lines was taken off the whole order.
+    const wholeOrder = Number((order.discountAmount - editable.reduce((sum, l) => sum + lineDiscount(l), 0)).toFixed(2));
+    setLines(editable);
+    const linked = order.customerId ? store.getCustomers().find(c => c.id === order.customerId) || null : null;
+    setMember(linked); setCustomer(linked ? '' : order.customerName || '');
+    setOrderType(order.orderType as typeof orderType); setPayment(order.paymentMethod);
+    setDiscount(wholeOrder > 0 ? String(wholeOrder) : ''); setDiscountType('fixed');
+    setSearch(''); setOpenCategories([]); setError('');
+  }, [order?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const orderLines = toOrderLines(lines);
+  const gross = orderLines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
+  const lineDiscounts = orderLines.reduce((sum, l) => sum + (l.discountAmount || 0), 0);
+  const orderDiscount = discountOff(gross - lineDiscounts, discount, discountType);
+  const amounts = orderAmounts(orderLines, orderDiscount, settings.taxRate);
+  const payments: string[] = ORDER_PAYMENT_METHODS.includes(payment as never) ? [...ORDER_PAYMENT_METHODS] : [...ORDER_PAYMENT_METHODS, payment];
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!order || saving || !lines.length) return;
+    setSaving(true); setError('');
+    try {
+      const saved = await store.updateOrder(order.id, {
+        customerName: member?.name || customer.trim() || 'Walk-in', customerId: member?.id || null,
+        orderType, paymentMethod: payment, orderDiscount, items: orderLines
+      });
+      onSaved?.(saved);
+      onClose();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'The order could not be saved.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <FormDialog
+      open={!!order}
+      onClose={onClose}
+      busy={saving}
+      size="lg"
+      title={order ? <>Edit <span className="mono">{order.orderNumber}</span></> : ''}
+      description={order ? `${ORDER_STATUS_LABELS[order.status] || order.status} · ${formatDateTime(order.createdAt)}. Ingredients are taken from or returned to stock to match.` : undefined}
+      submitLabel={`Save · ${fmt(amounts.totalAmount)}`}
+      submitDisabled={!lines.length}
+      onSubmit={submit}
+    >
+      {error && <Notice tone="danger">{error}</Notice>}
+      {lines.length === 0 ? <div className="ws-lane-empty">An order needs at least one item. Add one below, or cancel the order instead.</div>
+        : <div className="ws-panel" style={{ padding: '4px 12px' }}><OrderLinesEditor lines={lines} onChange={setLines} currency={currency} /></div>}
+      <div className="ws-field">
+        <span className="ws-label">Add items</span>
+        <div className="ws-toolbar-stack">
+          <SearchInput value={search} onChange={setSearch} placeholder="Find a drink or dish" label="Search menu" />
+          <MenuPicker categories={categories} menuItems={menuItems} query={search} open={openCategories} onOpenChange={setOpenCategories}
+            quantities={lineQuantities(lines)} onAdd={item => setLines(prev => addMenuItem(prev, item))} fmt={fmt} />
+        </div>
+      </div>
+      <Segmented block label="Order type" value={orderType} onChange={setOrderType} options={[{ value: 'dine_in', label: 'Dine-in' }, { value: 'takeout', label: 'Takeout' }, { value: 'pickup', label: 'Pickup' }]} />
+      <CustomerPicker customers={store.getCustomers()} orders={store.getOrders()} text={customer} onTextChange={setCustomer} member={member} onMemberChange={setMember} allowSignUp={false} />
+      <div className="ws-form-row cols-2">
+        <Field label="Payment">{id => (
+          <Select id={id} value={payment} onChange={e => setPayment(e.target.value)}>
+            {payments.map(m => <option key={m} value={m}>{paymentLabel(m)}</option>)}
+          </Select>
+        )}</Field>
+        <Field label="Order discount" hint="On top of any item discounts" aside={
+          <Segmented label="Order discount type" value={discountType} onChange={setDiscountType} options={[{ value: 'percent', label: '%' }, { value: 'fixed', label: currency }]} />
+        }>{id => <Input id={id} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" value={discount} onChange={e => setDiscount(e.target.value)} />}</Field>
+      </div>
+      <KeyValue
+        items={[
+          { label: `Subtotal · ${plural(lines.reduce((sum, l) => sum + l.quantity, 0), 'item')}`, value: fmt(amounts.subtotal) },
+          ...(amounts.discountAmount > 0 ? [{ label: 'Discounts', value: `−${fmt(amounts.discountAmount)}`, tone: 'positive' as const }] : []),
+          { label: `Tax (${settings.taxRate}%)`, value: fmt(amounts.taxAmount) }
+        ]}
+        total={{ label: 'Total', value: fmt(amounts.totalAmount) }}
+      />
+    </FormDialog>
+  );
+}
+
 /** Read-only order receipt, shared by the panel and the finance ledger. */
 export function OrderDetailsDialog({ order, items, currency, taxRate, onClose, actions }: {
   order: OrderSelect | null; items: OrderItemSelect[]; currency: string; taxRate: number; onClose: () => void; actions?: React.ReactNode;
@@ -197,7 +402,10 @@ export function OrderDetailsDialog({ order, items, currency, taxRate, onClose, a
               {items.map(item => (
                 <li key={item.id}>
                   <span><strong className="tabular">{item.quantity}×</strong> {item.itemName}</span>
-                  <span className="tabular">{money(item.quantity * item.unitPrice, currency)}</span>
+                  <span className="tabular" style={{ textAlign: 'right' }}>
+                    {money(item.quantity * item.unitPrice - (item.discountAmount || 0), currency)}
+                    {item.discountAmount > 0 && <span className="ws-hint" style={{ display: 'block' }}>−{money(item.discountAmount, currency)} off</span>}
+                  </span>
                 </li>
               ))}
             </ul>

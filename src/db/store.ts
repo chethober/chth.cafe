@@ -20,8 +20,29 @@ import {
   initialMenuVariants
 } from './seed';
 import { deviceStore, type QueuedRequest } from './offline';
+import { DEFAULT_STOCK_CATEGORIES, parseStockCategories } from '../utils/stockCategories';
 
 const STORAGE_KEY = 'chth_cafe_settings_v1';
+
+/** One order line as staff enter it. `discountAmount` is for the whole line, not each unit. */
+export interface OrderLineInput {
+  menuItemId: string;
+  itemName: string;
+  quantity: number;
+  unitPrice: number;
+  variants: string[];
+  discountAmount?: number;
+}
+
+/** Order money as the server works it out: `discountAmount` is every line discount plus `orderDiscount`. */
+export function orderAmounts(items: OrderLineInput[], orderDiscount: number, taxRate: number) {
+  const round2 = (value: number) => Number(value.toFixed(2));
+  const subtotal = round2(items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0));
+  const lineDiscounts = round2(items.reduce((sum, item) => sum + (item.discountAmount || 0), 0));
+  const discountAmount = Math.min(subtotal, round2(lineDiscounts + Math.max(0, orderDiscount)));
+  const taxAmount = round2(((subtotal - discountAmount) * taxRate) / 100);
+  return { subtotal, discountAmount, taxAmount, totalAmount: round2(subtotal - discountAmount + taxAmount) };
+}
 
 /** fetch() itself failed: the device has no connection to the café API. */
 class OfflineError extends Error {
@@ -1019,7 +1040,8 @@ class CafeStore {
         menuItemId: item.menuItemId, itemName: item.itemName,
         quantity: item.quantity, unitPrice: item.unitPrice,
         variantsJson: JSON.stringify(item.variants),
-        itemTotal: Number((item.quantity * item.unitPrice).toFixed(2))
+        discountAmount: item.discountAmount || 0,
+        itemTotal: Number((item.quantity * item.unitPrice - (item.discountAmount || 0)).toFixed(2))
       })),
       ...this.state.orderItems.filter(item => item.orderId !== order.id)
     ];
@@ -1037,29 +1059,18 @@ class CafeStore {
     customerId?: string | null;
     orderType: 'dine_in' | 'takeout' | 'pickup';
     paymentMethod: 'cash' | 'card' | 'google_pay' | 'online';
+    /** Taken off the whole order, on top of any line discounts. */
     discountAmount?: number;
     status?: 'pending' | 'preparing' | 'completed' | 'cancelled';
     createdAt?: string;
-    items: Array<{
-      menuItemId: string;
-      itemName: string;
-      quantity: number;
-      unitPrice: number;
-      variants: string[];
-    }>;
+    items: OrderLineInput[];
   }): Promise<OrderSelect> {
     const signature = JSON.stringify({ ...orderInput, createdAt: undefined });
     const orderId = this.orderAttempts.get(signature) || `ord-${crypto.randomUUID()}`;
     this.orderAttempts.set(signature, orderId);
     // Known before the server answers, so an order taken offline keeps the number staff called out.
     const orderNumber = `#${orderId.slice(4, 12).toUpperCase()}`;
-    const subtotal = Number(
-      orderInput.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toFixed(2)
-    );
-    const discountAmount = Math.max(0, Number((orderInput.discountAmount || 0).toFixed(2)));
-    const netSubtotal = Math.max(0, Number((subtotal - discountAmount).toFixed(2)));
-    const taxAmount = Number(((netSubtotal * this.state.settings.taxRate) / 100).toFixed(2));
-    const totalAmount = Number((netSubtotal + taxAmount).toFixed(2));
+    const { subtotal, discountAmount, taxAmount, totalAmount } = orderAmounts(orderInput.items, orderInput.discountAmount || 0, this.state.settings.taxRate);
     const now = orderInput.createdAt || new Date().toISOString();
 
     const newOrder: OrderSelect = {
@@ -1092,6 +1103,32 @@ class CafeStore {
     }
     const result = await response.json() as { data: OrderSelect };
     return result.data;
+  }
+
+  /**
+   * Replaces an order's lines and details. Waits for the server, which may refuse when there is not enough stock,
+   * so the editor can say why. Orders still waiting on this device cannot be edited until they are sent.
+   */
+  public async updateOrder(orderId: string, input: {
+    customerName: string;
+    customerId: string | null;
+    orderType: 'dine_in' | 'takeout' | 'pickup';
+    paymentMethod: string;
+    /** Taken off the whole order, on top of any line discounts. */
+    orderDiscount: number;
+    items: OrderLineInput[];
+  }): Promise<OrderSelect> {
+    const { orderDiscount, ...details } = input;
+    const { discountAmount } = orderAmounts(input.items, orderDiscount, this.state.settings.taxRate);
+    const response = await this.formMutation(`/api/orders/${encodeURIComponent(orderId)}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...details, discountAmount })
+    });
+    const { data } = await response.json() as { data: { order: OrderSelect; items: OrderItemSelect[] } };
+    this.state.orders = this.state.orders.map(order => order.id === orderId ? data.order : order);
+    this.state.orderItems = [...data.items, ...this.state.orderItems.filter(item => item.orderId !== orderId)];
+    this.notify();
+    return data.order;
   }
 
   public deleteOrder(orderId: string): boolean {
@@ -1426,6 +1463,37 @@ class CafeStore {
       return true;
     }
     return false;
+  }
+
+  /** The admin's category list, followed by any category a material uses that is missing from it. */
+  public getStockCategories(): string[] {
+    const saved = parseStockCategories(this.state.settings.stockCategories) ?? DEFAULT_STOCK_CATEGORIES;
+    const unlisted = this.state.stockItems.map(item => item.category).filter(name => !saved.includes(name));
+    return [...saved, ...new Set(unlisted)];
+  }
+
+  public async saveStockCategories(categories: string[]): Promise<string[]> {
+    const response = await this.formMutation('/api/stock-categories', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categories })
+    });
+    const { data } = await response.json() as { data: string[] };
+    this.state.settings = { ...this.state.settings, stockCategories: JSON.stringify(data) };
+    this.notify();
+    return data;
+  }
+
+  /** Renames a category and moves its materials along; renaming onto an existing category merges the two. */
+  public async renameStockCategory(from: string, to: string): Promise<string> {
+    const response = await this.formMutation('/api/stock-categories/rename', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to })
+    });
+    const { data } = await response.json() as { data: { categories: string[]; name: string } };
+    this.state.settings = { ...this.state.settings, stockCategories: JSON.stringify(data.categories) };
+    this.state.stockItems = this.state.stockItems.map(item => item.category === from ? { ...item, category: data.name } : item);
+    this.notify();
+    return data.name;
   }
 
   // --- Recipe Methods ---

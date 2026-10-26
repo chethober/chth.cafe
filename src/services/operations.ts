@@ -10,6 +10,8 @@ export function ensureFeatureTables(db: D1Database) {
       const { results: orderColumns } = await db.prepare('PRAGMA table_info(orders)').all();
       if (!orderColumns.some(column => column.name === 'customer_id')) await db.prepare('ALTER TABLE orders ADD COLUMN customer_id TEXT').run();
       await db.prepare('CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id)').run();
+      const { results: itemColumns } = await db.prepare('PRAGMA table_info(order_items)').all();
+      if (!itemColumns.some(column => column.name === 'discount_amount')) await db.prepare('ALTER TABLE order_items ADD COLUMN discount_amount REAL NOT NULL DEFAULT 0').run();
       // Split at statement boundaries, keeping trigger bodies intact.
       const statements = migration.match(/DROP TRIGGER[^;]*;|CREATE TRIGGER[\s\S]*?\nEND;|CREATE (?:TABLE|INDEX)[\s\S]*?;/g) || [];
       for (const sql of statements) {

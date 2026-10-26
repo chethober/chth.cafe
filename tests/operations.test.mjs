@@ -22,7 +22,7 @@ try {
   check(embeddedMigration.slice(embeddedMigration.indexOf('`')+1,embeddedMigration.lastIndexOf('`')),await readFile('migrations/0002_operations.sql','utf8')+(await readFile('migrations/0003_sync_and_indexes.sql','utf8')).replace(/^--.*\n/,'')+(await readFile('migrations/0004_cancel_keeps_stock.sql','utf8')).replace(/^--.*\n/,'')+(await readFile('migrations/0005_customers.sql','utf8')).replace(/^--.*\n/,'')+(await readFile('migrations/0006_events.sql','utf8')).replace(/^--.*\n/,''));
   const db = await mf.getD1Database('DB');
   // Start with the old schema to exercise the upgrade path, then seed real D1.
-  const schema = (await readFile('schema.sql','utf8')).replace(/^--.*$/gm,'').replace(/  time_zone TEXT[^\n]*\n/g,'').replace(/  allergens TEXT[^\n]*\n/g,'').replace(/  dietary_labels TEXT[^\n]*\n/g,'').replace(/  customer_id TEXT[^\n]*\n/g,'');
+  const schema = (await readFile('schema.sql','utf8')).replace(/^--.*$/gm,'').replace(/  time_zone TEXT[^\n]*\n/g,'').replace(/  allergens TEXT[^\n]*\n/g,'').replace(/  dietary_labels TEXT[^\n]*\n/g,'').replace(/  customer_id TEXT[^\n]*\n/g,'').replace(/  stock_categories TEXT[^\n]*\n/g,'').replace(/  discount_amount REAL NOT NULL DEFAULT 0, --[^\n]*\n/g,'');
   const statements = schema.match(/CREATE TRIGGER[\s\S]*?\nEND;|CREATE TABLE[\s\S]*?;|INSERT[\s\S]*?;/g);
   for (const sql of statements) if (!/CREATE TRIGGER|CREATE TABLE IF NOT EXISTS (inventory_movements|reconciliations|order_requests|customers|events|event_bookings)/.test(sql)) await db.prepare(sql).run();
   // Databases created before cancelling stopped restocking still carry this trigger; the Worker must drop it.
@@ -182,6 +182,71 @@ try {
   check((await request('/api/stock/stock-1',{quantity:3},true,'PUT')).status,200);
   check(Number((await db.prepare("SELECT quantity FROM stock_items WHERE id='stock-1'").first()).quantity),3);
   check((await request('/api/stock/stock-1',{quantity:-2},true,'PUT')).status,400);
+  // A material with stock history (its movements reference it) can still be deleted, together with its history and recipes.
+  response=await request('/api/stock',{id:'stock-doomed',name:'Doomed syrup',category:'Syrups & Flavors',quantity:4,unit:'liters',unitCost:2,minThreshold:1},true);check(response.status,200);
+  await db.prepare("INSERT INTO recipes (id,menu_item_id,stock_item_id,quantity_required) VALUES ('rcp-doomed','item-espresso','stock-doomed',0.1)").run();
+  check((await request('/api/stock/stock-doomed',undefined,true,'DELETE')).status,200);
+  check(await db.prepare("SELECT id FROM stock_items WHERE id='stock-doomed'").first(),null);
+  check(await db.prepare("SELECT id FROM recipes WHERE stock_item_id='stock-doomed'").first(),null);
+  check(await db.prepare("SELECT id FROM inventory_movements WHERE stock_item_id='stock-doomed'").first(),null);
+  // Material categories: the admin keeps the list; renaming moves materials along, and a category with materials stays.
+  check((await (await request('/api/admin/settings',undefined,true)).json()).data.stockCategories,null);
+  const usedCategories=(await db.prepare('SELECT DISTINCT category FROM stock_items ORDER BY category').all()).results.map(r=>r.category);
+  response=await request('/api/stock-categories',{categories:[...usedCategories,' Cleaning ','cleaning','']},true,'PUT');check(response.status,200);
+  check((await response.json()).data,[...usedCategories,'Cleaning']);
+  check((await request('/api/stock-categories',{categories:['Cleaning']},true,'PUT')).status,409);
+  check((await request('/api/stock-categories',{categories:['x'.repeat(61)]},true,'PUT')).status,400);
+  check((await panelRequest('/api/stock-categories',{categories:usedCategories},staffCookie,'PUT')).status,403);
+  response=await request('/api/stock-categories/rename',{from:'Cleaning',to:'Cleaning supplies'},true);check(response.status,200);
+  check((await response.json()).data.categories,[...usedCategories,'Cleaning supplies']);
+  // Renaming onto an existing category, in any case, merges the two.
+  response=await request('/api/stock-categories/rename',{from:'Produce',to:'cleaning SUPPLIES'},true);check(response.status,200);
+  check((await response.json()).data,{categories:[...usedCategories.filter(c=>c!=='Produce'),'Cleaning supplies'],name:'Cleaning supplies'});
+  check((await db.prepare("SELECT category FROM stock_items WHERE id='stock-7'").first()).category,'Cleaning supplies');
+  check(JSON.parse((await (await request('/api/admin/settings',undefined,true)).json()).data.stockCategories),[...usedCategories.filter(c=>c!=='Produce'),'Cleaning supplies']);
+  check((await (await request('/api/settings')).json()).data.stockCategories,undefined);
+  // Line discounts: the order's discountAmount is every line discount plus the order discount.
+  const stockNow=async()=>Number(Number((await db.prepare("SELECT quantity FROM stock_items WHERE id='stock-1'").first()).quantity).toFixed(6));
+  const stockStart=await stockNow();
+  const matchaLine=(quantity,discountAmount=0)=>({menuItemId:'item-iced-matcha',itemName:'Matcha',quantity,unitPrice:280,variants:['var-mc-oat'],discountAmount});
+  const staffOrder={id:`ord-${crypto.randomUUID()}`,customerName:'Table 2',orderType:'dine_in',paymentMethod:'card',discountAmount:110,items:[matchaLine(2,60)]};
+  check((await request('/api/orders',{...staffOrder,id:`ord-${crypto.randomUUID()}`,discountAmount:20},true)).status,400);
+  check((await request('/api/orders',{...staffOrder,id:`ord-${crypto.randomUUID()}`,discountAmount:600,items:[matchaLine(2,600)]},true)).status,400);
+  response=await request('/api/orders',staffOrder,true);check(response.status,200);
+  const discounted=(await response.json()).data;
+  check([discounted.subtotal,discounted.discountAmount,discounted.taxAmount,discounted.totalAmount],[560,110,38.25,488.25]);
+  check(await db.prepare('SELECT discount_amount, item_total FROM order_items WHERE order_id=?').bind(discounted.id).first(),{discount_amount:60,item_total:500});
+  check(await stockNow(),near(stockStart-0.03));
+  // Public orders cannot discount lines.
+  response=await request('/api/orders',{...staffOrder,id:`public-${crypto.randomUUID()}`,paymentMethod:'cash',discountAmount:0,items:[matchaLine(1,100)]});check(response.status,200);
+  const publicDiscount=(await response.json()).data;check(publicDiscount.discountAmount,0);check(publicDiscount.totalAmount,303.8);
+  check(await stockNow(),near(stockStart-0.045));
+  // Editing an order replaces its lines and moves stock by the difference, at any stage until it is cancelled.
+  const edit=(items,extra={})=>({customerName:'Table 7',orderType:'takeout',paymentMethod:'cash',discountAmount:items.reduce((sum,i)=>sum+(i.discountAmount||0),0),items,...extra});
+  response=await panelRequest(`/api/orders/${discounted.id}`,edit([matchaLine(1,10)]),staffCookie,'PUT');check(response.status,200);
+  let edited=(await response.json()).data;
+  check([edited.order.customerName,edited.order.orderType,edited.order.paymentMethod,edited.order.status],['Table 7','takeout','cash','pending']);
+  check([edited.order.subtotal,edited.order.discountAmount,edited.order.totalAmount],[280,10,292.95]);
+  check(edited.items.map(i=>[i.quantity,i.discountAmount,i.itemTotal]),[[1,10,270]]);
+  check(await stockNow(),near(stockStart-0.03));
+  check((await request(`/api/orders/${discounted.id}`,edit([matchaLine(1,10)],{discountAmount:5}),true,'PUT')).status,400);
+  check((await request(`/api/orders/${discounted.id}`,edit([]),true,'PUT')).status,400);
+  check((await request(`/api/orders/${discounted.id}`,edit([matchaLine(1)]))).status,401);
+  // Not enough stock refuses the whole change.
+  await db.prepare("UPDATE stock_items SET quantity=0.02 WHERE id='stock-1'").run();
+  check((await request(`/api/orders/${discounted.id}`,edit([matchaLine(3)]),true,'PUT')).status,409);
+  check((await db.prepare('SELECT quantity FROM order_items WHERE order_id=?').bind(discounted.id).first()).quantity,1);
+  check(Number((await db.prepare('SELECT total_amount FROM orders WHERE id=?').bind(discounted.id).first()).total_amount),292.95);
+  await db.prepare("UPDATE stock_items SET quantity=? WHERE id='stock-1'").bind(stockStart-0.03).run();
+  for (const status of ['preparing','ready','completed']) check((await request(`/api/orders/${discounted.id}/status`,{status},true,'PUT')).status,200);
+  check((await panelRequest(`/api/orders/${discounted.id}`,edit([matchaLine(2)]),staffCookie,'PUT')).status,403);
+  response=await request(`/api/orders/${discounted.id}`,edit([matchaLine(2),{menuItemId:`custom-${crypto.randomUUID()}`,itemName:'Corkage',quantity:1,unitPrice:50,variants:[]}]),true,'PUT');check(response.status,200);
+  edited=(await response.json()).data;check([edited.order.status,edited.order.subtotal,edited.items.length],['completed',610,2]);
+  check(await stockNow(),near(stockStart-0.045));
+  check((await request(`/api/orders/${publicDiscount.id}/status`,{status:'cancelled'},true,'PUT')).status,200);
+  check((await request(`/api/orders/${publicDiscount.id}`,edit([matchaLine(1)]),true,'PUT')).status,409);
+  for (const id of [discounted.id,publicDiscount.id]) check((await request(`/api/orders/${id}`,undefined,true,'DELETE')).status,200);
+  check(await stockNow(),near(stockStart));
   check((await request('/api/inventory-movements')).status,401);
   check((await request('/api/reconciliation?date=2026-10-02')).status,401);
   const date = new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Boxes, CheckSquare, ChefHat, Clock, History, LayoutGrid, Plus, Receipt, ShoppingBag, Shuffle, Tag, Trash2, Users } from 'lucide-react';
+import { Boxes, CheckSquare, ChefHat, Clock, History, LayoutGrid, Pencil, Plus, Receipt, ShoppingBag, Shuffle, Tag, Users } from 'lucide-react';
 import {
   OrderSelect,
   OrderItemSelect,
@@ -12,15 +12,18 @@ import {
   MenuVariantSelect,
   CustomerSelect
 } from '../db/schema';
-import { store } from '../db/store';
+import { store, orderAmounts } from '../db/store';
 import {
   AffixInput, Avatar, Badge, Button, Card, Chips, ConfirmDialog, Dialog, EmptyState, Field, FormDialog, IconButton, Input,
-  KeyValue, List, ListItem, Meter, Notice, Page, PageHeader, SearchInput, Segmented, Select, Stat, StatGrid, Stepper, Switch,
+  KeyValue, List, ListItem, Meter, Notice, Page, PageHeader, SearchInput, Segmented, Select, Stat, StatGrid, Switch,
   ageLabel, formatDate, reducedMotion, formatTime, localDateKey, minutesSince, money, orderTypeLabel, paymentLabel, plural, timestampForDay,
   ORDER_PAYMENT_METHODS, OrderPaymentMethod
 } from '../ui';
 import { CustomerClub, CustomerPicker } from './CustomerClub';
-import { MenuPicker, OrderDetailsDialog, TaskFormDialog, TaskRow, TASK_CATEGORIES, TASK_CATEGORY_ICONS, nextTaskStatus } from './shared';
+import {
+  MenuPicker, OrderDetailsDialog, OrderEditDialog, OrderLinesEditor, TaskFormDialog, TaskRow, TASK_CATEGORIES, TASK_CATEGORY_ICONS, nextTaskStatus,
+  addMenuItem, discountOff, lineQuantities, toOrderLines, type DiscountType, type EditableLine
+} from './shared';
 
 export type PanelSection = 'orders' | 'pos' | 'customers' | 'events' | 'tasks' | 'shifts';
 type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
@@ -41,8 +44,6 @@ interface PanelManagerProps {
   customers: CustomerSelect[];
   onStateChange: () => void;
 }
-
-interface CartLine { menuItemId: string; itemName: string; quantity: number; unitPrice: number }
 
 const LANES: { status: 'pending' | 'preparing' | 'ready'; label: string; color: string; next: OrderStatus; action: string }[] = [
   { status: 'pending', label: 'Waiting', color: 'var(--ws-warning)', next: 'preparing', action: 'Start prep' },
@@ -75,6 +76,9 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
   const [historyLimit, setHistoryLimit] = useState(30);
   const [detailsOrder, setDetailsOrder] = useState<OrderSelect | null>(null);
   const [cancelTarget, setCancelTarget] = useState<OrderSelect | null>(null);
+  const [editTarget, setEditTarget] = useState<OrderSelect | null>(null);
+  // Orders still on this device are edited once they reach the server.
+  const canEdit = (order: OrderSelect) => ['pending', 'preparing', 'ready'].includes(order.status) && !store.isQueuedOrder(order.id);
 
   const itemsByOrder = useMemo(() => {
     const map = new Map<string, OrderItemSelect[]>();
@@ -101,7 +105,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
   const showOrders = (lane: 'pending' | 'preparing' | 'ready') => { onNavigate('orders'); setOrderView('board'); setMobileLane(lane); };
 
   /* ---------------------------------------------------------------- POS */
-  const [cart, setCart] = useState<CartLine[]>([]);
+  const [cart, setCart] = useState<EditableLine[]>([]);
   const [posOpen, setPosOpen] = useState<string[]>([]);
   const [posSearch, setPosSearch] = useState('');
   const [posCustomer, setPosCustomer] = useState('');
@@ -110,7 +114,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
   const [posPayment, setPosPayment] = useState<OrderPaymentMethod>('card');
   const [posDate, setPosDate] = useState(() => localDateKey());
   const [posDiscount, setPosDiscount] = useState('');
-  const [posDiscountType, setPosDiscountType] = useState<'percent' | 'fixed'>('percent');
+  const [posDiscountType, setPosDiscountType] = useState<DiscountType>('percent');
   const [savingOrder, setSavingOrder] = useState(false);
   const [orderError, setOrderError] = useState('');
   const [orderPlaced, setOrderPlaced] = useState('');
@@ -120,27 +124,18 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
   const [customPrice, setCustomPrice] = useState('');
   const ticketRef = useRef<HTMLDivElement>(null);
 
-  // Immutable updates: StrictMode double-invokes updaters, so mutating would double-count.
   const addToCart = (item: MenuItemSelect) => {
     if (!item.isInStock) return;
     setOrderPlaced('');
-    setCart(prev => prev.some(l => l.menuItemId === item.id)
-      ? prev.map(l => l.menuItemId === item.id ? { ...l, quantity: l.quantity + 1 } : l)
-      : [...prev, { menuItemId: item.id, itemName: item.name, quantity: 1, unitPrice: item.basePrice }]);
+    setCart(prev => addMenuItem(prev, item));
   };
-  const changeQty = (id: string, delta: number) =>
-    setCart(prev => prev.flatMap(l => l.menuItemId !== id ? [l] : l.quantity + delta > 0 ? [{ ...l, quantity: l.quantity + delta }] : []));
-  const changePrice = (id: string, price: number) =>
-    setCart(prev => prev.map(l => l.menuItemId === id ? { ...l, unitPrice: Math.max(0, price) } : l));
-  const removeLine = (id: string) => setCart(prev => prev.filter(l => l.menuItemId !== id));
 
   const cartCount = cart.reduce((sum, l) => sum + l.quantity, 0);
-  const subtotal = cart.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
-  const discountValue = parseFloat(posDiscount) || 0;
-  const discount = Math.min(subtotal, Math.max(0, posDiscountType === 'percent' ? (subtotal * discountValue) / 100 : discountValue));
-  const taxable = subtotal - discount;
-  const tax = (taxable * settings.taxRate) / 100;
-  const total = taxable + tax;
+  const cartLines = toOrderLines(cart);
+  const lineDiscounts = cartLines.reduce((sum, l) => sum + (l.discountAmount || 0), 0);
+  // The order discount applies to what is left after item discounts.
+  const orderDiscount = discountOff(cartLines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0) - lineDiscounts, posDiscount, posDiscountType);
+  const { subtotal, discountAmount: discount, taxAmount: tax, totalAmount: total } = orderAmounts(cartLines, orderDiscount, settings.taxRate);
 
   const submitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,10 +149,10 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
         customerId: posMember?.id,
         orderType: posOrderType,
         paymentMethod: posPayment,
-        discountAmount: discount,
+        discountAmount: orderDiscount,
         status: 'pending',
         createdAt: timestampForDay(posDate),
-        items: cart.map(l => ({ menuItemId: l.menuItemId, itemName: l.itemName, quantity: l.quantity, unitPrice: l.unitPrice, variants: [] }))
+        items: cartLines
       });
     } catch (error) {
       setOrderError(error instanceof Error ? error.message : 'Order could not be saved.');
@@ -178,7 +173,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
     e.preventDefault();
     const price = parseFloat(customPrice);
     if (!customName.trim() || Number.isNaN(price) || price < 0) return;
-    setCart(prev => [...prev, { menuItemId: `custom-${crypto.randomUUID()}`, itemName: customName.trim(), quantity: 1, unitPrice: price }]);
+    setCart(prev => [...prev, { key: crypto.randomUUID(), menuItemId: `custom-${crypto.randomUUID()}`, itemName: customName.trim(), quantity: 1, unitPrice: price, variants: [], discount: '', discountType: 'percent' }]);
     setCustomName('');
     setCustomPrice('');
     setCustomOpen(false);
@@ -189,7 +184,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
   const visibleMenu = menuItems.filter(item => posQuery
     ? item.name.toLowerCase().includes(posQuery)
     : !posOpen.length || posOpen.includes(categories.some(c => c.id === item.categoryId) ? item.categoryId : 'other'));
-  const cartQuantities = Object.fromEntries(cart.map(l => [l.menuItemId, l.quantity]));
+  const cartQuantities = lineQuantities(cart);
 
   // "Pick for me": a short reel through the in-stock items on screen that slows to a stop, like the public menu's.
   const [pick, setPick] = useState<{ phase: 'idle' | 'spinning' | 'landed'; itemId: string | null; tick: number }>({ phase: 'idle', itemId: null, tick: 0 });
@@ -321,6 +316,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                             </div>
                             <div className="ws-ticket-foot" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
                               <Button size="sm" variant="danger-ghost" onClick={() => setCancelTarget(order)}>Cancel</Button>
+                              {canEdit(order) && <Button size="sm" variant="ghost" icon={<Pencil />} onClick={() => setEditTarget(order)}>Edit</Button>}
                               <Button size="sm" variant={lane.status === 'ready' ? 'accent' : 'primary'} onClick={() => updateOrderStatus(order.id, lane.next)}>{lane.action}</Button>
                             </div>
                           </article>
@@ -414,21 +410,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                   {cart.length === 0 ? (
                     <div className="ws-lane-empty"><Receipt width={20} height={20} style={{ margin: '0 auto 8px' }} />The order is empty.</div>
                   ) : (
-                    <ul className="ws-list" style={{ margin: '0 calc(var(--ws-pad) * -1)' }}>
-                      {cart.map(line => (
-                        <li key={line.menuItemId} className="ws-list-item" style={{ flexWrap: 'wrap', gap: 8 }}>
-                          <div className="ws-list-main" style={{ flexBasis: '100%' }}>
-                            <div className="ws-list-title"><span className="ws-truncate">{line.itemName}</span></div>
-                          </div>
-                          <Stepper label={`${line.itemName} quantity`} value={line.quantity} onDecrement={() => changeQty(line.menuItemId, -1)} onIncrement={() => changeQty(line.menuItemId, 1)} />
-                          <div style={{ width: 104 }}>
-                            <AffixInput affix={currency} aria-label={`${line.itemName} unit price`} type="number" inputMode="decimal" step="any" min="0" value={line.unitPrice} onChange={e => changePrice(line.menuItemId, parseFloat(e.target.value) || 0)} style={{ minHeight: 36, paddingRight: 6 }} />
-                          </div>
-                          <span className="ws-amount" style={{ marginLeft: 'auto' }}>{fmt(line.unitPrice * line.quantity)}</span>
-                          <IconButton label={`Remove ${line.itemName}`} variant="danger-ghost" onClick={() => removeLine(line.menuItemId)}><Trash2 /></IconButton>
-                        </li>
-                      ))}
-                    </ul>
+                    <OrderLinesEditor lines={cart} onChange={setCart} currency={currency} editablePrice flush />
                   )}
 
                   <Segmented block label="Order type" value={posOrderType} onChange={setPosOrderType} options={[
@@ -443,13 +425,13 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                     )}</Field>
                     <Field label="Order date" hint={posDate !== localDateKey() ? 'Back-dated order' : undefined}>{id => <Input id={id} type="date" value={posDate} max={localDateKey()} onChange={e => setPosDate(e.target.value || localDateKey())} />}</Field>
                   </div>
-                  <Field label="Discount" aside={
+                  <Field label="Order discount" hint={lineDiscounts > 0 ? 'On top of the item discounts' : undefined} aside={
                     <Segmented label="Discount type" value={posDiscountType} onChange={setPosDiscountType} options={[{ value: 'percent', label: '%' }, { value: 'fixed', label: currency }]} />
                   }>{id => <Input id={id} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" value={posDiscount} onChange={e => setPosDiscount(e.target.value)} />}</Field>
                   <KeyValue
                     items={[
                       { label: 'Subtotal', value: fmt(subtotal) },
-                      ...(discount > 0 ? [{ label: 'Discount', value: `−${fmt(discount)}`, tone: 'positive' as const }] : []),
+                      ...(discount > 0 ? [{ label: 'Discounts', value: `−${fmt(discount)}`, tone: 'positive' as const }] : []),
                       { label: `Tax (${settings.taxRate}%)`, value: fmt(tax) }
                     ]}
                     total={{ label: 'Total', value: fmt(total) }}
@@ -568,9 +550,20 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
         currency={currency}
         taxRate={settings.taxRate}
         onClose={() => setDetailsOrder(null)}
-        actions={detailsOrder && ['pending', 'preparing', 'ready'].includes(detailsOrder.status) && (
+        actions={detailsOrder && ['pending', 'preparing', 'ready'].includes(detailsOrder.status) && <>
           <span className="ws-spacer"><Button variant="danger-ghost" onClick={() => { setCancelTarget(detailsOrder); setDetailsOrder(null); }}>Cancel order</Button></span>
-        )}
+          {canEdit(detailsOrder) && <Button icon={<Pencil />} onClick={() => { setEditTarget(detailsOrder); setDetailsOrder(null); }}>Edit</Button>}
+        </>}
+      />
+
+      <OrderEditDialog
+        order={editTarget}
+        items={editTarget ? itemsByOrder.get(editTarget.id) || [] : []}
+        settings={settings}
+        categories={categories}
+        menuItems={menuItems}
+        onClose={() => setEditTarget(null)}
+        onSaved={onStateChange}
       />
 
       <ConfirmDialog
