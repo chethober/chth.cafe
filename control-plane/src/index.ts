@@ -1,10 +1,11 @@
 import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import schema from '../schema.sql';
-import { hashPassword, safeEqual, verifyPassword } from '../../src/utils/passwords';
+import { safeEqual } from '../../src/utils/passwords';
 import { CloudflareClient, CloudflareError, checkAccess, deleteCafe, deployCafe, setSetupToken, type CafeResources, type Release } from './cloudflare';
 import { decrypt, encrypt, randomToken, sha256 } from './crypto';
 import { authorizeUrl, exchangeCode, newVerifier, oauthConfigured, refresh, revoke, type Credentials, type OAuthEnv } from './oauth';
+import { applyTheme, FAVICON, THEME_COOKIE, THEME_SWITCH_COOKIE, themeScriptSource } from './design';
 import * as views from './views';
 
 type Bindings = OAuthEnv & {
@@ -14,12 +15,14 @@ type Bindings = OAuthEnv & {
   /** 32 random bytes, base64: encrypts the Cloudflare credentials owners connect. */
   ENCRYPTION_KEY: string;
 };
-type Owner = { id: string; email: string };
+/** Owners are Cloudflare accounts: whoever can reach an account with OAuth or a token manages its cafés. */
+type Owner = { id: string; name: string };
 type Env = { Bindings: Bindings; Variables: { owner: Owner | null; session: string | null } };
 type C = Context<Env>;
 
 const SESSION_DAYS = 7;
 const SESSION_COOKIE = 'cp_session';
+const OAUTH_COOKIE = 'cp_oauth';
 
 const ready = new WeakMap<object, Promise<void>>();
 function ensureSchema(db: D1Database) {
@@ -64,6 +67,8 @@ async function attempts(c: C, action: string) {
 }
 
 async function startSession(c: C, ownerId: string) {
+  const previous = c.get('session');
+  if (previous) await c.env.DB.prepare('DELETE FROM sessions WHERE id_hash = ?').bind(await sha256(previous)).run();
   const token = randomToken();
   await c.env.DB.prepare('INSERT INTO sessions (id_hash, owner_id, expires_at) VALUES (?, ?, ?)').bind(await sha256(token), ownerId, Date.now() + SESSION_DAYS * 86400000).run();
   // Lax, not Strict: Cloudflare's OAuth consent redirects back here, and that top-level navigation must carry the session.
@@ -91,25 +96,26 @@ async function clientFor(c: C, connection: ConnectionRow) {
   return new CloudflareClient(credentials.kind === 'token' ? credentials.token : credentials.accessToken);
 }
 
-/** Saves a verified connection to one of the accounts the credentials reach. */
-async function connect(c: C, method: 'token' | 'oauth', credentials: Credentials, preferredAccount?: string) {
+/** Signs in as one of the accounts the credentials reach, after checking they can deploy a café there. */
+async function signIn(c: C, method: 'token' | 'oauth', credentials: Credentials, preferredAccount?: string) {
   const client = new CloudflareClient(credentials.kind === 'token' ? credentials.token : credentials.accessToken);
   const accounts = await client.accounts();
   if (!accounts.length) throw new CloudflareError('These credentials do not reach any Cloudflare account.', 403);
   const account = preferredAccount ? accounts.find(a => a.id === preferredAccount) : accounts[0];
   if (!account) throw new CloudflareError('These credentials cannot reach that account ID.', 403);
   await checkAccess(client, account.id);
-  const ownerId = c.get('owner')!.id;
+  const ownerId = account.id;
   await c.env.DB.prepare(`INSERT INTO connections (owner_id, method, account_id, account_name, credentials, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(owner_id) DO UPDATE SET method = excluded.method, account_id = excluded.account_id, account_name = excluded.account_name, credentials = excluded.credentials, updated_at = excluded.updated_at`)
     .bind(ownerId, method, account.id, account.name, await encrypt(c.env.ENCRYPTION_KEY, ownerId, credentials), now(), now()).run();
-  await audit(c, 'connect', `${method} ${account.id}`);
+  c.set('owner', { id: ownerId, name: account.name });
+  await startSession(c, ownerId);
+  await audit(c, 'connect', method);
 }
 
 const message = (error: unknown) => error instanceof Error ? error.message : 'Something went wrong. Please try again.';
 const FLASH: Record<string, string> = {
-  connected: 'Your Cloudflare account is connected.',
-  disconnected: 'Disconnected. Your cafés keep running.',
+  connected: 'Signed in with your Cloudflare account.',
   account: 'Switched Cloudflare account.',
   forgotten: 'The café is no longer managed here. It keeps running in your account.',
   deleted: 'The café and its data were deleted from your Cloudflare account.'
@@ -121,24 +127,38 @@ const slug = (name: string) => name.toLowerCase().normalize('NFKD').replace(/[^a
 
 const app = new Hono<Env>();
 
+// Pages render without a theme; the saved one is applied here so no view has to know about it.
+app.use('*', async (c, next) => {
+  await next();
+  if (!c.res.headers.get('Content-Type')?.startsWith('text/html')) return;
+  const switched = getCookie(c, THEME_SWITCH_COOKIE) === '1';
+  const res = c.res;
+  const headers = new Headers(res.headers);
+  headers.delete('Content-Length');
+  c.res = new Response(applyTheme(await res.text(), getCookie(c, THEME_COOKIE), switched), { status: res.status, headers });
+  if (switched) deleteCookie(c, THEME_SWITCH_COOKIE, { path: '/' });
+});
+
 app.use('*', async (c, next) => {
   await ensureSchema(c.env.DB);
   c.header('X-Frame-Options', 'DENY');
-  c.header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self' https://dash.cloudflare.com; frame-ancestors 'none'; base-uri 'none'");
+  // The only script is the theme toggle, allowed by its hash.
+  c.header('Content-Security-Policy', `default-src 'none'; script-src ${await themeScriptSource()}; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self' https://dash.cloudflare.com; frame-ancestors 'none'; base-uri 'none'`);
   // same-origin, not no-referrer: with no-referrer, browsers send "Origin: null" on form posts, which the origin check refuses.
   c.header('Referrer-Policy', 'same-origin');
   const token = getCookie(c, SESSION_COOKIE);
   let owner: Owner | null = null;
   if (token) {
-    owner = await c.env.DB.prepare('SELECT o.id, o.email FROM sessions s JOIN owners o ON o.id = s.owner_id WHERE s.id_hash = ? AND s.expires_at > ?').bind(await sha256(token), Date.now()).first<Owner>();
+    // A session lasts only while the account's access is saved: disconnecting signs every browser out.
+    owner = await c.env.DB.prepare('SELECT c.owner_id AS id, c.account_name AS name FROM sessions s JOIN connections c ON c.owner_id = s.owner_id WHERE s.id_hash = ? AND s.expires_at > ?').bind(await sha256(token), Date.now()).first<Owner>();
   }
   c.set('owner', owner);
   c.set('session', owner ? token! : null);
   if (c.req.method === 'POST') {
-    // Forms only come from this origin; signed-in forms also carry the session's CSRF token.
+    // Forms only come from this origin; signed-in forms, other than signing in again, also carry the session's CSRF token.
     const origin = c.req.header('Origin');
     if (origin && origin !== new URL(c.req.url).origin) return c.html(views.errorPage('This form was sent from another site.'), 403);
-    if (owner && !['/signin', '/signup'].includes(c.req.path)) {
+    if (owner && c.req.path !== '/connect/token' && c.req.path !== '/theme') {
       const form = await c.req.parseBody();
       if (typeof form.csrf !== 'string' || !(await safeEqual(form.csrf, await csrfFor(token!)))) return c.html(views.errorPage('This form expired. Go back, reload the page and try again.'), 403);
     }
@@ -147,47 +167,38 @@ app.use('*', async (c, next) => {
 });
 
 const requireOwner = async (c: C, next: () => Promise<void>) => {
-  if (!c.get('owner')) return c.redirect('/signin');
+  if (!c.get('owner')) return c.redirect('/');
   await next();
 };
 
-app.get('/', c => c.get('owner') ? c.redirect('/dashboard') : c.html(views.landing()));
-app.get('/signup', c => c.html(views.authPage('signup')));
-app.get('/signin', c => c.html(views.authPage('signin')));
+const landing = (c: C, error?: string, status: 200 | 400 | 429 = 200) =>
+  c.html(views.landing({
+    oauth: oauthConfigured(c.env),
+    error: error ?? (c.req.query('error') === 'oauth' ? 'Cloudflare did not sign you in. Try again, or use an API token.' : undefined),
+    message: c.req.query('done') === 'disconnected' ? 'Signed out and forgot your Cloudflare access. Your cafés keep running.' : undefined
+  }), status);
 
-app.post('/signup', async c => {
+app.get('/', c => c.get('owner') ? c.redirect('/dashboard') : landing(c));
+
+const favicon = (c: C) => c.body(FAVICON, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' });
+app.get('/favicon.svg', favicon);
+app.get('/favicon.ico', favicon);
+
+/** Saves the theme and goes back to the page it was chosen on, which then reveals it from the toggle. */
+app.post('/theme', async c => {
   const form = await c.req.parseBody();
-  const email = String(form.email || '').trim().toLowerCase();
-  const password = String(form.password || '');
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) return c.html(views.authPage('signup', 'Enter a valid email address.', email), 400);
-  if (password.length < 12 || password.length > 200) return c.html(views.authPage('signup', 'Use a password of 12 to 200 characters.', email), 400);
-  const limit = await attempts(c, 'signup');
-  if (limit.blocked) return c.html(views.authPage('signup', 'Too many attempts. Try again in 15 minutes.', email), 429);
-  const id = crypto.randomUUID();
+  const theme = form.theme === 'light' ? 'light' : 'dark';
+  const secure = new URL(c.req.url).protocol === 'https:';
+  setCookie(c, THEME_COOKIE, theme, { secure, sameSite: 'Lax', path: '/', maxAge: 365 * 86400 });
+  setCookie(c, THEME_SWITCH_COOKIE, '1', { secure, sameSite: 'Lax', path: '/', maxAge: 30 });
+  let back = '/';
   try {
-    await c.env.DB.prepare('INSERT INTO owners (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)').bind(id, email, await hashPassword(password), now()).run();
-  } catch (error) {
-    await limit.fail();
-    if (String(error).includes('UNIQUE')) return c.html(views.authPage('signup', 'An account with this email already exists. Sign in instead.', email), 409);
-    throw error;
-  }
-  await startSession(c, id);
-  return c.redirect('/dashboard', 303);
-});
-
-app.post('/signin', async c => {
-  const form = await c.req.parseBody();
-  const email = String(form.email || '').trim().toLowerCase();
-  const limit = await attempts(c, 'signin');
-  if (limit.blocked) return c.html(views.authPage('signin', 'Too many attempts. Try again in 15 minutes.', email), 429);
-  const owner = await c.env.DB.prepare('SELECT id, password_hash FROM owners WHERE email = ?').bind(email).first<{ id: string; password_hash: string }>();
-  if (!owner || !(await verifyPassword(String(form.password || ''), owner.password_hash))) {
-    await limit.fail();
-    return c.html(views.authPage('signin', 'The email or password is incorrect.', email), 401);
-  }
-  await limit.clear();
-  await startSession(c, owner.id);
-  return c.redirect('/dashboard', 303);
+    const referer = new URL(c.req.header('Referer') || '');
+    // Only pages that can be loaded again; a page shown after a form goes to the dashboard.
+    if (referer.origin === new URL(c.req.url).origin && /^\/(?:dashboard|cafes\/new|cafes\/[\w-]+\/delete)?$/.test(referer.pathname)) back = referer.pathname;
+    else if (c.get('owner')) back = '/dashboard';
+  } catch { /* no referer: go home */ }
+  return c.redirect(back, 303);
 });
 
 app.post('/signout', async c => {
@@ -198,7 +209,7 @@ app.post('/signout', async c => {
 });
 
 app.use('/dashboard', requireOwner);
-app.use('/connect/*', requireOwner);
+app.use('/connect/account', requireOwner);
 app.use('/disconnect', requireOwner);
 app.use('/cafes', requireOwner);
 app.use('/cafes/*', requireOwner);
@@ -221,13 +232,13 @@ app.get('/dashboard', async c => {
     c.env.DB.prepare('SELECT * FROM cafes WHERE owner_id = ? ORDER BY created_at').bind(owner.id).all<CafeRow>()
   ]);
   let accounts: { id: string; name: string }[] | undefined;
-  let error = c.req.query('error') === 'oauth' ? 'Cloudflare did not connect your account. Try again, or use an API token.' : undefined;
+  let error: string | undefined;
   if (connection) {
-    try { accounts = await (await clientFor(c, connection)).accounts(); } catch (e) { error = `Cloudflare is not accepting the saved access: ${message(e)} Disconnect and connect again.`; }
+    try { accounts = await (await clientFor(c, connection)).accounts(); } catch (e) { error = `Cloudflare is not accepting the saved access: ${message(e)} Sign out and sign in again.`; }
   }
   const pending = await Promise.all(cafes.map(setupPending));
   return c.html(views.dashboard({
-    email: owner.email, csrf: await csrfFor(c.get('session')!), oauth: oauthConfigured(c.env), currentVersion: release.version, accounts,
+    accountName: owner.name, csrf: await csrfFor(c.get('session')!), oauth: oauthConfigured(c.env), currentVersion: release.version, accounts,
     message: FLASH[c.req.query('done') || ''], error,
     connection: connection && { method: connection.method, accountId: connection.account_id, accountName: connection.account_name },
     cafes: cafes.map((cafe, i) => ({
@@ -242,37 +253,41 @@ app.post('/connect/token', async c => {
   const token = String(form.token || '').trim();
   const accountId = String(form.accountId || '').trim() || undefined;
   const limit = await attempts(c, 'token');
-  if (limit.blocked) return c.html(views.errorPage('Too many attempts. Try again in 15 minutes.'), 429);
+  if (limit.blocked) return landing(c, 'Too many attempts. Try again in 15 minutes.', 429);
   try {
-    await connect(c, 'token', { kind: 'token', token }, accountId);
+    await signIn(c, 'token', { kind: 'token', token }, accountId);
   } catch (error) {
     await limit.fail();
-    return c.html(views.errorPage(message(error)), 400);
+    return landing(c, message(error), 400);
   }
+  await limit.clear();
   return c.redirect('/dashboard?done=connected', 303);
 });
 
 app.get('/connect/oauth', async c => {
-  if (!oauthConfigured(c.env)) return c.html(views.errorPage('Connecting with Cloudflare is not set up on this control plane. Use an API token instead.'), 404);
+  if (!oauthConfigured(c.env)) return landing(c, 'Signing in with Cloudflare is not set up here yet. Use an API token instead.', 400);
   const state = randomToken();
   const verifier = newVerifier();
-  await c.env.DB.prepare('DELETE FROM oauth_states WHERE expires_at < ?').bind(Date.now()).run();
-  await c.env.DB.prepare('INSERT INTO oauth_states (state_hash, owner_id, verifier, expires_at) VALUES (?, ?, ?, ?)').bind(await sha256(state), c.get('owner')!.id, verifier, Date.now() + 10 * 60000).run();
+  await c.env.DB.prepare('DELETE FROM oauth_logins WHERE expires_at < ?').bind(Date.now()).run();
+  await c.env.DB.prepare('INSERT INTO oauth_logins (state_hash, verifier, expires_at) VALUES (?, ?, ?)').bind(await sha256(state), verifier, Date.now() + 10 * 60000).run();
+  // The state also goes in a cookie, so a callback link made in another browser cannot sign this one in.
+  setCookie(c, OAUTH_COOKIE, state, { httpOnly: true, secure: new URL(c.req.url).protocol === 'https:', sameSite: 'Lax', path: '/connect/oauth', maxAge: 600 });
   return c.redirect(await authorizeUrl(c.env, new URL('/connect/oauth/callback', c.req.url).toString(), state, verifier));
 });
 
 app.get('/connect/oauth/callback', async c => {
   const state = c.req.query('state') || '';
   const code = c.req.query('code') || '';
-  const stateHash = await sha256(state);
-  // The state is single use and must belong to the owner who started the flow.
-  const row = await c.env.DB.prepare('DELETE FROM oauth_states WHERE state_hash = ? AND owner_id = ? AND expires_at > ? RETURNING verifier').bind(stateHash, c.get('owner')!.id, Date.now()).first<{ verifier: string }>();
-  if (!row || !code || c.req.query('error')) return c.redirect('/dashboard?error=oauth', 303);
+  if (!state || !(await safeEqual(state, getCookie(c, OAUTH_COOKIE) || ''))) return c.redirect('/?error=oauth', 303);
+  deleteCookie(c, OAUTH_COOKIE, { path: '/connect/oauth' });
+  // The state is single use.
+  const row = await c.env.DB.prepare('DELETE FROM oauth_logins WHERE state_hash = ? AND expires_at > ? RETURNING verifier').bind(await sha256(state), Date.now()).first<{ verifier: string }>();
+  if (!row || !code || c.req.query('error')) return c.redirect('/?error=oauth', 303);
   try {
     const credentials = await exchangeCode(c.env, code, row.verifier, new URL('/connect/oauth/callback', c.req.url).toString());
-    await connect(c, 'oauth', credentials);
+    await signIn(c, 'oauth', credentials);
   } catch (error) {
-    return c.html(views.errorPage(message(error)), 400);
+    return landing(c, message(error), 400);
   }
   return c.redirect('/dashboard?done=connected', 303);
 });
@@ -285,7 +300,7 @@ app.post('/connect/account', async c => {
     // Refreshes an expiring OAuth token first, then reads the saved credentials back.
     await clientFor(c, connection);
     const saved = (await connectionOf(c))!;
-    await connect(c, saved.method, await decrypt<Credentials>(c.env.ENCRYPTION_KEY, c.get('owner')!.id, saved.credentials), String(form.accountId || ''));
+    await signIn(c, saved.method, await decrypt<Credentials>(c.env.ENCRYPTION_KEY, c.get('owner')!.id, saved.credentials), String(form.accountId || ''));
   } catch (error) {
     return c.html(views.errorPage(message(error)), 400);
   }
@@ -297,9 +312,11 @@ app.post('/disconnect', async c => {
   if (connection) {
     await revoke(c.env, await decrypt<Credentials>(c.env.ENCRYPTION_KEY, c.get('owner')!.id, connection.credentials).catch(() => ({ kind: 'token', token: '' }) as Credentials));
     await c.env.DB.prepare('DELETE FROM connections WHERE owner_id = ?').bind(c.get('owner')!.id).run();
-    await audit(c, 'disconnect', connection.account_id);
+    await c.env.DB.prepare('DELETE FROM sessions WHERE owner_id = ?').bind(c.get('owner')!.id).run();
+    await audit(c, 'disconnect', connection.method);
   }
-  return c.redirect('/dashboard?done=disconnected', 303);
+  deleteCookie(c, SESSION_COOKIE, { path: '/' });
+  return c.redirect('/?done=disconnected', 303);
 });
 
 app.get('/cafes/new', async c => c.html(views.newCafe({ csrf: await csrfFor(c.get('session')!) })));

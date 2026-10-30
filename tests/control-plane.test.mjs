@@ -5,6 +5,7 @@ import { Miniflare, Log, LogLevel, convertV4MiniflareOptions } from 'miniflare';
 
 // The control plane against a fake Cloudflare API: it must create, update and delete a café with the
 // same calls wrangler makes, keep credentials encrypted, and never let one owner reach another's café.
+// Owners are Cloudflare accounts: the API token reaches acc1, the OAuth token reaches acc2.
 const ASSETS = {
   '/index.html': { body: '<!doctype html><title>Café</title>', hash: 'a'.repeat(32), contentType: 'text/html; charset=utf-8' },
   '/assets/app.js': { body: 'console.log("café")', hash: 'b'.repeat(32), contentType: 'text/javascript; charset=utf-8' }
@@ -50,8 +51,9 @@ async function cloudflare(request) {
     return ok({ jwt: 'assets-complete-jwt' });
   }
   if (auth !== 'Bearer api-token' && auth !== 'Bearer oauth-access') return Response.json({ success: false, errors: [{ code: 10000, message: 'Authentication error' }] }, { status: 403 });
-  if (route === 'GET /accounts') return ok([{ id: 'acc1', name: 'Corner Beans Ltd' }]);
-  if (route === 'GET /accounts/acc1/workers/scripts' || route === 'GET /accounts/acc1/d1/database' || route === 'GET /accounts/acc1/storage/kv/namespaces') return ok([]);
+  const account = auth === 'Bearer oauth-access' ? 'acc2' : 'acc1';
+  if (route === 'GET /accounts') return ok(account === 'acc1' ? [{ id: 'acc1', name: 'Corner Beans Ltd' }] : [{ id: 'acc2', name: 'Stranger Roasters' }]);
+  if ([`GET /accounts/${account}/workers/scripts`, `GET /accounts/${account}/d1/database`, `GET /accounts/${account}/storage/kv/namespaces`].includes(route)) return ok([]);
   if (route === 'GET /accounts/acc1/workers/subdomain') return ok({ subdomain: 'owner' });
   if (route === 'POST /accounts/acc1/d1/database') return ok({ uuid: 'db-1' });
   if (route === 'POST /accounts/acc1/storage/kv/namespaces') return ok({ id: 'kv-1' });
@@ -85,15 +87,17 @@ let checks = 0;
 const check = (actual, expected) => { assert.deepEqual(actual, expected); checks++; };
 const HOST = 'https://cloud.example.com';
 const browser = () => {
-  let cookie = '';
+  const jar = new Map();
   return async (path, form, headers = {}) => {
     const response = await mf.dispatchFetch(`${HOST}${path}`, {
       method: form ? 'POST' : 'GET', redirect: 'manual',
-      headers: { Cookie: cookie, Origin: HOST, ...(form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}), ...headers },
+      headers: { Cookie: [...jar].map(([name, value]) => `${name}=${value}`).join('; '), Origin: HOST, ...(form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}), ...headers },
       ...(form ? { body: new URLSearchParams(form).toString() } : {})
     });
-    const set = response.headers.get('set-cookie');
-    if (set) cookie = set.split(';')[0];
+    for (const set of response.headers.getSetCookie()) {
+      const [, name, value] = /^([^=]+)=([^;]*)/.exec(set);
+      if (/Max-Age=0/i.test(set) || !value) jar.delete(name); else jar.set(name, value);
+    }
     return response;
   };
 };
@@ -105,27 +109,39 @@ try {
   check(response.status, 200);
   // With no-referrer, browsers send "Origin: null" on form posts and every form would be refused.
   check(response.headers.get('referrer-policy'), 'same-origin');
-  check((await browser()('/signup', { email: 'null@example.com', password: 'a-long-owner-password' }, { Origin: 'null' })).status, 403);
-  check((await owner('/dashboard')).headers.get('location'), '/signin');
-  check((await owner('/signup', { email: 'owner@example.com', password: 'short' })).status, 400);
-  response = await owner('/signup', { email: 'Owner@Example.com', password: 'a-long-owner-password' });
-  check([response.status, response.headers.get('location')], [303, '/dashboard']);
-  check((await browser()('/signup', { email: 'owner@example.com', password: 'another-long-password' })).status, 409);
-  response = await owner('/dashboard');
-  const page = await response.text();
-  assert.match(page, /Connect your Cloudflare account/); checks++;
-  assert.match(page, /permissionGroupKeys=/); checks++;
-  const csrf = /name="csrf" value="([^"]+)"/.exec(page)[1];
+  const landing = await response.text();
+  assert.match(landing, /href="\/connect\/oauth"/); checks++;
+  assert.match(landing, /permissionGroupKeys=/); checks++;
+  check((await owner('/favicon.ico')).headers.get('content-type'), 'image/svg+xml');
+  // The theme toggle is a form: it saves the choice, goes back, and only the next page load reveals it.
+  const viewer = browser();
+  response = await viewer('/theme', { theme: 'light' }, { Referer: `${HOST}/` });
+  check([response.status, response.headers.get('location')], [303, '/']);
+  check((await viewer('/theme', { theme: 'dark' }, { Referer: 'https://evil.example/' })).headers.get('location'), '/');
+  check(/<html[^>]*>/.exec(await (await viewer('/')).text())[0], '<html lang="en" data-theme="dark" data-theme-switch>');
+  check(/<html[^>]*>/.exec(await (await viewer('/')).text())[0], '<html lang="en" data-theme="dark">');
+  check(/<html[^>]*>/.exec(landing)[0], '<html lang="en">');
+  // There are no control plane accounts to sign up for.
+  check((await owner('/signup')).status, 404);
+  check((await owner('/signin', { email: 'owner@example.com', password: 'a-long-owner-password' })).status, 404);
+  check((await owner('/dashboard')).headers.get('location'), '/');
 
-  // Forms need the session's CSRF token and this origin.
-  check((await owner('/connect/token', { token: 'api-token' })).status, 403);
-  check((await owner('/connect/token', { token: 'api-token', csrf }, { Origin: 'https://evil.example' })).status, 403);
-  check((await owner('/connect/token', { token: 'wrong-token', csrf })).status, 400);
-  response = await owner('/connect/token', { token: 'api-token', csrf });
+  // Signing in with a token checks it can deploy, from this origin only.
+  check((await browser()('/connect/token', { token: 'api-token' }, { Origin: 'null' })).status, 403);
+  check((await owner('/connect/token', { token: 'api-token' }, { Origin: 'https://evil.example' })).status, 403);
+  response = await owner('/connect/token', { token: 'wrong-token' });
+  check(response.status, 400);
+  assert.match(await response.text(), /Sign in with token/); checks++;
+  response = await owner('/connect/token', { token: 'api-token' });
   check(response.headers.get('location'), '/dashboard?done=connected');
+  const page = await (await owner('/dashboard')).text();
+  assert.match(page, /Corner Beans Ltd/); checks++;
+  const csrf = /name="csrf" value="([^"]+)"/.exec(page)[1];
+  // Signed-in forms need the session's CSRF token.
+  check((await owner('/cafes', { name: 'No token' })).status, 403);
   const db = await mf.getD1Database('DB');
   const connection = await db.prepare('SELECT * FROM connections').first();
-  check([connection.method, connection.account_id, connection.account_name], ['token', 'acc1', 'Corner Beans Ltd']);
+  check([connection.owner_id, connection.method, connection.account_id, connection.account_name], ['acc1', 'token', 'acc1', 'Corner Beans Ltd']);
   assert.ok(!connection.credentials.includes('api-token') && connection.credentials.startsWith('v1.')); checks++;
 
   // First deploy: database, namespace, demo data, assets, Worker, cron, workers.dev, and a one-time setup link.
@@ -171,15 +187,13 @@ try {
   check(scripts.at(-1).metadata.bindings.some(binding => binding.name === 'SETUP_TOKEN'), false);
   check(calls.filter(call => call.method === 'POST' && call.path === '/accounts/acc1/d1/database').length, 1);
 
-  // Another owner cannot see or touch the café.
-  const stranger = browser();
-  await stranger('/signup', { email: 'stranger@example.com', password: 'a-long-stranger-password' });
-  const strangerCsrf = await csrfOf(await stranger('/dashboard'));
-  check((await stranger(`/cafes/${cafe.id}/deploy`, { csrf: strangerCsrf })).status, 404);
-  check((await stranger(`/cafes/${cafe.id}/delete`)).status, 404);
-  check((await stranger(`/cafes/${cafe.id}/deploy`, { csrf })).status, 403);
+  // Anyone who can reach the same account manages the same cafés.
+  const colleague = browser();
+  await colleague('/connect/token', { token: 'api-token' });
+  assert.match(await (await colleague('/dashboard')).text(), /Corner Beans/); checks++;
 
-  // Connect with Cloudflare: PKCE, a single-use state bound to the owner, encrypted tokens, revoked on disconnect.
+  // Sign in with Cloudflare: PKCE, and a single-use state bound to the browser that started it.
+  const stranger = browser();
   response = await stranger('/connect/oauth');
   const authorize = new URL(response.headers.get('location'));
   check([authorize.origin + authorize.pathname, authorize.searchParams.get('client_id'), authorize.searchParams.get('code_challenge_method')], ['https://dash.cloudflare.com/oauth2/auth', 'test-client', 'S256']);
@@ -187,11 +201,18 @@ try {
   check(authorize.searchParams.get('redirect_uri'), `${HOST}/connect/oauth/callback`);
   issuedChallenge = authorize.searchParams.get('code_challenge');
   const state = authorize.searchParams.get('state');
-  // Another owner cannot use the state, and their attempt does not use it up.
-  check((await owner(`/connect/oauth/callback?state=${state}&code=good-code`)).headers.get('location'), '/dashboard?error=oauth');
-  check((await stranger(`/connect/oauth/callback?state=forged&code=good-code`)).headers.get('location'), '/dashboard?error=oauth');
+  // Another browser cannot use the state, and its attempt does not use it up.
+  check((await browser()(`/connect/oauth/callback?state=${state}&code=good-code`)).headers.get('location'), '/?error=oauth');
+  check((await stranger(`/connect/oauth/callback?state=forged&code=good-code`)).headers.get('location'), '/?error=oauth');
   check((await stranger(`/connect/oauth/callback?state=${state}&code=good-code`)).headers.get('location'), '/dashboard?done=connected');
-  check((await stranger(`/connect/oauth/callback?state=${state}&code=good-code`)).headers.get('location'), '/dashboard?error=oauth');
+  check((await stranger(`/connect/oauth/callback?state=${state}&code=good-code`)).headers.get('location'), '/?error=oauth');
+  const strangerCsrf = await csrfOf(await stranger('/dashboard'));
+
+  // Another account cannot see or touch the café.
+  check((await stranger(`/cafes/${cafe.id}/deploy`, { csrf: strangerCsrf })).status, 404);
+  check((await stranger(`/cafes/${cafe.id}/delete`)).status, 404);
+  check((await stranger(`/cafes/${cafe.id}/deploy`, { csrf })).status, 403);
+
   const oauthRow = await db.prepare("SELECT * FROM connections WHERE method = 'oauth'").first();
   assert.ok(oauthRow && !oauthRow.credentials.includes('oauth-access')); checks++;
   // Rows are bound to their owner: swapping credentials between owners does not decrypt.
@@ -200,8 +221,10 @@ try {
   check(response.status, 502);
   assert.match(await response.text(), /cannot be read/); checks++;
   await db.prepare('UPDATE connections SET credentials = ? WHERE owner_id = ?').bind(connection.credentials, connection.owner_id).run();
-  check((await stranger('/disconnect', { csrf: strangerCsrf })).headers.get('location'), '/dashboard?done=disconnected');
+  // Disconnecting revokes the OAuth grant and signs the account out.
+  check((await stranger('/disconnect', { csrf: strangerCsrf })).headers.get('location'), '/?done=disconnected');
   check(calls.find(call => call.path === '/oauth2/revoke').token, 'oauth-refresh');
+  check((await stranger('/dashboard')).headers.get('location'), '/');
 
   // Deleting needs the Worker name typed out, then removes the Worker, database and namespace.
   check((await owner(`/cafes/${cafe.id}/delete`, { csrf, confirm: 'wrong' })).status, 400);
@@ -209,10 +232,10 @@ try {
   check((await owner(`/cafes/${cafe.id}/delete`, { csrf, confirm: 'cafe-corner-beans' })).headers.get('location'), '/dashboard?done=deleted');
   check(calls.filter(call => call.method === 'DELETE').map(call => call.path), ['/accounts/acc1/workers/scripts/cafe-corner-beans', '/accounts/acc1/d1/database/db-1', '/accounts/acc1/storage/kv/namespaces/kv-1']);
   check((await db.prepare('SELECT COUNT(*) AS n FROM cafes').first()).n, 0);
-  check((await db.prepare("SELECT action FROM audit_log WHERE owner_id = ? ORDER BY id").bind(connection.owner_id).all()).results.map(row => row.action), ['connect', 'deploy', 'setup-link', 'update', 'deploy-failed', 'delete']);
+  check((await db.prepare("SELECT action FROM audit_log WHERE owner_id = ? ORDER BY id").bind(connection.owner_id).all()).results.map(row => row.action), ['connect', 'deploy', 'setup-link', 'update', 'connect', 'deploy-failed', 'delete']);
 
   check((await owner('/signout', { csrf })).headers.get('location'), '/');
-  check((await owner('/dashboard')).headers.get('location'), '/signin');
+  check((await owner('/dashboard')).headers.get('location'), '/');
   console.log(`Passed ${checks} control plane assertions.`);
 } finally {
   await mf.dispose();

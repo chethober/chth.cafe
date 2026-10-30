@@ -10,13 +10,13 @@
     "binding": "RELEASE",
     "run_worker_first": true
   },
-  // For your own domain, replace workers_dev with a custom domain route, for example:
-  // "routes": [{ "pattern": "cloud.chth.cafe", "custom_domain": true }],
+  "routes": [
+    { "pattern": "chth.cafe", "custom_domain": true },
+    { "pattern": "www.chth.cafe", "custom_domain": true }
+  ],
   "workers_dev": true,
-  // Uploading a café hashes and encodes its files; Workers Paid's CPU limit leaves room for that.
-  "limits": {
-    "cpu_ms": 30000
-  },
+  // On Workers Paid, raise the CPU limit: uploading a café hashes and encodes its files.
+  // "limits": { "cpu_ms": 30000 },
   "d1_databases": [
     {
       "binding": "DB",

@@ -1,6 +1,6 @@
 name: Deploy to Cloudflare Workers
 
-# Deploys this repository's own café (chth.cafe). wrangler.jsonc is the generic config that the
+# Deploys this repository's own café. wrangler.jsonc is the generic config that the
 # Deploy button and new owners use, so production deploys from its own config, kept as a secret:
 # set CAFE_WRANGLER_CONFIG to the contents of wrangler.production.jsonc (with the real database
 # and namespace IDs and the custom domain routes). Without it this workflow only builds.

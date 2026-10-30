@@ -1,21 +1,17 @@
 -- Control plane tables. The Worker creates them on first use; this file is for reference and manual setup.
-CREATE TABLE IF NOT EXISTS owners (
-  id TEXT PRIMARY KEY,
-  email TEXT NOT NULL UNIQUE COLLATE NOCASE,
-  password_hash TEXT NOT NULL,
-  created_at TEXT NOT NULL
-);
+-- There are no control plane accounts: an owner is a Cloudflare account, signed in with OAuth or an API token.
 CREATE TABLE IF NOT EXISTS sessions (
   id_hash TEXT PRIMARY KEY, -- SHA-256 of the cookie value, so a database read does not leak live sessions
-  owner_id TEXT NOT NULL,
+  owner_id TEXT NOT NULL, -- the Cloudflare account ID
   expires_at INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_sessions_owner ON sessions(owner_id);
 CREATE TABLE IF NOT EXISTS attempts (
   key TEXT PRIMARY KEY,
   count INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
 );
--- One Cloudflare account per owner, reached with an API token or OAuth. Credentials are AES-GCM encrypted.
+-- The saved access to each signed-in Cloudflare account; owner_id is the account ID. Credentials are AES-GCM encrypted.
 CREATE TABLE IF NOT EXISTS connections (
   owner_id TEXT PRIMARY KEY,
   method TEXT NOT NULL CHECK (method IN ('token', 'oauth')),
@@ -25,9 +21,9 @@ CREATE TABLE IF NOT EXISTS connections (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE TABLE IF NOT EXISTS oauth_states (
+-- Sign-ins with Cloudflare in progress. The state is also kept in a cookie in the browser that started it.
+CREATE TABLE IF NOT EXISTS oauth_logins (
   state_hash TEXT PRIMARY KEY,
-  owner_id TEXT NOT NULL,
   verifier TEXT NOT NULL,
   expires_at INTEGER NOT NULL
 );

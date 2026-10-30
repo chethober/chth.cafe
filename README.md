@@ -68,7 +68,7 @@ There are three ways to put a café online. Each café gets its own Worker, D1 d
 
 ### One click from CHTH Café Cloud
 
-The control plane in [`control-plane/`](control-plane/README.md) lets owners sign up, connect their own Cloudflare account (with Cloudflare's consent screen or an API token), and deploy or update a café with one click. The café runs in the owner's account; the control plane never sees its passwords.
+The control plane in [`control-plane/`](control-plane/README.md) lets owners sign in with their own Cloudflare account (with Cloudflare's consent screen or an API token), with no separate account to create, and deploy or update a café with one click. The café runs in the owner's account; the control plane never sees its passwords.
 
 ### Deploy button
 

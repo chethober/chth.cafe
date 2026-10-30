@@ -1,6 +1,8 @@
 # CHTH Café Cloud (control plane)
 
-A small Worker where café owners sign up, connect their own Cloudflare account, and deploy the café in one click. Each café runs in the **owner's** account, with its own Worker, D1 database and KV namespace. The control plane keeps only the owner's email, an encrypted way to reach their account, and the list of cafés it deployed.
+A small Worker where café owners sign in with their own Cloudflare account and deploy the café in one click. Each café runs in the **owner's** account, with its own Worker, D1 database and KV namespace.
+
+There are no control plane accounts, emails or passwords. Owners sign in with Cloudflare (OAuth) or an API token, and the Cloudflare account they reach *is* the owner: anyone who can reach that account manages its cafés. The control plane keeps only the account's name, an encrypted way to reach it, and the list of cafés it deployed. Disconnecting forgets that access and signs the account out everywhere.
 
 ```
 owner ──▶ control plane ──(owner's token or OAuth)──▶ Cloudflare API ──▶ café Worker + D1 + KV in the owner's account
@@ -18,7 +20,7 @@ owner ──▶ control plane ──(owner's token or OAuth)──▶ Cloudflare
 
 ## Running it
 
-The control plane deploys the café release packaged next to it (`release/`, from `npm run release`). It needs the Workers Paid plan: encoding a café's files takes longer than the free plan's 10 ms CPU limit. If you deploy on the free plan, remove the `limits` block from `wrangler.jsonc`.
+The control plane deploys the café release packaged next to it (`release/`, from `npm run release`). It runs on the free plan, but encoding a café's files can pass the free plan's 10 ms CPU limit; on Workers Paid, uncomment the `limits` block in `wrangler.jsonc`.
 
 ```bash
 npx wrangler login
@@ -26,7 +28,7 @@ openssl rand -base64 32 | npx wrangler secret put ENCRYPTION_KEY -c control-plan
 npm run deploy:control-plane
 ```
 
-Wrangler creates the `chth-cafe-control-plane` database on the first deploy, and the Worker creates its tables on first use. To serve it on your domain, replace `workers_dev` in `control-plane/wrangler.jsonc` with a custom domain route such as `cloud.chth.cafe`. The café itself already uses `chth.cafe`, `admin.` and `panel.`, so pick another subdomain.
+Wrangler creates the `chth-cafe-control-plane` database on the first deploy, and the Worker creates its tables on first use. It serves `chth.cafe` and `www.chth.cafe`; change the `routes` in `control-plane/wrangler.jsonc` to serve it on your own domain.
 
 Keep `ENCRYPTION_KEY` safe: it decrypts every owner's Cloudflare access. Losing it only means owners have to connect again; their cafés keep running.
 
@@ -51,13 +53,13 @@ Keep `ENCRYPTION_KEY` safe: it decrypts every owner's Cloudflare access. Losing 
    npx wrangler secret put CF_OAUTH_CLIENT_SECRET -c control-plane/wrangler.jsonc   # confidential clients only
    ```
 
-The flow uses PKCE and a single-use state bound to the signed-in owner. Access tokens are refreshed shortly before they expire, and revoked when the owner disconnects.
+The flow uses PKCE and a single-use state bound to the browser that started it. Access tokens are refreshed shortly before they expire, and revoked when the owner disconnects.
 
 ## Security notes
 
-- Cloudflare credentials are encrypted with AES-GCM, with the owner's ID bound in, so a row copied to another owner does not decrypt.
+- Cloudflare credentials are encrypted with AES-GCM, with the account ID bound in, so a row copied to another account does not decrypt.
 - Sessions are random tokens stored as SHA-256 hashes. Every form carries a CSRF token tied to the session and must come from the control plane's own origin.
-- Sign-in, sign-up and token checks are rate limited per address. Every deploy, update, setup link, disconnect and delete is written to `audit_log`.
+- Signing in with Cloudflare uses a single-use state kept both in the database and in a cookie in the browser that started it. Token sign-ins are rate limited per address. Every deploy, update, setup link, disconnect and delete is written to `audit_log`.
 - Owners can revoke the control plane at any time: from their Cloudflare profile for OAuth, or by deleting the API token.
 
 ## Tests
