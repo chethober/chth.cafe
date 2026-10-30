@@ -36,3 +36,6 @@ backups/
 # Local menu/stock data exports
 menu_catalogue_*.json
 stock_inventory_*.json
+
+# Packaged café release (npm run release), deployed by the control plane
+release/

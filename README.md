@@ -47,7 +47,7 @@ Local apps:
 - Admin: http://admin.localhost:3000
 - Daily panel: http://panel.localhost:3000
 
-Vite runs on port 3000 and proxies `/api` to the local Worker on port 8787. The startup scripts enable `CAFE_DEV_PROXY` locally to preserve the staff subdomain through Wrangler; do not enable this binding in deployment. Staff apps use their subdomains; `/admin` and `/panel` paths return 404.
+Vite runs on port 3000 and proxies `/api` to the local Worker on port 8787. The startup scripts enable `CAFE_DEV_PROXY` locally to preserve the staff subdomain through Wrangler; do not enable this binding in deployment. Staff apps use their subdomains; because `wrangler.jsonc` sets `CAFE_WORKSPACE_PATHS`, they also open at http://localhost:3000/admin and http://localhost:3000/panel, as on workers.dev.
 
 | Command | Purpose |
 | --- | --- |
@@ -56,33 +56,37 @@ Vite runs on port 3000 and proxies `/api` to the local Worker on port 8787. The 
 | `npm run dev:worker` | Start only the local Worker (build first) |
 | `npm run db:seed` | Initialize the local database from `schema.sql` |
 | `npm run db:migrate:local` | Apply `backup.sql` to the local database |
-| `npm test` | Run Worker/D1 integration and timezone regression tests |
+| `npm test` | Run Worker/D1 integration, setup, control plane and release tests |
 | `npm run check` | Check TypeScript types |
 | `npm run build` | Check types and build production assets |
+| `npm run release` | Build and package a versioned release for the control plane in `release/` |
+| `npm run deploy:control-plane` | Package a release and deploy the control plane |
 
 ## Deploy
 
-Use the button above to start the [Cloudflare deployment flow](https://developers.cloudflare.com/workers/platform/deploy-buttons/), or deploy from the CLI:
+There are three ways to put a café online. Each café gets its own Worker, D1 database and KV namespace.
 
-1. Create a D1 database and KV namespace, then put their IDs in `wrangler.jsonc`.
-2. Update the custom domain routes for your cafe. The menu, admin, and panel use the main domain, `admin` subdomain, and `panel` subdomain respectively.
-3. Sign in and set the required Worker secrets:
+### One click from CHTH Café Cloud
 
-   ```bash
-   npx wrangler login
-   npx wrangler secret put ADMIN_PASSWORD
-   npx wrangler secret put PANEL_PASSWORD
-   npx wrangler secret put SESSION_SECRET
-   ```
+The control plane in [`control-plane/`](control-plane/README.md) lets owners sign up, connect their own Cloudflare account (with Cloudflare's consent screen or an API token), and deploy or update a café with one click. The café runs in the owner's account; the control plane never sees its passwords.
 
-4. Initialize a new remote database and deploy:
+### Deploy button
 
-   ```bash
-   npm run db:seed:remote
-   npm run deploy
-   ```
+Use the button above to start the [Cloudflare deployment flow](https://developers.cloudflare.com/workers/platform/deploy-buttons/). Use `npm run deploy` as the deploy command, and enter any long random value for `SETUP_TOKEN` when asked. Wrangler creates the database and namespace, and the Worker creates its tables on first use. Then open `https://<worker>.<subdomain>.workers.dev/admin`, enter the setup code, and choose the admin and panel passwords.
 
-For the button flow, use `npm run deploy` as the deploy command; it builds the app before publishing. Verify the domain routes, required secrets, and database initialization before using the app.
+### From the CLI
+
+```bash
+npx wrangler login
+npx wrangler secret put SETUP_TOKEN
+npm run deploy
+```
+
+`wrangler.jsonc` serves the café on workers.dev, with the admin at `/admin` and the panel at `/panel` (`CAFE_WORKSPACE_PATHS`). To use your own domain, add custom domain routes for the main domain and its `admin` and `panel` subdomains, and remove `CAFE_WORKSPACE_PATHS` so the staff apps stay on their subdomains. Keep that configuration in a Git-ignored `wrangler.production.jsonc` and deploy with `npx wrangler deploy -c wrangler.production.jsonc`. The Deploy workflow does the same when the `CAFE_WRANGLER_CONFIG` secret holds that file.
+
+To start with the demo menu instead of an empty café, run `npm run db:seed:remote` before the first visit.
+
+Passwords chosen at setup can be changed later in **Settings → Sign-in**. Deployments that set `ADMIN_PASSWORD` and `PANEL_PASSWORD` as Worker secrets keep using them instead, and skip setup. `SESSION_SECRET` is optional: without it the Worker generates one and keeps it in D1.
 
 Telegram notifications optionally use `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Set the cafe timezone and opening hours in Settings before accepting orders.
 

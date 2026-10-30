@@ -11,14 +11,6 @@
     "binding": "ASSETS",
     "run_worker_first": true
   },
-  // The Worker bundles schema.sql as text and creates its tables on first use.
-  "rules": [
-    {
-      "type": "Text",
-      "globs": ["**/*.sql"],
-      "fallthrough": true
-    }
-  ],
   // Served on workers.dev, with the admin at /admin and the panel at /panel.
   // For your own domain, add custom domain routes for example.com, admin.example.com and
   // panel.example.com, and remove CAFE_WORKSPACE_PATHS to keep the staff apps on their subdomains.

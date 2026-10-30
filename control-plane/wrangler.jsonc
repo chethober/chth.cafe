@@ -1,0 +1,30 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  // Deploy with: npm run release && npx wrangler deploy -c control-plane/wrangler.jsonc
+  "name": "chth-cafe-control-plane",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-01-01",
+  // The café release this control plane deploys. The Worker runs first and never serves these files.
+  "assets": {
+    "directory": "../release",
+    "binding": "RELEASE",
+    "run_worker_first": true
+  },
+  // For your own domain, replace workers_dev with a custom domain route, for example:
+  // "routes": [{ "pattern": "cloud.chth.cafe", "custom_domain": true }],
+  "workers_dev": true,
+  // Uploading a café hashes and encodes its files; Workers Paid's CPU limit leaves room for that.
+  "limits": {
+    "cpu_ms": 30000
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "chth-cafe-control-plane"
+    }
+  ],
+  // Optional "Connect with Cloudflare" button: set CF_OAUTH_CLIENT_ID (and CF_OAUTH_CLIENT_SECRET for a
+  // confidential client) as secrets. Without them, owners connect with an API token.
+  // Required secret: ENCRYPTION_KEY, 32 random bytes in base64 (openssl rand -base64 32).
+  "vars": {}
+}

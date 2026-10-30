@@ -1,4 +1,4 @@
-// The Worker bundles .sql files as text (see the rules in wrangler.jsonc).
+// Wrangler bundles .sql imports as text by default; esbuild needs loader: { '.sql': 'text' }.
 declare module '*.sql' {
   const sql: string;
   export default sql;
