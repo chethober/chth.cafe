@@ -1,3 +1,9 @@
 # One-time code for choosing the admin and panel passwords on the first visit to /admin.
 # Pick any long random value; it is useless once setup is finished.
 SETUP_TOKEN=
+
+# Optional instead of setup: fixed passwords as Worker secrets (the admin cannot change them then).
+# ADMIN_PASSWORD=replace-with-a-unique-admin-password
+# PANEL_PASSWORD=replace-with-a-different-panel-password
+# Optional: without it the Worker generates and stores its own.
+# SESSION_SECRET=replace-with-a-random-secret-of-at-least-32-characters
