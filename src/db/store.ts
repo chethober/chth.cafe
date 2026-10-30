@@ -21,6 +21,7 @@ import {
 } from './seed';
 import { deviceStore, type QueuedRequest } from './offline';
 import { DEFAULT_STOCK_CATEGORIES, parseStockCategories } from '../utils/stockCategories';
+import { currentWorkspace } from '../utils/workspace';
 
 const STORAGE_KEY = 'chth_cafe_settings_v1';
 
@@ -177,8 +178,8 @@ class CafeStore {
         return;
       }
       if (this.offline) { this.offline = false; this.notify(); }
-      const managementView = /^(admin|panel)\./.test(window.location.hostname) || /^\/(admin|panel)(\/|$)/.test(window.location.pathname);
-      const adminAccess = session?.authenticated && window.location.hostname.startsWith('admin.');
+      const managementView = currentWorkspace() !== null;
+      const adminAccess = session?.authenticated && currentWorkspace() === 'admin';
       // Nothing was written since the last complete sync for this access level, so skip re-reading every table.
       const syncKey = typeof session?.version === 'number' ? `${session.version}|${Boolean(session.authenticated)}|${managementView}|${Boolean(adminAccess)}` : '';
       if (syncKey && syncKey === this.lastSyncKey) return;

@@ -1,3 +1,3 @@
-ADMIN_PASSWORD=replace-with-a-unique-admin-password
-SESSION_SECRET=replace-with-a-random-secret-of-at-least-32-characters
-PANEL_PASSWORD=replace-with-a-different-panel-password
+# One-time code for choosing the admin and panel passwords on the first visit to /admin.
+# Pick any long random value; it is useless once setup is finished.
+SETUP_TOKEN=

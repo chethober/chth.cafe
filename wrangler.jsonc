@@ -11,35 +11,31 @@
     "binding": "ASSETS",
     "run_worker_first": true
   },
-  "routes": [
+  // The Worker bundles schema.sql as text and creates its tables on first use.
+  "rules": [
     {
-      "pattern": "chth.cafe",
-      "custom_domain": true
-    },
-    {
-      "pattern": "www.chth.cafe",
-      "custom_domain": true
-    },
-    {
-      "pattern": "admin.chth.cafe",
-      "custom_domain": true
-    },
-    {
-      "pattern": "panel.chth.cafe",
-      "custom_domain": true
+      "type": "Text",
+      "globs": ["**/*.sql"],
+      "fallthrough": true
     }
   ],
+  // Served on workers.dev, with the admin at /admin and the panel at /panel.
+  // For your own domain, add custom domain routes for example.com, admin.example.com and
+  // panel.example.com, and remove CAFE_WORKSPACE_PATHS to keep the staff apps on their subdomains.
+  "workers_dev": true,
+  "vars": {
+    "CAFE_WORKSPACE_PATHS": "true"
+  },
+  // Wrangler creates the database and namespace on the first deploy when no IDs are given.
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "chth-cafe-db",
-      "database_id": "<YOUR_D1_DATABASE_ID>"
+      "database_name": "chth-cafe-db"
     }
   ],
   "kv_namespaces": [
     {
-      "binding": "KV",
-      "id": "<YOUR_KV_NAMESPACE_ID>"
+      "binding": "KV"
     }
   ],
   "triggers": {

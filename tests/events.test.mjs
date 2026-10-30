@@ -17,7 +17,7 @@ const outboundService = async request => {
   return Response.json({ ok: true, result: { message_id: nextMessageId++ } });
 };
 
-const bundle = await build({ entryPoints: ['src/server.ts'], bundle: true, format: 'esm', platform: 'browser', write: false });
+const bundle = await build({ entryPoints: ['src/server.ts'], bundle: true, format: 'esm', platform: 'browser', loader: { '.sql': 'text' }, write: false });
 const mf = new Miniflare(convertV4MiniflareOptions({
   log: new Log(LogLevel.NONE), modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2025-01-01',
   d1Databases: { DB: 'events-cafe' }, kvNamespaces: ['KV'], outboundService,

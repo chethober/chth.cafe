@@ -31,6 +31,7 @@ import { StockManagement } from './components/StockManagement';
 import { CustomerClub } from './components/CustomerClub';
 import { EventManager } from './components/EventManager';
 import { Button, Field, Input, Notice, NavItem, WorkspaceShell } from './ui';
+import { currentWorkspace, workspaceHome } from './utils/workspace';
 
 type AdminTab = 'financials' | 'customers' | 'events' | 'tasks' | 'menu_admin' | 'stock' | 'staff' | 'settings';
 const ADMIN_TABS: AdminTab[] = ['financials', 'customers', 'events', 'tasks', 'menu_admin', 'stock', 'staff', 'settings'];
@@ -59,10 +60,10 @@ function wasSignedIn() {
 }
 
 export const App: React.FC = () => {
-  // Each SPA is selected only by its subdomain, including local development.
-  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-  const isAdminView = hostname.startsWith('admin.');
-  const isPanelView = hostname.startsWith('panel.');
+  // Each SPA is selected by its subdomain, or by its path on hosts with CAFE_WORKSPACE_PATHS.
+  const workspace = currentWorkspace();
+  const isAdminView = workspace === 'admin';
+  const isPanelView = workspace === 'panel';
   const isWorkspace = isAdminView || isPanelView;
 
   const [adminTab, setAdminTab] = usePersistentState<AdminTab>('chth_admin_last_tab', ADMIN_TABS, 'financials');
@@ -112,11 +113,14 @@ export const App: React.FC = () => {
   // Admin authentication state
   const [isAdminAuthed, setIsAdminAuthed] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+  // A fresh deployment has no passwords yet; the owner chooses them with the setup code it was deployed with.
+  const [setupRequired, setSetupRequired] = useState(false);
   useEffect(() => {
     const checkSession = () => fetch('/api/auth/session').then(
       res => res.json().then(data => {
-        const signedIn = (data as { authenticated?: boolean }).authenticated === true;
-        setIsAdminAuthed(signedIn); rememberSignIn(signedIn);
+        const session = data as { authenticated?: boolean; setupRequired?: boolean };
+        const signedIn = session.authenticated === true;
+        setIsAdminAuthed(signedIn); rememberSignIn(signedIn); setSetupRequired(session.setupRequired === true);
       }).catch(() => {}),
       () => { if (wasSignedIn()) setIsAdminAuthed(true); }
     );
@@ -129,6 +133,12 @@ export const App: React.FC = () => {
   }, []);
   const [passwordInput, setPasswordInput] = useState('');
   const [authError, setAuthError] = useState<string | null>(null);
+  // The deploy link carries the setup code in the fragment, which never reaches the server or its logs.
+  const [setupForm, setSetupForm] = useState(() => {
+    const token = typeof window !== 'undefined' ? new URLSearchParams(window.location.hash.slice(1)).get('setup') || '' : '';
+    if (token) window.history.replaceState({}, '', window.location.pathname + window.location.search);
+    return { token, cafeName: '', adminPassword: '', panelPassword: '' };
+  });
 
   useEffect(() => {
     const unsubscribe = store.subscribe(refresh);
@@ -144,11 +154,22 @@ export const App: React.FC = () => {
     } catch (error) { setAuthError(error instanceof Error ? error.message : 'Sign-in failed.'); }
     finally { setAuthLoading(false); }
   };
+  const handleSetup = async (e: React.FormEvent) => {
+    e.preventDefault(); setAuthLoading(true); setAuthError(null);
+    try {
+      const result = await api<{ success?: boolean }>('/api/auth/setup', setupForm);
+      if (result.success !== true) throw new Error('The setup response was invalid. Check the café API.');
+      setSetupRequired(false); setIsAdminAuthed(true); rememberSignIn(true);
+      setSetupForm({ token: '', cafeName: '', adminPassword: '', panelPassword: '' });
+      await store.syncFromAPI();
+    } catch (error) { setAuthError(error instanceof Error ? error.message : 'Setup failed.'); }
+    finally { setAuthLoading(false); }
+  };
   const handleAdminLogout = async () => {
     try {
       const response = await fetch('/api/auth/logout', { method: 'POST' });
       if (!response.ok) throw new Error('Sign-out failed. Please try again.');
-      setIsAdminAuthed(false); rememberSignIn(false); store.clearPrivateData(); window.history.replaceState({}, '', '/');
+      setIsAdminAuthed(false); rememberSignIn(false); store.clearPrivateData(); window.history.replaceState({}, '', workspaceHome());
     } catch (error) { setAuthError(error instanceof Error ? error.message : 'Sign-out failed.'); }
   };
 
@@ -181,6 +202,34 @@ export const App: React.FC = () => {
 
   /* ------------------------------------------------------------ Workspace */
   if (isWorkspace) {
+    if (!isAdminAuthed && setupRequired && isAdminView) {
+      const updateSetup = (field: keyof typeof setupForm) => (e: React.ChangeEvent<HTMLInputElement>) => setSetupForm(form => ({ ...form, [field]: e.target.value }));
+      return (
+        <div className="ws ws-auth">
+          <form className="ws-auth-card" aria-busy={authLoading} onSubmit={handleSetup}>
+            <div>
+              <span className="ws-brand-mark" style={{ width: 48, height: 48, marginBottom: 20 }}><Lock width={22} height={22} /></span>
+              <h1>Set up your café</h1>
+              <p>Choose the passwords for the admin and the daily panel. Staff use the panel password on the café's devices.</p>
+            </div>
+            {authError && <Notice tone="danger">{authError}</Notice>}
+            <Field label="Setup code" hint="From your deploy link, or the SETUP_TOKEN secret you set on the Worker.">{(id, hint) => (
+              <Input id={id} aria-describedby={hint} autoComplete="off" required value={setupForm.token} onChange={updateSetup('token')} />
+            )}</Field>
+            <Field label="Café name" optional>{id => (
+              <Input id={id} autoComplete="organization" maxLength={100} value={setupForm.cafeName} onChange={updateSetup('cafeName')} />
+            )}</Field>
+            <Field label="Admin password" hint="At least 10 characters.">{(id, hint) => (
+              <Input id={id} aria-describedby={hint} type="password" autoComplete="new-password" required minLength={10} value={setupForm.adminPassword} onChange={updateSetup('adminPassword')} />
+            )}</Field>
+            <Field label="Panel password" hint="At least 10 characters, different from the admin password.">{(id, hint) => (
+              <Input id={id} aria-describedby={hint} type="password" autoComplete="new-password" required minLength={10} value={setupForm.panelPassword} onChange={updateSetup('panelPassword')} />
+            )}</Field>
+            <Button type="submit" variant="primary" size="lg" block loading={authLoading}>{authLoading ? 'Setting up…' : 'Finish setup'}</Button>
+          </form>
+        </div>
+      );
+    }
     if (!isAdminAuthed) {
       return (
         <div className="ws ws-auth">
@@ -191,6 +240,7 @@ export const App: React.FC = () => {
               <p>{isPanelView ? 'Sign in to take orders, run the checklist, and clock the team in.' : 'Sign in to manage finances, menu, stock, staff, and settings.'}</p>
             </div>
             {authError && <Notice tone="danger">{authError}</Notice>}
+            {setupRequired && isPanelView && <Notice tone="info">This café is not set up yet. Open the admin to choose the passwords first.</Notice>}
             <Field label={isPanelView ? 'Panel password' : 'Admin password'}>{id => (
               <Input id={id} type="password" autoComplete="current-password" autoFocus required value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} />
             )}</Field>

@@ -5,20 +5,6 @@ import tailwindcss from '@tailwindcss/vite';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    {
-      name: 'removed-dashboard-paths',
-      configureServer(server) {
-        server.middlewares.use((req, res, next) => {
-          const pathname = new URL(req.url || '/', 'http://localhost').pathname;
-          if (/^\/(admin|panel)(\/|$)/.test(pathname)) {
-            res.statusCode = 404;
-            res.end('Not Found');
-            return;
-          }
-          next();
-        });
-      }
-    },
     react(),
     tailwindcss()
   ],

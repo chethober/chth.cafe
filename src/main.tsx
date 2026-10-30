@@ -1,11 +1,14 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
+import { installWorkspaceHeader } from './utils/workspace';
 import './index.css';
 import './styles/design-system.css';
 import './styles/public-menu.css';
 import './styles/workspace.css';
 import './styles/events.css';
+
+installWorkspaceHeader();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

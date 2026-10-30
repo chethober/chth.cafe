@@ -16,12 +16,18 @@ import { registerTelegramBot, runScheduledTelegram, sendDailyReport } from './se
 import { registerCustomers } from './services/customers';
 import { registerEvents } from './services/events';
 import { registerStockCategories } from './services/stockCategories';
+import { login, registerCredentials, setupRequired, withSessionSecret } from './services/credentials';
+import { ensureBaseSchema } from './services/baseSchema';
 import { calendarOf, isCalendarSystem } from './utils/events';
 
 export type Env = {
   Variables: { authed: boolean; workspace: 'admin' | 'panel' };
   Bindings: {
     CAFE_DEV_PROXY?: string;
+    /** "true" serves the admin and panel at /admin and /panel, for hosts without subdomains such as workers.dev. */
+    CAFE_WORKSPACE_PATHS?: string;
+    /** One-time code the owner enters to choose the passwords on a fresh deployment. */
+    SETUP_TOKEN?: string;
     ADMIN_PASSWORD?: string;
     PANEL_PASSWORD?: string;
     SESSION_SECRET?: string;
@@ -174,7 +180,10 @@ app.use('/api/*', async (c, next) => {
   const forwardedOrigin = localProxy ? c.req.header('X-Cafe-Dev-Origin') : undefined;
   const origin = forwardedOrigin ? decodeURIComponent(forwardedOrigin) : c.req.header('Origin');
   if (origin && origin !== requestOrigin) return c.json({ success: false, message: 'Origin not allowed.' }, 403);
-  const workspace = new URL(requestOrigin).hostname.startsWith('panel.') ? 'panel' : 'admin';
+  // With path workspaces the admin and panel share one origin; the page names its workspace in a header.
+  // That only picks which session cookie is checked, so it never grants more than the cookie holds.
+  const pathWorkspace = c.env.CAFE_WORKSPACE_PATHS === 'true' && c.req.header('X-Cafe-Workspace') === 'panel';
+  const workspace = new URL(requestOrigin).hostname.startsWith('panel.') || pathWorkspace ? 'panel' : 'admin';
   c.set('workspace', workspace);
   const secret = c.env?.SESSION_SECRET;
   const session = secret ? await getSignedCookie(c, secret, `cafe_${workspace}_session`) : false;
@@ -182,7 +191,7 @@ app.use('/api/*', async (c, next) => {
   const authed = Boolean(sessionId && expires && Number(expires) > Date.now() && c.env?.KV && await c.env.KV.get(`session:${workspace}:${sessionId}`) === expires);
   const path = c.req.path;
   const publicRead = c.req.method === 'GET' && ['/api/settings', '/api/menu', '/api/auth/session'].includes(path);
-  const publicWrite = c.req.method === 'POST' && ['/api/auth/login', '/api/orders'].includes(path);
+  const publicWrite = c.req.method === 'POST' && ['/api/auth/login', '/api/auth/setup', '/api/orders'].includes(path);
   const tracking = (c.req.method === 'GET' && /^\/api\/(orders\/[^/]+\/tracking|events\/public|event-bookings\/[^/]+\/status)$/.test(path))
     || (c.req.method === 'POST' && /^\/api\/(events\/[^/]+\/bookings|event-bookings\/[^/]+\/cancel)$/.test(path));
   if (!authed && !publicRead && !publicWrite && !tracking) return c.json({ success: false, message: 'Please sign in.' }, 401);
@@ -196,6 +205,7 @@ app.use('/api/*', async (c, next) => {
   c.set('authed', authed);
   if (!c.env?.DB && !path.startsWith('/api/auth/')) return c.json({ success: false, message: 'The café database is not configured.' }, 503);
   if (c.env?.DB && !path.startsWith('/api/auth/')) {
+    await ensureBaseSchema(c.env.DB);
     await ensureSettingsColumns(c.env.DB);
     await ensureStockTables(c.env.DB);
     await ensureFeatureTables(c.env.DB);
@@ -213,36 +223,15 @@ app.onError((error, c) => {
 app.get('/api/auth/session', async c => {
   let version: number | null = null;
   if (c.env?.DB) {
-    try { await ensureFeatureTables(c.env.DB); version = await dataVersion(c.env.DB); } catch (e) { console.warn('Data version unavailable:', e); }
+    try { await ensureBaseSchema(c.env.DB); await ensureFeatureTables(c.env.DB); version = await dataVersion(c.env.DB); } catch (e) { console.warn('Data version unavailable:', e); }
   }
-  return c.json({ authenticated: c.get('authed') === true, workspace: c.get('workspace'), version });
+  let needsSetup = false;
+  try { needsSetup = await setupRequired(c.env); } catch (e) { console.warn('Setup state unavailable:', e); }
+  return c.json({ authenticated: c.get('authed') === true, workspace: c.get('workspace'), version, setupRequired: needsSetup });
 });
 app.post('/api/auth/login', async c => {
-  const workspace = c.get('workspace');
-  const password = workspace === 'panel' ? c.env.PANEL_PASSWORD : c.env.ADMIN_PASSWORD;
-  if (!password || !c.env.SESSION_SECRET || !c.env.KV) return c.json({ success: false, message: `Set ${workspace === 'panel' ? 'PANEL_PASSWORD' : 'ADMIN_PASSWORD'} and SESSION_SECRET on the server first.` }, 503);
-  if (c.env.ADMIN_PASSWORD === c.env.PANEL_PASSWORD) return c.json({ success: false, message: 'Admin and panel passwords must be different.' }, 503);
-  const ip = c.req.header('CF-Connecting-IP') || 'local';
-  const key = `login:${workspace}:${ip}`;
-  const attempts = c.env.KV ? Number(await c.env.KV.get(key) || 0) : 0;
-  if (attempts >= 10) return c.json({ success: false, message: 'Too many attempts. Try again in 15 minutes.' }, 429);
   const body = await c.req.json();
-  const digest = async (value: string) => new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
-  const [actual, expected] = await Promise.all([digest(String(body.password || '')), digest(password)]);
-  let difference = 0;
-  for (let i = 0; i < actual.length; i++) difference |= actual[i] ^ expected[i];
-  if (difference) {
-    if (c.env.KV) await c.env.KV.put(key, String(attempts + 1), { expirationTtl: 900 });
-    return c.json({ success: false, message: 'Incorrect password.' }, 401);
-  }
-  if (c.env.KV) await c.env.KV.delete(key);
-  const sessionId = crypto.randomUUID();
-  const expires = String(Date.now() + 8 * 3600000);
-  await c.env.KV.put(`session:${workspace}:${sessionId}`, expires, { expirationTtl: 8 * 3600 });
-  await setSignedCookie(c, `cafe_${workspace}_session`, `${sessionId}:${expires}`, c.env.SESSION_SECRET, {
-    httpOnly: true, secure: new URL(c.req.url).protocol === 'https:', sameSite: 'Strict', path: '/', maxAge: 8 * 3600
-  });
-  return c.json({ success: true });
+  return login(c, String(body.password || ''));
 });
 app.post('/api/auth/logout', async c => {
   const workspace = c.get('workspace');
@@ -252,6 +241,7 @@ app.post('/api/auth/logout', async c => {
   return c.json({ success: true });
 });
 
+registerCredentials(app);
 registerOperations(app);
 registerTelegramBot(app);
 registerCustomers(app);
@@ -1561,9 +1551,10 @@ app.post('/api/telegram/daily-report', async (c) => {
   return c.json(result);
 });
 
-// --- 7. Host-selected SPA fallback; former dashboard path aliases are removed. ---
+// --- 7. Host-selected SPA fallback; /admin and /panel exist only with CAFE_WORKSPACE_PATHS. ---
 app.get('*', async (c) => {
-  if (c.req.path.startsWith('/api') || /^\/(admin|panel)(\/|$)/.test(c.req.path)) {
+  const workspacePath = /^\/(admin|panel)(\/|$)/.test(c.req.path);
+  if (c.req.path.startsWith('/api') || (workspacePath && c.env?.CAFE_WORKSPACE_PATHS !== 'true')) {
     return c.notFound();
   }
 
@@ -1580,8 +1571,11 @@ app.get('*', async (c) => {
 });
 
 export default {
-  fetch: app.fetch,
-  async scheduled(event: any, env: Env['Bindings'], ctx: any) {
+  async fetch(request: Request, env: Env['Bindings'], ctx: ExecutionContext) {
+    return app.fetch(request, await withSessionSecret(env), ctx);
+  },
+  async scheduled(event: any, bindings: Env['Bindings'], ctx: any) {
+    const env = await withSessionSecret(bindings);
     if (ctx?.waitUntil) {
       ctx.waitUntil(runScheduledTelegram(env, new Date(event?.scheduledTime || Date.now())));
     } else {

@@ -1,9 +1,10 @@
 import { ImageUpload } from './ImageUpload';
 import React, { useEffect, useRef, useState } from 'react';
-import { Bot, Boxes, CalendarClock, CalendarDays, CheckSquare, Clock, Database, Download, Eye, EyeOff, Link2Off, Palette, RefreshCw, Send, ShoppingCart, Store, UserCheck } from 'lucide-react';
+import { Bot, Boxes, CalendarClock, CalendarDays, CheckSquare, Clock, Database, Download, Eye, EyeOff, KeyRound, Link2Off, Palette, RefreshCw, Send, ShoppingCart, Store, UserCheck } from 'lucide-react';
 import { SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { AppearanceEditor } from './AppearanceEditor';
+import { PasswordSettings } from './PasswordSettings';
 import { OpeningHoursEditor, openingHoursErrors, parseOpeningHours } from './OpeningHoursEditor';
 import { AppearanceSettings, parseAppearance } from '../utils/appearance';
 import { Button, Card, ConfirmDialog, Field, IconButton, Input, Notice, Page, PageHeader, Segmented, Select, ToggleRow, localDateKey } from '../ui';
@@ -28,6 +29,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'hours', label: 'Opening hours', icon: CalendarClock },
   { id: 'appearance', label: 'Appearance', icon: Palette },
   { id: 'notifications', label: 'Notifications', icon: Send },
+  { id: 'signin', label: 'Sign-in', icon: KeyRound },
   { id: 'data', label: 'Data', icon: Database }
 ];
 type Feedback = { success: boolean; message: string } | null;
@@ -285,6 +287,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
               </div>
             </div>
           </form>
+
+          <section id="settings-signin" className="ws-section" aria-label="Sign-in">
+            <PasswordSettings />
+          </section>
 
           <section id="settings-data" className="ws-section" aria-label="Data">
             <Card title="Data" description="Download everything as JSON, or start over.">
