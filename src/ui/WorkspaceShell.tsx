@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, Coffee, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, RefreshCw, Sun, WifiOff, X } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, CheckCircle2, Coffee, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, RefreshCw, Sun, WifiOff, X } from 'lucide-react';
 import { IconButton, Notice, Button, PageContext } from './primitives';
 
 export interface NavSection {
@@ -61,6 +61,21 @@ function SyncStatus({ pendingSaves, saveError, offline, queuedChanges }: { pendi
   if (queuedChanges > 0) return <span className="ws-sync" data-state="saving" role="status"><RefreshCw width={14} height={14} className="ws-spin" />Sending {queuedChanges}…</span>;
   if (pendingSaves > 0) return <span className="ws-sync" data-state="saving" role="status"><RefreshCw width={14} height={14} className="ws-spin" />Saving {pendingSaves}…</span>;
   return <span className="ws-sync" role="status"><CheckCircle2 width={14} height={14} />Saved</span>;
+}
+
+/** The one line CHTH Café Cloud shows at the top of cafés it deployed: an announcement or an advert. */
+function PlatformNotice() {
+  const [notice, setNotice] = useState<{ text: string; url: string | null } | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetch('/api/platform-notice').then(r => r.ok ? r.json() as Promise<{ notice?: { text: string; url: string | null } | null }> : null).then(data => { if (live && data?.notice?.text) setNotice(data.notice); }).catch(() => { /* no notice */ });
+    return () => { live = false; };
+  }, []);
+  if (!notice) return null;
+  const body = <><span className="ws-platform-tag">CHTH</span><span className="ws-platform-text">{notice.text}</span>{notice.url && <ArrowUpRight width={14} height={14} aria-hidden="true" />}</>;
+  return notice.url
+    ? <a className="ws-platform" href={notice.url} target="_blank" rel="noopener noreferrer">{body}</a>
+    : <div className="ws-platform" role="note">{body}</div>;
 }
 
 const MOBILE = '(max-width: 1023px)';
@@ -199,6 +214,7 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
         </header>
 
         <main id="workspace-main" className="ws-content">
+          <PlatformNotice />
           {offline && (
             <div style={{ marginBottom: 20 }}>
               <Notice tone="warning" role="status">

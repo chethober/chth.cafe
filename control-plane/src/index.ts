@@ -1,21 +1,15 @@
 import { Hono, type Context } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
-import schema from '../schema.sql';
 import { safeEqual } from '../../src/utils/passwords';
-import { CloudflareClient, CloudflareError, checkAccess, deleteCafe, deployCafe, setSetupToken, type CafeResources, type Release } from './cloudflare';
+import { CloudflareClient, CloudflareError, checkAccess, deleteCafe, setSetupToken } from './cloudflare';
 import { decrypt, encrypt, randomToken, sha256 } from './crypto';
-import { authorizeUrl, exchangeCode, newVerifier, oauthConfigured, refresh, revoke, type Credentials, type OAuthEnv } from './oauth';
-import { applyTheme, FAVICON, THEME_COOKIE, THEME_SWITCH_COOKIE, themeScriptSource } from './design';
+import { authorizeUrl, exchangeCode, newVerifier, oauthConfigured, revoke, type Credentials } from './oauth';
+import { FAVICON, THEME_COOKIE, THEME_SWITCH_COOKIE } from './design';
 import { LOGO_PNG } from './logo';
+import { attempts, audit as auditFor, clientFor as clientForEnv, currentRelease, deployRow, guarded, isAdminHost, message, now, resourcesOf, themed, type Bindings, type CafeRow, type ConnectionRow } from './shared';
+import admin from './admin';
 import * as views from './views';
 
-type Bindings = OAuthEnv & {
-  DB: D1Database;
-  /** The packaged café release (release/ from npm run release), never served to visitors. */
-  RELEASE: Fetcher;
-  /** 32 random bytes, base64: encrypts the Cloudflare credentials owners connect. */
-  ENCRYPTION_KEY: string;
-};
 /** Owners are Cloudflare accounts: whoever can reach an account with OAuth or a token manages its cafés. */
 type Owner = { id: string; name: string };
 type Env = { Bindings: Bindings; Variables: { owner: Owner | null; session: string | null } };
@@ -25,47 +19,10 @@ const SESSION_DAYS = 7;
 const SESSION_COOKIE = 'cp_session';
 const OAUTH_COOKIE = 'cp_oauth';
 
-const ready = new WeakMap<object, Promise<void>>();
-function ensureSchema(db: D1Database) {
-  let pending = ready.get(db);
-  if (!pending) {
-    const statements = schema.replace(/^--.*$/gm, '').replace(/--[^\n]*/g, '').split(';').map(sql => sql.trim()).filter(Boolean);
-    pending = db.batch(statements.map(sql => db.prepare(sql))).then(() => {});
-    ready.set(db, pending);
-    pending.catch(() => ready.delete(db));
-  }
-  return pending;
-}
-
-let releaseCache: Promise<Release> | null = null;
-const releaseFile = (env: Bindings) => (path: string) => env.RELEASE.fetch(new Request(`https://release/${path}`));
-function currentRelease(env: Bindings) {
-  releaseCache ??= releaseFile(env)('manifest.json').then(async response => {
-    if (!response.ok) throw new Error('The control plane was deployed without a café release. Run npm run release before deploying it.');
-    return response.json() as Promise<Release>;
-  });
-  releaseCache.catch(() => { releaseCache = null; });
-  return releaseCache;
-}
-
-const now = () => new Date().toISOString();
-const audit = (c: C, action: string, detail = '', cafeId: string | null = null) =>
-  c.env.DB.prepare('INSERT INTO audit_log (owner_id, cafe_id, action, detail, created_at) VALUES (?, ?, ?, ?, ?)').bind(c.get('owner')!.id, cafeId, action, detail.slice(0, 500), now()).run();
+const audit = (c: C, action: string, detail = '', cafeId: string | null = null) => auditFor(c.env.DB, c.get('owner')!.id, action, detail, cafeId);
 
 /** Tied to the session, so a form posted from another site cannot carry it. */
 const csrfFor = (session: string) => sha256(`csrf:${session}`);
-
-/** Allows ten failures per action and address every 15 minutes. */
-async function attempts(c: C, action: string) {
-  const key = `${action}:${c.req.header('CF-Connecting-IP') || 'local'}`;
-  const row = await c.env.DB.prepare('SELECT count FROM attempts WHERE key = ? AND expires_at > ?').bind(key, Date.now()).first<{ count: number }>();
-  return {
-    blocked: (row?.count ?? 0) >= 10,
-    fail: () => c.env.DB.prepare('INSERT INTO attempts (key, count, expires_at) VALUES (?, 1, ?) ON CONFLICT(key) DO UPDATE SET count = CASE WHEN expires_at > ? THEN count + 1 ELSE 1 END, expires_at = excluded.expires_at')
-      .bind(key, Date.now() + 15 * 60000, Date.now()).run(),
-    clear: () => c.env.DB.prepare('DELETE FROM attempts WHERE key = ?').bind(key).run()
-  };
-}
 
 async function startSession(c: C, ownerId: string) {
   const previous = c.get('session');
@@ -76,26 +33,8 @@ async function startSession(c: C, ownerId: string) {
   setCookie(c, SESSION_COOKIE, token, { httpOnly: true, secure: new URL(c.req.url).protocol === 'https:', sameSite: 'Lax', path: '/', maxAge: SESSION_DAYS * 86400 });
 }
 
-type ConnectionRow = { owner_id: string; method: 'token' | 'oauth'; account_id: string; account_name: string; credentials: string };
-type CafeRow = {
-  id: string; owner_id: string; account_id: string; name: string; script_name: string; database_id: string | null; kv_namespace_id: string | null;
-  custom_domain: string | null; url: string | null; admin_url: string | null; version: string | null; status: 'deploying' | 'live' | 'failed'; last_error: string | null;
-};
-
 const connectionOf = (c: C) => c.env.DB.prepare('SELECT * FROM connections WHERE owner_id = ?').bind(c.get('owner')!.id).first<ConnectionRow>();
-
-/** A client for the owner's account, refreshing an OAuth access token that is about to expire. */
-async function clientFor(c: C, connection: ConnectionRow) {
-  const ownerId = c.get('owner')!.id;
-  let credentials = await decrypt<Credentials>(c.env.ENCRYPTION_KEY, ownerId, connection.credentials).catch(() => {
-    throw new Error('The saved Cloudflare access cannot be read. Disconnect and connect your account again.');
-  });
-  if (credentials.kind === 'oauth' && credentials.expiresAt < Date.now() + 60000) {
-    credentials = await refresh(c.env, credentials);
-    await c.env.DB.prepare('UPDATE connections SET credentials = ?, updated_at = ? WHERE owner_id = ?').bind(await encrypt(c.env.ENCRYPTION_KEY, ownerId, credentials), now(), ownerId).run();
-  }
-  return new CloudflareClient(credentials.kind === 'token' ? credentials.token : credentials.accessToken);
-}
+const clientFor = (c: C, connection: ConnectionRow) => clientForEnv(c.env, connection);
 
 /** Signs in as one of the accounts the credentials reach, after checking they can deploy a café there. */
 async function signIn(c: C, method: 'token' | 'oauth', credentials: Credentials, preferredAccount?: string) {
@@ -114,7 +53,6 @@ async function signIn(c: C, method: 'token' | 'oauth', credentials: Credentials,
   await audit(c, 'connect', method);
 }
 
-const message = (error: unknown) => error instanceof Error ? error.message : 'Something went wrong. Please try again.';
 const FLASH: Record<string, string> = {
   connected: 'Signed in with your Cloudflare account.',
   account: 'Switched Cloudflare account.',
@@ -128,25 +66,9 @@ const slug = (name: string) => name.toLowerCase().normalize('NFKD').replace(/[^a
 
 const app = new Hono<Env>();
 
-// Pages render without a theme; the saved one is applied here so no view has to know about it.
-app.use('*', async (c, next) => {
-  await next();
-  if (!c.res.headers.get('Content-Type')?.startsWith('text/html')) return;
-  const switched = getCookie(c, THEME_SWITCH_COOKIE) === '1';
-  const res = c.res;
-  const headers = new Headers(res.headers);
-  headers.delete('Content-Length');
-  c.res = new Response(applyTheme(await res.text(), getCookie(c, THEME_COOKIE), switched), { status: res.status, headers });
-  if (switched) deleteCookie(c, THEME_SWITCH_COOKIE, { path: '/' });
-});
+app.use('*', themed, guarded);
 
 app.use('*', async (c, next) => {
-  await ensureSchema(c.env.DB);
-  c.header('X-Frame-Options', 'DENY');
-  // The only script is the theme toggle, allowed by its hash.
-  c.header('Content-Security-Policy', `default-src 'none'; script-src ${await themeScriptSource()}; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self' https://dash.cloudflare.com; frame-ancestors 'none'; base-uri 'none'`);
-  // same-origin, not no-referrer: with no-referrer, browsers send "Origin: null" on form posts, which the origin check refuses.
-  c.header('Referrer-Policy', 'same-origin');
   const token = getCookie(c, SESSION_COOKIE);
   let owner: Owner | null = null;
   if (token) {
@@ -156,9 +78,7 @@ app.use('*', async (c, next) => {
   c.set('owner', owner);
   c.set('session', owner ? token! : null);
   if (c.req.method === 'POST') {
-    // Forms only come from this origin; signed-in forms, other than signing in again, also carry the session's CSRF token.
-    const origin = c.req.header('Origin');
-    if (origin && origin !== new URL(c.req.url).origin) return c.html(views.errorPage('This form was sent from another site.'), 403);
+    // Signed-in forms, other than signing in again, also carry the session's CSRF token.
     if (owner && c.req.path !== '/connect/token' && c.req.path !== '/theme') {
       const form = await c.req.parseBody();
       if (typeof form.csrf !== 'string' || !(await safeEqual(form.csrf, await csrfFor(token!)))) return c.html(views.errorPage('This form expired. Go back, reload the page and try again.'), 403);
@@ -323,23 +243,15 @@ app.post('/disconnect', async c => {
 
 app.get('/cafes/new', async c => c.html(views.newCafe({ csrf: await csrfFor(c.get('session')!) })));
 
-const resourcesOf = (cafe: CafeRow): CafeResources => ({
-  accountId: cafe.account_id, scriptName: cafe.script_name, databaseId: cafe.database_id, kvNamespaceId: cafe.kv_namespace_id, customDomain: cafe.custom_domain
-});
-
 /** Deploys a café row, recording the outcome on it; a first deploy gets a fresh setup code. */
 async function runDeploy(c: C, cafe: CafeRow, connection: ConnectionRow, demoData = false) {
-  const release = await currentRelease(c.env);
   const firstDeploy = !cafe.version;
   const setupToken = firstDeploy ? randomToken(24) : undefined;
   try {
-    const result = await deployCafe(await clientFor(c, connection), resourcesOf(cafe), release, releaseFile(c.env), { setupToken, demoData });
-    await c.env.DB.prepare("UPDATE cafes SET database_id = ?, kv_namespace_id = ?, url = ?, admin_url = ?, version = ?, status = 'live', last_error = NULL, updated_at = ? WHERE id = ?")
-      .bind(result.databaseId, result.kvNamespaceId, result.url, result.adminUrl, release.version, now(), cafe.id).run();
-    await audit(c, firstDeploy ? 'deploy' : 'update', release.version, cafe.id);
+    const result = await deployRow(c.env, c.req.url, cafe, connection, { setupToken, demoData });
+    await audit(c, firstDeploy ? 'deploy' : 'update', result.version, cafe.id);
     return c.html(views.deployed({ csrf: await csrfFor(c.get('session')!), name: cafe.name, url: result.url, setupUrl: setupToken ? `${result.adminUrl}#setup=${setupToken}` : null, kind: firstDeploy ? 'deployed' : 'updated' }));
   } catch (error) {
-    await c.env.DB.prepare("UPDATE cafes SET status = CASE WHEN version IS NULL THEN 'failed' ELSE status END, last_error = ?, updated_at = ? WHERE id = ?").bind(message(error).slice(0, 1000), now(), cafe.id).run();
     await audit(c, 'deploy-failed', message(error), cafe.id);
     return c.html(views.errorPage(`${message(error)} Fix it, then retry from your dashboard.`), 502);
   }
@@ -427,10 +339,22 @@ app.post('/cafes/:id/delete', async c => {
   return c.redirect('/dashboard?done=deleted', 303);
 });
 
+/** The notice line a café shows in its admin and panel, asked for by the café's own Worker. Public: it is an advert. */
+app.get('/api/notice', async c => {
+  const cafe = c.req.query('cafe') || '';
+  const { results } = await c.env.DB.prepare("SELECT scope, text, url FROM notices WHERE scope IN ('global', ?)").bind(cafe).all<{ scope: string; text: string; url: string | null }>();
+  const row = results.find(r => r.scope === cafe && cafe) || results.find(r => r.scope === 'global');
+  c.header('Cache-Control', 'public, max-age=300');
+  return c.json({ notice: row?.text ? { text: row.text, url: row.url || null } : null });
+});
+
 app.notFound(c => c.html(views.errorPage('This page does not exist.'), 404));
 app.onError((error, c) => {
   console.error('Control plane request failed', error);
   return c.html(views.errorPage('Something went wrong on our side. Please try again.'), 500);
 });
 
-export default app;
+/** admin.<host> is the platform admin; every other host is the owner site. */
+export default {
+  fetch: (request: Request, env: Bindings, ctx: ExecutionContext) => (isAdminHost(request.url) ? admin : app).fetch(request, env, ctx)
+};

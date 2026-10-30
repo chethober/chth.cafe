@@ -28,7 +28,15 @@ openssl rand -base64 32 | npx wrangler secret put ENCRYPTION_KEY -c control-plan
 npm run deploy:control-plane
 ```
 
-Wrangler creates the `chth-cafe-control-plane` database on the first deploy, and the Worker creates its tables on first use. It serves `chth.cafe` and `www.chth.cafe`; change the `routes` in `control-plane/wrangler.jsonc` to serve it on your own domain.
+Wrangler creates the `chth-cafe-control-plane` database on the first deploy, and the Worker creates its tables on first use. It serves `chth.cafe`, `www.chth.cafe` and the platform admin on `admin.chth.cafe`; change the `routes` in `control-plane/wrangler.jsonc` to serve it on your own domain.
+
+### Platform admin
+
+`admin.<host>` is for whoever runs the control plane. It lists every connected account and café, and can rename a café, update it to the latest release with the owner's saved access, remove it from the platform (it keeps running), delete it from Cloudflare, or remove an account (its access is revoked and it is signed out everywhere; its cafés keep running).
+
+It also sets the **notice line**: one line of text, with an optional https link, shown at the top of every café's admin and panel, for announcements or adverts. Each café can show the platform's line, its own, or none. Cafés ask `GET /api/notice?cafe=<id>` on the main host and keep the answer for ten minutes; cafés deployed before the notice line existed show it after their next update.
+
+`npm run deploy:control-plane` sets a new admin password on every deploy and prints it once. Only its SHA-256 reaches Cloudflare (the `ADMIN_PASSWORD_HASH` secret), and a new password ends every admin session. The release workflow's deploy keeps the previous password, and never prints one in public logs.
 
 Keep `ENCRYPTION_KEY` safe: it decrypts every owner's Cloudflare access. Losing it only means owners have to connect again; their cafés keep running.
 
@@ -61,6 +69,7 @@ The flow uses PKCE and a single-use state bound to the browser that started it. 
 - Cloudflare credentials are encrypted with AES-GCM, with the account ID bound in, so a row copied to another account does not decrypt.
 - Sessions are random tokens stored as SHA-256 hashes. Every form carries a CSRF token tied to the session and must come from the control plane's own origin.
 - Signing in with Cloudflare uses a single-use state kept both in the database and in a cookie in the browser that started it. Token sign-ins are rate limited per address. Every deploy, update, setup link, disconnect and delete is written to `audit_log`.
+- The admin password is about 100 random bits, checked against its SHA-256, rate limited per address, and only valid until the next deploy. Admin forms carry their own CSRF token, and admin actions are written to the owner's `audit_log` as `admin:<action>`.
 - Owners can revoke the control plane at any time: from their Cloudflare profile for OAuth, or by deleting the API token.
 
 ## Tests

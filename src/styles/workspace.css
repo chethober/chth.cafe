@@ -149,6 +149,22 @@ html.light .ws {
 .ws-topbar-title span { font-size: 12px; color: var(--ws-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ws-topbar-actions { display: flex; align-items: center; gap: 4px; }
 .ws-content { flex: 1; width: 100%; max-width: 1240px; margin: 0 auto; padding: 20px 16px calc(32px + env(safe-area-inset-bottom, 0px)); }
+.ws-platform {
+  display: flex; align-items: center; gap: 10px; margin: 0 0 16px; padding: 8px 12px;
+  border: 1px solid var(--ws-rule); border-radius: var(--ws-radius-sm); background: var(--ws-sunken);
+  color: var(--ws-muted); font-size: 13px; line-height: 1.4; text-decoration: none;
+  animation: ws-platform-in 240ms var(--ws-ease) backwards;
+}
+.ws-platform-tag { flex-shrink: 0; font: 700 10px var(--font-sans); letter-spacing: .1em; color: var(--ws-accent); }
+.ws-platform-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ws-platform > svg { flex-shrink: 0; color: var(--ws-accent); transition: transform 160ms var(--ws-ease); }
+a.ws-platform { transition: border-color 150ms ease, color 150ms ease; }
+@media (hover: hover) and (pointer: fine) {
+  a.ws-platform:hover { border-color: var(--ws-rule-strong); color: var(--ws-ink); }
+  a.ws-platform:hover > svg { transform: translate(2px, -2px); }
+}
+@keyframes ws-platform-in { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .ws-platform { animation: none; } }
 .ws-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .ws-brand-mark { width: 36px; height: 36px; flex-shrink: 0; border-radius: 50%; display: grid; place-items: center; background: var(--ws-ink); color: var(--ws-bg); overflow: hidden; }
 .ws-brand-mark img { width: 100%; height: 100%; object-fit: cover; }

@@ -36,6 +36,9 @@ export type Env = {
     ASSETS: Fetcher;
     TELEGRAM_BOT_TOKEN?: string;
     TELEGRAM_CHAT_ID?: string;
+    /** Set by CHTH Café Cloud: where the admin and panel ask for the platform's notice line, and this café's ID there. */
+    PLATFORM_URL?: string;
+    PLATFORM_CAFE_ID?: string;
   };
 };
 
@@ -190,7 +193,7 @@ app.use('/api/*', async (c, next) => {
   const [sessionId, expires] = typeof session === 'string' ? session.split(':') : [];
   const authed = Boolean(sessionId && expires && Number(expires) > Date.now() && c.env?.KV && await c.env.KV.get(`session:${workspace}:${sessionId}`) === expires);
   const path = c.req.path;
-  const publicRead = c.req.method === 'GET' && ['/api/settings', '/api/menu', '/api/auth/session'].includes(path);
+  const publicRead = c.req.method === 'GET' && ['/api/settings', '/api/menu', '/api/auth/session', '/api/platform-notice'].includes(path);
   const publicWrite = c.req.method === 'POST' && ['/api/auth/login', '/api/auth/setup', '/api/orders'].includes(path);
   const tracking = (c.req.method === 'GET' && /^\/api\/(orders\/[^/]+\/tracking|events\/public|event-bookings\/[^/]+\/status)$/.test(path))
     || (c.req.method === 'POST' && /^\/api\/(events\/[^/]+\/bookings|event-bookings\/[^/]+\/cancel)$/.test(path));
@@ -228,6 +231,25 @@ app.get('/api/auth/session', async c => {
   let needsSetup = false;
   try { needsSetup = await setupRequired(c.env); } catch (e) { console.warn('Setup state unavailable:', e); }
   return c.json({ authenticated: c.get('authed') === true, workspace: c.get('workspace'), version, setupRequired: needsSetup });
+});
+// The platform's notice line, kept for ten minutes per isolate so cafés do not ask on every page load.
+let platformNotice: { at: number; key: string; body: { notice: { text: string; url: string | null } | null } } | null = null;
+app.get('/api/platform-notice', async c => {
+  const base = c.env.PLATFORM_URL;
+  if (!base) return c.json({ notice: null });
+  const key = `${base}|${c.env.PLATFORM_CAFE_ID || ''}`;
+  if (!platformNotice || platformNotice.key !== key || Date.now() - platformNotice.at > 10 * 60000) {
+    let body: { notice: { text: string; url: string | null } | null } = { notice: null };
+    try {
+      const response = await fetch(`${base}/api/notice?cafe=${encodeURIComponent(c.env.PLATFORM_CAFE_ID || '')}`, { signal: AbortSignal.timeout(3000) });
+      const data = await response.json() as { notice?: { text?: unknown; url?: unknown } | null };
+      const text = typeof data.notice?.text === 'string' ? data.notice.text.slice(0, 200) : '';
+      const url = typeof data.notice?.url === 'string' && data.notice.url.startsWith('https://') ? data.notice.url : null;
+      body = { notice: text ? { text, url } : null };
+    } catch (e) { console.warn('Platform notice unavailable:', e); }
+    platformNotice = { at: Date.now(), key, body };
+  }
+  return c.json(platformNotice.body);
 });
 app.post('/api/auth/login', async c => {
   const body = await c.req.json();

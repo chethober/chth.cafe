@@ -48,9 +48,9 @@ form.stack{display:grid;gap:18px}
 @media (prefers-reduced-motion:reduce){.cafe:hover{transform:none}}
 `;
 
-/** A signed-in page. */
-function layout(title: string, body: View, options: { account?: string; csrf?: string; narrow?: boolean; themeToggle?: boolean } = {}) {
-  return page(html`<main class="app ${options.narrow ? 'narrow' : ''}">${body}</main>`, { title, styles: STYLES, account: options.account, csrf: options.csrf, themeToggle: options.themeToggle });
+/** A signed-in page; the admin adds its own styles. */
+export function layout(title: string, body: View, options: { account?: string; csrf?: string; narrow?: boolean; themeToggle?: boolean; styles?: string } = {}) {
+  return page(html`<main class="app ${options.narrow ? 'narrow' : ''}">${body}</main>`, { title, styles: STYLES + (options.styles || ''), account: options.account, csrf: options.csrf, themeToggle: options.themeToggle });
 }
 
 export interface ConnectionView { method: 'token' | 'oauth'; accountId: string; accountName: string }

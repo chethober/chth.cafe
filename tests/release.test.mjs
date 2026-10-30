@@ -18,8 +18,16 @@ for (const [path, asset] of Object.entries(manifest.assets)) {
 }
 const mf = new Miniflare(convertV4MiniflareOptions({
   log: new Log(LogLevel.NONE), modules: true, scriptPath: 'release/server.js', compatibilityDate: manifest.compatibilityDate, compatibilityFlags: manifest.compatibilityFlags,
-  d1Databases: { DB: 'release-cafe' }, kvNamespaces: ['KV'], bindings: { SETUP_TOKEN: 'release-setup-token', CAFE_WORKSPACE_PATHS: 'true' }
+  d1Databases: { DB: 'release-cafe' }, kvNamespaces: ['KV'], bindings: { SETUP_TOKEN: 'release-setup-token', CAFE_WORKSPACE_PATHS: 'true', PLATFORM_URL: 'https://cloud.example.com', PLATFORM_CAFE_ID: 'cafe-1' },
+  // The control plane's notice line, the only request a café makes to it.
+  outboundService: request => {
+    const url = new URL(request.url);
+    assert.equal(`${url.origin}${url.pathname}?${url.searchParams}`, 'https://cloud.example.com/api/notice?cafe=cafe-1');
+    platformCalls++;
+    return Response.json({ notice: { text: 'Try CHTH Pro', url: 'javascript:alert(1)' } });
+  }
 }));
+let platformCalls = 0;
 try {
   const session = await (await mf.dispatchFetch('https://cafe.owner.workers.dev/api/auth/session')).json();
   check([session.authenticated, session.setupRequired], [false, true]);
@@ -29,6 +37,10 @@ try {
   });
   check(setup.status, 200);
   check((await (await mf.dispatchFetch('https://cafe.owner.workers.dev/api/settings')).json()).data.cafeName, 'My café');
+  // Shown to signed-out pages too, without a link that is not https, and fetched once per isolate.
+  check(await (await mf.dispatchFetch('https://cafe.owner.workers.dev/api/platform-notice')).json(), { notice: { text: 'Try CHTH Pro', url: null } });
+  await mf.dispatchFetch('https://cafe.owner.workers.dev/api/platform-notice');
+  check(platformCalls, 1);
   console.log(`Passed ${checks} release package assertions for ${manifest.version}.`);
 } finally {
   await mf.dispose();

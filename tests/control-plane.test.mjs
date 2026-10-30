@@ -79,19 +79,20 @@ const bundle = await build({ entryPoints: ['control-plane/src/index.ts'], bundle
 const mf = new Miniflare(convertV4MiniflareOptions({
   log: new Log(LogLevel.NONE), modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2025-01-01',
   d1Databases: { DB: 'control-plane' },
-  bindings: { ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'), CF_OAUTH_CLIENT_ID: 'test-client' },
+  bindings: { ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'), CF_OAUTH_CLIENT_ID: 'test-client', ADMIN_PASSWORD_HASH: createHash('sha256').update('admin-pass-1').digest('hex') },
   serviceBindings: { RELEASE: request => { const file = releaseFiles[new URL(request.url).pathname.slice(1)]; return file === undefined ? new Response('missing', { status: 404 }) : new Response(file); } },
   outboundService: cloudflare
 }));
 let checks = 0;
 const check = (actual, expected) => { assert.deepEqual(actual, expected); checks++; };
 const HOST = 'https://cloud.example.com';
-const browser = () => {
+const ADMIN_HOST = 'https://admin.cloud.example.com';
+const browser = (host = HOST) => {
   const jar = new Map();
   return async (path, form, headers = {}) => {
-    const response = await mf.dispatchFetch(`${HOST}${path}`, {
+    const response = await mf.dispatchFetch(`${host}${path}`, {
       method: form ? 'POST' : 'GET', redirect: 'manual',
-      headers: { Cookie: [...jar].map(([name, value]) => `${name}=${value}`).join('; '), Origin: HOST, ...(form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}), ...headers },
+      headers: { Cookie: [...jar].map(([name, value]) => `${name}=${value}`).join('; '), Origin: host, ...(form ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}), ...headers },
       ...(form ? { body: new URLSearchParams(form).toString() } : {})
     });
     for (const set of response.headers.getSetCookie()) {
@@ -160,11 +161,14 @@ try {
   check([first.metadata.compatibility_date, first.metadata.compatibility_flags], ['2025-01-01', ['nodejs_compat']]);
   check(first.metadata.assets, { jwt: 'assets-complete-jwt', config: { run_worker_first: true } });
   check(first.metadata.keep_bindings, ['secret_text', 'secret_key']);
+  const cafeId = (await (await mf.getD1Database('DB')).prepare('SELECT id FROM cafes').first()).id;
   check(first.metadata.bindings, [
     { type: 'd1', name: 'DB', id: 'db-1' },
     { type: 'kv_namespace', name: 'KV', namespace_id: 'kv-1' },
     { type: 'assets', name: 'ASSETS' },
     { type: 'plain_text', name: 'CAFE_WORKSPACE_PATHS', text: 'true' },
+    { type: 'plain_text', name: 'PLATFORM_URL', text: HOST },
+    { type: 'plain_text', name: 'PLATFORM_CAFE_ID', text: cafeId },
     { type: 'secret_text', name: 'SETUP_TOKEN', text: setupToken }
   ]);
   check(calls.find(call => call.path.endsWith('/schedules')).body, [{ cron: '0 * * * *' }]);
@@ -193,6 +197,42 @@ try {
   const colleague = browser();
   await colleague('/connect/token', { token: 'api-token' });
   assert.match(await (await colleague('/dashboard')).text(), /Corner Beans/); checks++;
+
+  // The platform admin, on admin.<host>, behind the password the last deploy printed.
+  const admin = browser(ADMIN_HOST);
+  assert.match(await (await admin('/')).text(), /Admin password/); checks++;
+  check((await admin(`/cafes/${cafe.id}`)).headers.get('location'), '/');
+  check((await admin('/login', { password: 'admin-pass-0' })).status, 400);
+  check((await admin('/login', { password: 'admin-pass-1' }, { Origin: 'https://evil.example' })).status, 403);
+  check((await admin('/login', { password: 'admin-pass-1' })).headers.get('location'), '/');
+  // The admin exists only on the admin host.
+  check((await browser()('/login', { password: 'admin-pass-1' })).status, 404);
+  const overview = await (await admin('/')).text();
+  assert.match(overview, /Corner Beans Ltd/); assert.match(overview, new RegExp(`/cafes/${cafe.id}`)); checks += 2;
+  const adminCsrf = /name="csrf" value="([^"]+)"/.exec(overview)[1];
+  check((await admin('/notice', { text: 'No token' })).status, 403);
+  check((await admin('/notice', { csrf: adminCsrf, text: 'Hi', url: 'http://plain.example' })).status, 400);
+  // The notice line: global, then overridden per café; cafés ask the owner site for it.
+  check((await owner('/api/notice?cafe=' + cafe.id).then(r => r.json())), { notice: null });
+  check((await admin('/notice', { csrf: adminCsrf, text: '  Try   CHTH Pro ', url: 'https://chth.example/pro' })).headers.get('location'), '/?done=notice');
+  check(await owner('/api/notice?cafe=' + cafe.id).then(r => r.json()), { notice: { text: 'Try CHTH Pro', url: 'https://chth.example/pro' } });
+  check(await admin(`/cafes/${cafe.id}/notice`, { csrf: adminCsrf, mode: 'custom', text: '' }).then(r => r.status), 400);
+  await admin(`/cafes/${cafe.id}/notice`, { csrf: adminCsrf, mode: 'custom', text: 'Beans only', url: '' });
+  check(await owner('/api/notice?cafe=' + cafe.id).then(r => r.json()), { notice: { text: 'Beans only', url: null } });
+  await admin(`/cafes/${cafe.id}/notice`, { csrf: adminCsrf, mode: 'none' });
+  check(await owner('/api/notice?cafe=' + cafe.id).then(r => r.json()), { notice: null });
+  check(await owner('/api/notice?cafe=other').then(r => r.json()), { notice: { text: 'Try CHTH Pro', url: 'https://chth.example/pro' } });
+  await admin(`/cafes/${cafe.id}/notice`, { csrf: adminCsrf, mode: 'global' });
+  check(await owner('/api/notice?cafe=' + cafe.id).then(r => r.json()), { notice: { text: 'Try CHTH Pro', url: 'https://chth.example/pro' } });
+  // Renaming and updating a café with the owner's saved access; the café still asks the owner site.
+  check((await admin(`/cafes/${cafe.id}`, { csrf: adminCsrf, name: 'Corner Beans HQ' })).headers.get('location'), `/cafes/${cafe.id}?done=saved`);
+  assert.match(await (await owner('/dashboard')).text(), /Corner Beans HQ/); checks++;
+  check((await admin(`/cafes/${cafe.id}/deploy`, { csrf: adminCsrf })).headers.get('location'), `/cafes/${cafe.id}?done=updated`);
+  check(scripts.at(-1).metadata.bindings.find(binding => binding.name === 'PLATFORM_URL').text, HOST);
+  check(scripts.at(-1).metadata.bindings.some(binding => binding.name === 'SETUP_TOKEN'), false);
+  check((await admin('/accounts/acc1')).status, 200);
+  check((await admin('/signout', { csrf: adminCsrf })).headers.get('location'), '/');
+  check((await admin(`/cafes/${cafe.id}`)).headers.get('location'), '/');
 
   // Sign in with Cloudflare: PKCE, and a single-use state bound to the browser that started it.
   const stranger = browser();
@@ -234,10 +274,18 @@ try {
   check((await owner(`/cafes/${cafe.id}/delete`, { csrf, confirm: 'cafe-corner-beans' })).headers.get('location'), '/dashboard?done=deleted');
   check(calls.filter(call => call.method === 'DELETE').map(call => call.path), ['/accounts/acc1/workers/scripts/cafe-corner-beans', '/accounts/acc1/d1/database/db-1', '/accounts/acc1/storage/kv/namespaces/kv-1']);
   check((await db.prepare('SELECT COUNT(*) AS n FROM cafes').first()).n, 0);
-  check((await db.prepare("SELECT action FROM audit_log WHERE owner_id = ? ORDER BY id").bind(connection.owner_id).all()).results.map(row => row.action), ['connect', 'deploy', 'setup-link', 'update', 'connect', 'deploy-failed', 'delete']);
+  check((await db.prepare("SELECT action FROM audit_log WHERE owner_id = ? ORDER BY id").bind(connection.owner_id).all()).results.map(row => row.action), ['connect', 'deploy', 'setup-link', 'update', 'connect', 'admin:rename', 'admin:update', 'deploy-failed', 'delete']);
 
   check((await owner('/signout', { csrf })).headers.get('location'), '/');
   check((await owner('/dashboard')).headers.get('location'), '/');
+
+  // Removing an account from the platform forgets it and signs every browser out.
+  const admin2 = browser(ADMIN_HOST);
+  await admin2('/login', { password: 'admin-pass-1' });
+  const admin2Csrf = await csrfOf(await admin2('/accounts/acc1'));
+  check((await admin2('/accounts/acc1/remove', { csrf: admin2Csrf })).headers.get('location'), '/?done=removed');
+  check((await colleague('/dashboard')).headers.get('location'), '/');
+  check((await db.prepare("SELECT COUNT(*) AS n FROM connections WHERE owner_id = 'acc1'").first()).n, 0);
   console.log(`Passed ${checks} control plane assertions.`);
 } finally {
   await mf.dispose();

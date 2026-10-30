@@ -158,7 +158,7 @@ export interface DeployResult {
  * Creates the café's database and namespace on first deploy, then uploads the release.
  * Running it again with the same resources updates the café in place, keeping its data and secrets.
  */
-export async function deployCafe(client: CloudflareClient, cafe: CafeResources, release: Release, files: ReleaseFiles, options: { setupToken?: string; demoData?: boolean } = {}): Promise<DeployResult> {
+export async function deployCafe(client: CloudflareClient, cafe: CafeResources, release: Release, files: ReleaseFiles, options: { setupToken?: string; demoData?: boolean; platform?: { url: string; cafeId: string } } = {}): Promise<DeployResult> {
   const { accountId, scriptName } = cafe;
   const base = `/accounts/${accountId}/workers`;
   let subdomain = '';
@@ -181,6 +181,8 @@ export async function deployCafe(client: CloudflareClient, cafe: CafeResources, 
     { type: 'assets', name: 'ASSETS' }
   ];
   if (!cafe.customDomain) bindings.push({ type: 'plain_text', name: 'CAFE_WORKSPACE_PATHS', text: 'true' });
+  // Where the café's admin and panel ask for the platform's notice line.
+  if (options.platform) bindings.push({ type: 'plain_text', name: 'PLATFORM_URL', text: options.platform.url }, { type: 'plain_text', name: 'PLATFORM_CAFE_ID', text: options.platform.cafeId });
   if (options.setupToken) bindings.push({ type: 'secret_text', name: 'SETUP_TOKEN', text: options.setupToken });
   const metadata = {
     main_module: release.mainModule,

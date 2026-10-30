@@ -56,3 +56,17 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_audit_owner ON audit_log(owner_id, id);
+-- The line of text cafés show at the top of their admin and panel. scope is 'global' or a café ID;
+-- a café's own row overrides the global one, and an empty text hides the line for that café.
+CREATE TABLE IF NOT EXISTS notices (
+  scope TEXT PRIMARY KEY,
+  text TEXT NOT NULL,
+  url TEXT,
+  updated_at TEXT NOT NULL
+);
+-- Platform admin sessions (admin.<host>). They end when a deploy sets a new admin password.
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  id_hash TEXT PRIMARY KEY,
+  password_hash TEXT NOT NULL,
+  expires_at INTEGER NOT NULL
+);

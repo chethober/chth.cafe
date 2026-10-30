@@ -17,7 +17,7 @@
     "test": "node tests/operations.test.mjs && node tests/telegram.test.mjs && node tests/events.test.mjs && node tests/setup.test.mjs && node tests/control-plane.test.mjs && node tests/release.test.mjs",
     "dev:worker": "wrangler dev --local --var CAFE_DEV_PROXY:true",
     "dev:ui": "vite",
-    "deploy:control-plane": "npm run release && wrangler deploy -c control-plane/wrangler.jsonc"
+    "deploy:control-plane": "npm run release && node scripts/deploy-control-plane.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",
