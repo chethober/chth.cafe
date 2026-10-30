@@ -23,7 +23,7 @@ export type Credentials =
 // Cloudflare's scope IDs (GET /client/v4/oauth/scopes), the same permissions as the API token template:
 // Workers Scripts, KV and D1 to deploy, Account Settings to list accounts, and Zone Read and Workers Routes
 // for custom domains, which the client can mark optional.
-const DEFAULT_SCOPES = 'workers-scripts.write workers-kv-storage.write d1.write account-settings.read zone.read workers-routes.write';
+const DEFAULT_SCOPES = 'workers-scripts.edit workers-kv-storage.write d1.write account-settings.read zone.read workers-routes.write';
 
 export const oauthConfigured = (env: OAuthEnv) => Boolean(env.CF_OAUTH_CLIENT_ID);
 const authUrl = (env: OAuthEnv) => env.CF_OAUTH_AUTH_URL || 'https://dash.cloudflare.com/oauth2/auth';

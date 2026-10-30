@@ -45,7 +45,7 @@ Keep `ENCRYPTION_KEY` safe: it decrypts every owner's Cloudflare access. Losing 
 1. In the Cloudflare dashboard, go to Manage Account → OAuth clients and create a client.
 2. Response type `code`, grant type `authorization_code`, and token authentication method `client_secret_post` (or `none` for a public PKCE client without a secret; `client_secret_basic` is not supported).
 3. Set the client URL to `https://<control plane host>` and the redirect URL to `https://<control plane host>/connect/oauth/callback`.
-4. Choose the scopes: Workers Scripts Write, Workers KV Storage Write, D1 Write and Account Settings Read, and, optional for custom domains, Zone Read and Workers Routes Write. These are `DEFAULT_SCOPES` in `src/oauth.ts`; set `CF_OAUTH_SCOPES` to request others.
+4. Choose the scopes: Workers: Edit, Workers KV Storage: Edit, D1: Edit and Account Settings: Read, and, optional for custom domains, Zone: Read and Workers Routes: Edit. These are `DEFAULT_SCOPES` in `src/oauth.ts`; set `CF_OAUTH_SCOPES` to request others.
 5. To let owners outside your account sign in, verify the client URL's domain with the `cloudflare_oauth_client_publisher=` TXT record Cloudflare gives you, then change the client's visibility to public. That change is permanent.
 6. Set the secrets:
 
