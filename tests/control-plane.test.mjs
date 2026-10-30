@@ -113,6 +113,8 @@ try {
   assert.match(landing, /href="\/connect\/oauth"/); checks++;
   assert.match(landing, /permissionGroupKeys=/); checks++;
   check((await owner('/favicon.ico')).headers.get('content-type'), 'image/svg+xml');
+  response = await owner('/logo.png');
+  check([response.headers.get('content-type'), [...new Uint8Array(await response.arrayBuffer()).slice(1, 4)]], ['image/png', [80, 78, 71]]);
   // The theme toggle is a form: it saves the choice, goes back, and only the next page load reveals it.
   const viewer = browser();
   response = await viewer('/theme', { theme: 'light' }, { Referer: `${HOST}/` });

@@ -6,6 +6,7 @@ import { CloudflareClient, CloudflareError, checkAccess, deleteCafe, deployCafe,
 import { decrypt, encrypt, randomToken, sha256 } from './crypto';
 import { authorizeUrl, exchangeCode, newVerifier, oauthConfigured, refresh, revoke, type Credentials, type OAuthEnv } from './oauth';
 import { applyTheme, FAVICON, THEME_COOKIE, THEME_SWITCH_COOKIE, themeScriptSource } from './design';
+import { LOGO_PNG } from './logo';
 import * as views from './views';
 
 type Bindings = OAuthEnv & {
@@ -183,6 +184,7 @@ app.get('/', c => c.get('owner') ? c.redirect('/dashboard') : landing(c));
 const favicon = (c: C) => c.body(FAVICON, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' });
 app.get('/favicon.svg', favicon);
 app.get('/favicon.ico', favicon);
+app.get('/logo.png', c => c.body(Uint8Array.from(atob(LOGO_PNG), ch => ch.charCodeAt(0)), 200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' }));
 
 /** Saves the theme and goes back to the page it was chosen on, which then reveals it from the toggle. */
 app.post('/theme', async c => {
