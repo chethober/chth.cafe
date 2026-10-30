@@ -20,9 +20,10 @@ export type Credentials =
   | { kind: 'token'; token: string }
   | { kind: 'oauth'; accessToken: string; refreshToken: string; expiresAt: number; scope: string };
 
-// Workers scripts, KV and D1 to deploy; zone and routes for custom domains; account and user to list accounts.
-// offline_access returns a refresh token, so updates work after the first hour.
-const DEFAULT_SCOPES = 'account:read user:read workers:write workers_scripts:write workers_kv:write workers_routes:write d1:write zone:read offline_access';
+// Cloudflare's scope IDs (GET /client/v4/oauth/scopes), the same permissions as the API token template:
+// Workers Scripts, KV and D1 to deploy, Account Settings to list accounts, and Zone Read and Workers Routes
+// for custom domains, which the client can mark optional.
+const DEFAULT_SCOPES = 'workers-scripts.write workers-kv-storage.write d1.write account-settings.read zone.read workers-routes.write';
 
 export const oauthConfigured = (env: OAuthEnv) => Boolean(env.CF_OAUTH_CLIENT_ID);
 const authUrl = (env: OAuthEnv) => env.CF_OAUTH_AUTH_URL || 'https://dash.cloudflare.com/oauth2/auth';

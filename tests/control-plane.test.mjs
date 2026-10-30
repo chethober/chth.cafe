@@ -197,7 +197,7 @@ try {
   response = await stranger('/connect/oauth');
   const authorize = new URL(response.headers.get('location'));
   check([authorize.origin + authorize.pathname, authorize.searchParams.get('client_id'), authorize.searchParams.get('code_challenge_method')], ['https://dash.cloudflare.com/oauth2/auth', 'test-client', 'S256']);
-  assert.match(authorize.searchParams.get('scope'), /offline_access/); checks++;
+  check(authorize.searchParams.get('scope').split(' ').sort(), ['account-settings.read', 'd1.write', 'workers-kv-storage.write', 'workers-routes.write', 'workers-scripts.write', 'zone.read']);
   check(authorize.searchParams.get('redirect_uri'), `${HOST}/connect/oauth/callback`);
   issuedChallenge = authorize.searchParams.get('code_challenge');
   const state = authorize.searchParams.get('state');
