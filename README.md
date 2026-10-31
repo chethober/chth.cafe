@@ -82,7 +82,7 @@ npx wrangler secret put SETUP_TOKEN
 npm run deploy
 ```
 
-`wrangler.jsonc` serves the café on workers.dev, with the admin at `/admin` and the panel at `/panel` (`CAFE_WORKSPACE_PATHS`). To use your own domain, add custom domain routes for the main domain and its `admin` and `panel` subdomains, and remove `CAFE_WORKSPACE_PATHS` so the staff apps stay on their subdomains. Keep that configuration in a Git-ignored `wrangler.production.jsonc` and deploy with `npx wrangler deploy -c wrangler.production.jsonc`. The Deploy workflow does the same when the `CAFE_WRANGLER_CONFIG` secret holds that file.
+`wrangler.jsonc` serves the café on workers.dev, with the admin at `/admin` and the panel at `/panel` (`CAFE_WORKSPACE_PATHS`). To use your own domain, add custom domain routes for the main domain and its `admin` and `panel` subdomains, and remove `CAFE_WORKSPACE_PATHS` so the staff apps stay on their subdomains. Keep that configuration in a Git-ignored `wrangler.production.jsonc` and deploy with `npx wrangler deploy -c wrangler.production.jsonc`.
 
 To start with the demo menu instead of an empty café, run `npm run db:seed:remote` before the first visit.
 
