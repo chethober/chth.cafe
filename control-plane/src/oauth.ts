@@ -23,14 +23,11 @@ export type Credentials =
 // Cloudflare's scope IDs (GET /client/v4/oauth/scopes). Uploading a café needs Workers Scripts Write
 // (workers-scripts.write, what wrangler asks for); Workers Editor (workers-scripts.edit) can list Workers
 // but is refused the upload ("No access to the specified resource" on assets-upload-session).
-// Cloudflare only lets a client ask for the scopes its registration allows, and CHTH's OAuth client
-// allows workers-scripts.edit but not workers-scripts.write (asking for it fails with invalid_scope).
-// So sign-in asks for what the client may request, and deploys check for the upload scope up front.
-// Once the client registration allows Workers Scripts Write or Workers Admin, set CF_OAUTH_SCOPES to request
-// it, e.g. "workers-scripts.admin workers-kv-storage.write d1.write account-settings.read zone.read workers-routes.write".
-/** Either lets a grant upload a Worker: Workers Scripts Write, or Workers Admin, which includes it. */
+// Cloudflare only lets a client ask for the scopes its registration allows (anything else fails with
+// invalid_scope), and CHTH's OAuth client allows Workers Admin (the scope above Editor, expected to allow uploads). CF_OAUTH_SCOPES
+// overrides the list for a client registered with other scopes.
 export const SCRIPTS_SCOPES = ['workers-scripts.write', 'workers-scripts.admin'];
-const DEFAULT_SCOPES = 'workers-scripts.edit workers-kv-storage.write d1.write account-settings.read zone.read workers-routes.write';
+const DEFAULT_SCOPES = 'workers-scripts.admin workers-kv-storage.write d1.write account-settings.read zone.read workers-routes.write';
 
 /** An OAuth grant Cloudflare will refuse a Worker upload: it names its scopes, and none of SCRIPTS_SCOPES is among them. */
 export const lacksScriptsScope = (credentials: Credentials) =>
