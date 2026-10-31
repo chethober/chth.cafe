@@ -1,8 +1,11 @@
+import { intlTag, tr } from '../i18n/translate';
+
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export interface OpeningStatus {
   isOpen: boolean;
-  label: 'Open' | 'Closed' | 'Hours unavailable';
+  /** Open, Closed or Hours unavailable, in the customer's language on the public menu. */
+  label: string;
   detail: string;
   nextOpening: Date | null;
 }
@@ -10,8 +13,8 @@ export interface OpeningStatus {
 /** Evaluate the café schedule in its IANA timezone, regardless of device location. */
 export function getOpeningStatus(rawHours: string, now = new Date(), timeZone = 'Asia/Tehran'): OpeningStatus {
   const unavailable: OpeningStatus = {
-    isOpen: false, label: 'Hours unavailable',
-    detail: 'Please contact the café to check opening hours.', nextOpening: null
+    isOpen: false, label: tr('Hours unavailable'),
+    detail: tr('Please contact the café to check opening hours.'), nextOpening: null
   };
   try {
     const wallDate = (date: Date) => {
@@ -56,15 +59,15 @@ export function getOpeningStatus(rawHours: string, now = new Date(), timeZone = 
       end.setUTCHours(Math.floor(entry.close / 60), entry.close % 60);
       intervals.push({ start, end });
     }
-    const time = (date: Date) => date.toLocaleTimeString([], { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
+    const time = (date: Date) => date.toLocaleTimeString(intlTag(), { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
     const current = intervals.find(({ start, end }) => now >= start && now < end);
-    if (current) return { isOpen: true, label: 'Open', detail: `Until ${time(current.end)} · ${timeZone}`, nextOpening: null };
+    if (current) return { isOpen: true, label: tr('Open'), detail: tr('Until {time} · {zone}', { time: time(current.end), zone: timeZone }), nextOpening: null };
     const nextOpening = intervals.find(({ start }) => start > now)?.start ?? null;
     return {
-      isOpen: false, label: 'Closed', nextOpening: nextOpening ? instant(nextOpening) : null,
+      isOpen: false, label: tr('Closed'), nextOpening: nextOpening ? instant(nextOpening) : null,
       detail: nextOpening
-        ? `Opens ${nextOpening.toLocaleDateString([], { weekday: 'long', timeZone: 'UTC' })} at ${time(nextOpening)} · ${timeZone}`
-        : 'No opening hours scheduled. Please contact the café.'
+        ? tr('Opens {day} at {time} · {zone}', { day: nextOpening.toLocaleDateString(intlTag(), { weekday: 'long', timeZone: 'UTC' }), time: time(nextOpening), zone: timeZone })
+        : tr('No opening hours scheduled. Please contact the café.')
     };
   } catch {
     return unavailable;

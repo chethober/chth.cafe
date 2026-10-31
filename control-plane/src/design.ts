@@ -219,6 +219,6 @@ ${body}
 export function applyTheme(document: string, theme: string | undefined, switched: boolean) {
   if (theme !== 'light' && theme !== 'dark') return document;
   return document
-    .replace('<html lang="en">', `<html lang="en" data-theme="${theme}"${switched ? ' data-theme-switch' : ''}>`)
+    .replace(/<html lang="([a-z]{2})"/, `<html lang="$1" data-theme="${theme}"${switched ? ' data-theme-switch' : ''}`)
     .replace(/<meta name="theme-color"[^>]*>\s*<meta name="theme-color"[^>]*>/, `<meta name="theme-color" content="${THEME_COLORS[theme]}">`);
 }

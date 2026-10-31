@@ -121,9 +121,18 @@ try {
   response = await viewer('/theme', { theme: 'light' }, { Referer: `${HOST}/` });
   check([response.status, response.headers.get('location')], [303, '/']);
   check((await viewer('/theme', { theme: 'dark' }, { Referer: 'https://evil.example/' })).headers.get('location'), '/');
-  check(/<html[^>]*>/.exec(await (await viewer('/')).text())[0], '<html lang="en" data-theme="dark" data-theme-switch>');
-  check(/<html[^>]*>/.exec(await (await viewer('/')).text())[0], '<html lang="en" data-theme="dark">');
-  check(/<html[^>]*>/.exec(landing)[0], '<html lang="en">');
+  check(/<html[^>]*>/.exec(await (await viewer('/')).text())[0], '<html lang="en" data-theme="dark" data-theme-switch dir="ltr" data-chth-product="cafe">');
+  check(/<html[^>]*>/.exec(await (await viewer('/')).text())[0], '<html lang="en" data-theme="dark" dir="ltr" data-chth-product="cafe">');
+  check(/<html[^>]*>/.exec(landing)[0], '<html lang="en" dir="ltr" data-chth-product="cafe">');
+  // The landing page speaks five languages: ?lang= picks one and remembers it.
+  const persian = await viewer('/?lang=fa');
+  check(/chth_lang=fa/.test(persian.headers.get('Set-Cookie') || ''), true);
+  const persianPage = await persian.text();
+  check(/<html lang="fa"[^>]*dir="rtl"/.test(persianPage), true);
+  check(persianPage.includes('ورود با کلادفلر'), true);
+  check(persianPage.includes('class="chth-footer"'), true);
+  check((await (await browser()('/', undefined, { 'Accept-Language': 'es-ES,es;q=0.9' })).text()).includes('Preguntas'), true);
+  check((await mf.dispatchFetch(`${HOST}/internal/stats`)).status, 403);
   // There are no control plane accounts to sign up for.
   check((await owner('/signup')).status, 404);
   check((await owner('/signin', { email: 'owner@example.com', password: 'a-long-owner-password' })).status, 404);

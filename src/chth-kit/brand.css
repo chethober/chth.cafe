@@ -1,0 +1,125 @@
+/* Generated from the CHTH kit (chth.hub/kit) by `npm run sync`. Do not edit here: edit the kit and sync. */
+:root {
+  --chth-ink: #09090b;
+  --chth-ink-soft: #18181b;
+  --chth-paper: #fafaf9;
+  --chth-paper-soft: #f4f4f5;
+  --chth-muted: #71717a;
+  --chth-line: rgba(127, 127, 127, 0.22);
+  --chth-accent: #ff6a2b;
+  --chth-accent-hover: #ff7d45;
+  --chth-on-accent: #1a0a02;
+  --chth-success: #10b981;
+  --chth-warning: #f59e0b;
+  --chth-danger: #f43f5e;
+  --chth-telegram: #2ca5e0;
+  --chth-font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --chth-font-display: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --chth-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --chth-font-rtl: 'Vazirmatn', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
+  --chth-radius-sm: 8px;
+  --chth-radius-md: 10px;
+  --chth-radius-lg: 14px;
+  --chth-radius-xl: 20px;
+  --chth-radius-full: 9999px;
+  --chth-cafe-accent: #f59e0b;
+  --chth-cafe-accent-hover: #d97706;
+  --chth-cafe-on-accent: #451a03;
+  --chth-gym-accent: #ff6a2b;
+  --chth-gym-accent-hover: #ff7d45;
+  --chth-gym-on-accent: #1a0a02;
+  --chth-shop-accent: #f97316;
+  --chth-shop-accent-hover: #ea580c;
+  --chth-shop-on-accent: #1a0a02;
+  --chth-hub-accent: #ff6a2b;
+  --chth-hub-accent-hover: #ff7d45;
+  --chth-hub-on-accent: #1a0a02;
+  --chth-product-accent: var(--chth-accent);
+  --chth-product-accent-hover: var(--chth-accent-hover);
+  --chth-product-on-accent: var(--chth-on-accent);
+}
+
+[data-chth-product="cafe"] {
+  --chth-product-accent: var(--chth-cafe-accent);
+  --chth-product-accent-hover: var(--chth-cafe-accent-hover);
+  --chth-product-on-accent: var(--chth-cafe-on-accent);
+}
+
+[data-chth-product="gym"] {
+  --chth-product-accent: var(--chth-gym-accent);
+  --chth-product-accent-hover: var(--chth-gym-accent-hover);
+  --chth-product-on-accent: var(--chth-gym-on-accent);
+}
+
+[data-chth-product="shop"] {
+  --chth-product-accent: var(--chth-shop-accent);
+  --chth-product-accent-hover: var(--chth-shop-accent-hover);
+  --chth-product-on-accent: var(--chth-shop-on-accent);
+}
+
+[data-chth-product="hub"] {
+  --chth-product-accent: var(--chth-hub-accent);
+  --chth-product-accent-hover: var(--chth-hub-accent-hover);
+  --chth-product-on-accent: var(--chth-hub-on-accent);
+}
+
+/* Persian and Arabic pages use the RTL font wherever the brand sans font is used. */
+:root:lang(fa), :root:lang(ar), [dir="rtl"] { --chth-font-sans: var(--chth-font-rtl); --chth-font-display: var(--chth-font-rtl); }
+
+/* Shared CHTH components. Colors come from the surrounding page (currentColor) plus the brand
+   variables, so the same footer fits a dark café menu, the gym app and the light shop. */
+
+.chth-footer {
+  border-top: 1px solid var(--chth-line);
+  color: inherit;
+  font-family: var(--chth-font-sans);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  padding: 2.5rem 1.25rem calc(2rem + env(safe-area-inset-bottom, 0px));
+}
+.chth-footer__inner {
+  display: grid;
+  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  margin-inline: auto;
+  max-width: 72rem;
+}
+.chth-footer__brand { align-items: center; display: flex; gap: 0.75rem; }
+.chth-footer__brand small { opacity: 0.65; }
+.chth-footer__mark { color: var(--chth-product-accent); display: inline-flex; height: 2rem; width: 2rem; }
+.chth-footer__mark svg { height: 100%; width: 100%; }
+.chth-footer h2 {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 0 0 0.75rem;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+.chth-footer ul { display: grid; gap: 0.4rem; list-style: none; margin: 0; padding: 0; }
+.chth-footer a { color: inherit; opacity: 0.85; text-decoration: none; }
+.chth-footer a:hover, .chth-footer a:focus-visible { color: var(--chth-product-accent); opacity: 1; }
+.chth-footer p { margin: 0.75rem 0 0; }
+.chth-footer__langs { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chth-footer__langs a,
+.chth-lang-switch button {
+  border: 1px solid var(--chth-line);
+  border-radius: var(--chth-radius-full);
+  padding: 0.2rem 0.7rem;
+}
+.chth-footer__langs a[aria-current="true"],
+.chth-lang-switch button[aria-pressed="true"] {
+  background: var(--chth-product-accent);
+  border-color: var(--chth-product-accent);
+  color: var(--chth-product-on-accent);
+  opacity: 1;
+}
+
+.chth-lang-switch { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; }
+.chth-lang-switch button {
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
