@@ -12,9 +12,7 @@
   },
   "routes": [
     { "pattern": "chth.cafe", "custom_domain": true },
-    { "pattern": "www.chth.cafe", "custom_domain": true },
-    // The platform admin. Its password changes on every npm run deploy:control-plane.
-    { "pattern": "admin.chth.cafe", "custom_domain": true }
+    { "pattern": "www.chth.cafe", "custom_domain": true }
   ],
   "workers_dev": true,
   // On Workers Paid, raise the CPU limit: uploading a café hashes and encodes its files.
@@ -28,6 +26,6 @@
   // Optional "Connect with Cloudflare" button: set CF_OAUTH_CLIENT_ID (and CF_OAUTH_CLIENT_SECRET for a
   // confidential client) as secrets. Without them, owners connect with an API token.
   // Required secret: ENCRYPTION_KEY, 32 random bytes in base64 (openssl rand -base64 32).
-  // ADMIN_PASSWORD_HASH is set by npm run deploy:control-plane, which prints the new admin password.
+  // The platform admin is the CHTH hub's admin bot: set HUB_SECRET (and HUB_URL) to let it in.
   "vars": {}
 }

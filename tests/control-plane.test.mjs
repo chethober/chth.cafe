@@ -79,14 +79,22 @@ const bundle = await build({ entryPoints: ['control-plane/src/index.ts'], bundle
 const mf = new Miniflare(convertV4MiniflareOptions({
   log: new Log(LogLevel.NONE), modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2025-01-01',
   d1Databases: { DB: 'control-plane' },
-  bindings: { ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'), CF_OAUTH_CLIENT_ID: 'test-client', ADMIN_PASSWORD_HASH: createHash('sha256').update('admin-pass-1').digest('hex') },
+  bindings: { ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'), CF_OAUTH_CLIENT_ID: 'test-client', HUB_SECRET: 'h'.repeat(32) },
   serviceBindings: { RELEASE: request => { const file = releaseFiles[new URL(request.url).pathname.slice(1)]; return file === undefined ? new Response('missing', { status: 404 }) : new Response(file); } },
   outboundService: cloudflare
 }));
 let checks = 0;
 const check = (actual, expected) => { assert.deepEqual(actual, expected); checks++; };
 const HOST = 'https://cloud.example.com';
-const ADMIN_HOST = 'https://admin.cloud.example.com';
+// The platform admin is the CHTH hub's admin bot: signed calls to /internal/*.
+const { signedHeaders } = await import('../src/chth-kit/hub.js');
+const hub = async (method, path, payload, secret = 'h'.repeat(32)) => {
+  const url = `${HOST}${path}`;
+  const body = payload === undefined ? '' : JSON.stringify(payload);
+  const headers = await signedHeaders({ source: 'hub', secret, method, url, body });
+  const response = await mf.dispatchFetch(url, { method, headers, body: body || undefined });
+  return { status: response.status, json: await response.json() };
+};
 const browser = (host = HOST) => {
   const jar = new Map();
   return async (path, form, headers = {}) => {
@@ -207,41 +215,38 @@ try {
   await colleague('/connect/token', { token: 'api-token' });
   assert.match(await (await colleague('/dashboard')).text(), /Corner Beans/); checks++;
 
-  // The platform admin, on admin.<host>, behind the password the last deploy printed.
-  const admin = browser(ADMIN_HOST);
-  assert.match(await (await admin('/')).text(), /Admin password/); checks++;
-  check((await admin(`/cafes/${cafe.id}`)).headers.get('location'), '/');
-  check((await admin('/login', { password: 'admin-pass-0' })).status, 400);
-  check((await admin('/login', { password: 'admin-pass-1' }, { Origin: 'https://evil.example' })).status, 403);
-  check((await admin('/login', { password: 'admin-pass-1' })).headers.get('location'), '/');
-  // The admin exists only on the admin host.
-  check((await browser()('/login', { password: 'admin-pass-1' })).status, 404);
-  const overview = await (await admin('/')).text();
-  assert.match(overview, /Corner Beans Ltd/); assert.match(overview, new RegExp(`/cafes/${cafe.id}`)); checks += 2;
-  const adminCsrf = /name="csrf" value="([^"]+)"/.exec(overview)[1];
-  check((await admin('/notice', { text: 'No token' })).status, 403);
-  check((await admin('/notice', { csrf: adminCsrf, text: 'Hi', url: 'http://plain.example' })).status, 400);
+  // The platform admin: only the hub, with its secret, gets in; there is no admin website.
+  check((await mf.dispatchFetch(`${HOST}/internal/cafes`)).status, 403);
+  check((await hub('GET', '/internal/cafes', undefined, 'x'.repeat(32))).status, 403);
+  check((await mf.dispatchFetch('https://admin.cloud.example.com/login', { method: 'POST' })).status, 404);
+  const listed = (await hub('GET', '/internal/cafes')).json;
+  check(listed.accounts.map(a => [a.name, a.cafes.map(c => c.id)]), [['Corner Beans Ltd', [cafe.id]]]);
+  check(listed.accounts[0].cafes[0].notice, 'global');
+  check((await hub('GET', `/internal/cafes/${cafe.id}`)).json.cafe.reachable, true);
+  check((await hub('GET', '/internal/stats')).json.cafes, 1);
+  check((await hub('POST', '/internal/notice', { text: 'Hi', url: 'http://plain.example' })).status, 400);
   // The notice line: global, then overridden per café; cafés ask the owner site for it.
   check((await owner('/api/notice?cafe=' + cafe.id).then(r => r.json())), { notice: null });
-  check((await admin('/notice', { csrf: adminCsrf, text: '  Try   CHTH Pro ', url: 'https://chth.example/pro' })).headers.get('location'), '/?done=notice');
+  check((await hub('POST', '/internal/notice', { text: '  Try   CHTH Pro ', url: 'https://chth.example/pro' })).json, { ok: true });
   check(await owner('/api/notice?cafe=' + cafe.id).then(r => r.json()), { notice: { text: 'Try CHTH Pro', url: 'https://chth.example/pro' } });
-  check(await admin(`/cafes/${cafe.id}/notice`, { csrf: adminCsrf, mode: 'custom', text: '' }).then(r => r.status), 400);
-  await admin(`/cafes/${cafe.id}/notice`, { csrf: adminCsrf, mode: 'custom', text: 'Beans only', url: '' });
+  check((await hub('POST', `/internal/cafes/${cafe.id}/notice`, { mode: 'custom', text: '' })).status, 400);
+  await hub('POST', `/internal/cafes/${cafe.id}/notice`, { mode: 'custom', text: 'Beans only', url: '' });
   check(await owner('/api/notice?cafe=' + cafe.id).then(r => r.json()), { notice: { text: 'Beans only', url: null } });
-  await admin(`/cafes/${cafe.id}/notice`, { csrf: adminCsrf, mode: 'none' });
+  await hub('POST', `/internal/cafes/${cafe.id}/notice`, { mode: 'none' });
   check(await owner('/api/notice?cafe=' + cafe.id).then(r => r.json()), { notice: null });
+  check((await hub('GET', '/internal/cafes')).json.accounts[0].cafes[0].notice, 'none');
   check(await owner('/api/notice?cafe=other').then(r => r.json()), { notice: { text: 'Try CHTH Pro', url: 'https://chth.example/pro' } });
-  await admin(`/cafes/${cafe.id}/notice`, { csrf: adminCsrf, mode: 'global' });
+  await hub('POST', `/internal/cafes/${cafe.id}/notice`, { mode: 'global' });
   check(await owner('/api/notice?cafe=' + cafe.id).then(r => r.json()), { notice: { text: 'Try CHTH Pro', url: 'https://chth.example/pro' } });
   // Renaming and updating a café with the owner's saved access; the café still asks the owner site.
-  check((await admin(`/cafes/${cafe.id}`, { csrf: adminCsrf, name: 'Corner Beans HQ' })).headers.get('location'), `/cafes/${cafe.id}?done=saved`);
+  check((await hub('POST', `/internal/cafes/${cafe.id}/rename`, { name: '' })).status, 400);
+  check((await hub('POST', `/internal/cafes/${cafe.id}/rename`, { name: 'Corner Beans HQ' })).json, { ok: true });
   assert.match(await (await owner('/dashboard')).text(), /Corner Beans HQ/); checks++;
-  check((await admin(`/cafes/${cafe.id}/deploy`, { csrf: adminCsrf })).headers.get('location'), `/cafes/${cafe.id}?done=updated`);
+  check((await hub('POST', `/internal/cafes/${cafe.id}/deploy`)).json.ok, true);
   check(scripts.at(-1).metadata.bindings.find(binding => binding.name === 'PLATFORM_URL').text, HOST);
   check(scripts.at(-1).metadata.bindings.some(binding => binding.name === 'SETUP_TOKEN'), false);
-  check((await admin('/accounts/acc1')).status, 200);
-  check((await admin('/signout', { csrf: adminCsrf })).headers.get('location'), '/');
-  check((await admin(`/cafes/${cafe.id}`)).headers.get('location'), '/');
+  check((await hub('POST', `/internal/cafes/${cafe.id}/delete`, { confirm: 'wrong' })).status, 400);
+  check((await hub('POST', '/internal/cafes/nope/forget')).status, 404);
 
   // Sign in with Cloudflare: PKCE, and a single-use state bound to the browser that started it.
   const stranger = browser();
@@ -283,16 +288,13 @@ try {
   check((await owner(`/cafes/${cafe.id}/delete`, { csrf, confirm: 'cafe-corner-beans' })).headers.get('location'), '/dashboard?done=deleted');
   check(calls.filter(call => call.method === 'DELETE').map(call => call.path), ['/accounts/acc1/workers/scripts/cafe-corner-beans', '/accounts/acc1/d1/database/db-1', '/accounts/acc1/storage/kv/namespaces/kv-1']);
   check((await db.prepare('SELECT COUNT(*) AS n FROM cafes').first()).n, 0);
-  check((await db.prepare("SELECT action FROM audit_log WHERE owner_id = ? ORDER BY id").bind(connection.owner_id).all()).results.map(row => row.action), ['connect', 'deploy', 'setup-link', 'update', 'connect', 'admin:rename', 'admin:update', 'deploy-failed', 'delete']);
+  check((await db.prepare("SELECT action FROM audit_log WHERE owner_id = ? ORDER BY id").bind(connection.owner_id).all()).results.map(row => row.action), ['connect', 'deploy', 'setup-link', 'update', 'connect', 'admin:notice', 'admin:notice', 'admin:notice', 'admin:rename', 'admin:update', 'deploy-failed', 'delete']);
 
   check((await owner('/signout', { csrf })).headers.get('location'), '/');
   check((await owner('/dashboard')).headers.get('location'), '/');
 
   // Removing an account from the platform forgets it and signs every browser out.
-  const admin2 = browser(ADMIN_HOST);
-  await admin2('/login', { password: 'admin-pass-1' });
-  const admin2Csrf = await csrfOf(await admin2('/accounts/acc1'));
-  check((await admin2('/accounts/acc1/remove', { csrf: admin2Csrf })).headers.get('location'), '/?done=removed');
+  check((await hub('POST', '/internal/accounts/acc1/remove')).json, { ok: true });
   check((await colleague('/dashboard')).headers.get('location'), '/');
   check((await db.prepare("SELECT COUNT(*) AS n FROM connections WHERE owner_id = 'acc1'").first()).n, 0);
   console.log(`Passed ${checks} control plane assertions.`);

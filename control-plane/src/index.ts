@@ -6,11 +6,11 @@ import { decrypt, encrypt, randomToken, sha256 } from './crypto';
 import { authorizeUrl, exchangeCode, newVerifier, oauthConfigured, revoke, type Credentials } from './oauth';
 import { FAVICON, THEME_COOKIE, THEME_SWITCH_COOKIE } from './design';
 import { LOGO_PNG } from './logo';
-import { attempts, audit as auditFor, clientFor as clientForEnv, currentRelease, deployRow, guarded, isAdminHost, message, now, resourcesOf, themed, type Bindings, type CafeRow, type ConnectionRow } from './shared';
-import admin from './admin';
+import { attempts, audit as auditFor, clientFor as clientForEnv, currentRelease, deployRow, guarded, message, now, resourcesOf, themed, type Bindings, type CafeRow, type ConnectionRow } from './shared';
+import internal from './internal';
 import * as views from './views';
 import { landingLocale, localizeLanding } from './i18n';
-import { hubStats, track } from './hub';
+import { track } from './hub';
 import { BRAND_CSS } from '../../src/chth-kit/brand.js';
 
 /** Owners are Cloudflare accounts: whoever can reach an account with OAuth or a token manages its cafés. */
@@ -109,9 +109,6 @@ const landing = async (c: C, error?: string, status: 200 | 400 | 429 = 200) => {
   });
   return c.html(localizeLanding(String(page), locale, BRAND_CSS), status);
 };
-
-// Stats for the CHTH hub (signed requests only; see hub.ts).
-app.get('/internal/stats', c => hubStats(c));
 
 app.get('/', c => c.get('owner') ? c.redirect('/dashboard') : landing(c));
 
@@ -370,7 +367,7 @@ app.onError((error, c) => {
   return c.html(views.errorPage('Something went wrong on our side. Please try again.'), 500);
 });
 
-/** admin.<host> is the platform admin; every other host is the owner site. */
+/** /internal/* is the platform admin for the CHTH hub's signed calls (internal.ts); everything else is the owner site. */
 export default {
-  fetch: (request: Request, env: Bindings, ctx: ExecutionContext) => (isAdminHost(request.url) ? admin : app).fetch(request, env, ctx)
+  fetch: (request: Request, env: Bindings, ctx: ExecutionContext) => (new URL(request.url).pathname.startsWith('/internal/') ? internal : app).fetch(request, env, ctx)
 };

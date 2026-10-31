@@ -7,15 +7,13 @@ import { refresh, type Credentials, type OAuthEnv } from './oauth';
 import { applyTheme, THEME_COOKIE, THEME_SWITCH_COOKIE, themeScriptSource } from './design';
 import * as views from './views';
 
-/** What the owner site (chth.cafe) and the platform admin (admin.chth.cafe) share. */
+/** What the owner site (chth.cafe) and the hub's internal API share. */
 export type Bindings = OAuthEnv & {
   DB: D1Database;
   /** The packaged café release (release/ from npm run release), never served to visitors. */
   RELEASE: Fetcher;
   /** 32 random bytes, base64: encrypts the Cloudflare credentials owners connect. */
   ENCRYPTION_KEY: string;
-  /** SHA-256 (hex) of the platform admin password; npm run deploy:control-plane sets a new one on every deploy. */
-  ADMIN_PASSWORD_HASH?: string;
   /** CHTH hub reporting (optional): the hub's URL and this site's own secret. */
   HUB_URL?: string;
   HUB_SECRET?: string;
@@ -69,9 +67,8 @@ export async function attempts(c: Context, action: string) {
   };
 }
 
-export const isAdminHost = (url: string) => new URL(url).hostname.startsWith('admin.');
-/** The owner site's origin, also from the admin host, so cafés ask chth.cafe and not admin.chth.cafe for their notice. */
-export const platformOrigin = (url: string) => new URL(url).origin.replace('//admin.', '//');
+/** The owner site's origin, which cafés ask for their notice line. */
+export const platformOrigin = (url: string) => new URL(url).origin;
 
 /** A client for the connection's account, refreshing an OAuth access token that is about to expire. */
 export async function clientFor(env: Bindings, connection: ConnectionRow) {
