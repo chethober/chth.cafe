@@ -67,60 +67,88 @@
 :root:lang(fa), :root:lang(ar), [dir="rtl"] { --chth-font-sans: var(--chth-font-rtl); --chth-font-display: var(--chth-font-rtl); }
 
 /* Shared CHTH components. Colors come from the surrounding page (currentColor) plus the brand
-   variables, so the same footer fits a dark café menu, the gym app and the light shop. */
+   variables, so the same footer and language menu fit a dark café menu, the gym app and the
+   light shop. A site can set --chth-line, --chth-menu-bg and --chth-menu-ink to match itself. */
 
+/* Footer: one line, the CHTH logo and "Part of CHTH", linking to chth.wtf. */
 .chth-footer {
   border-top: 1px solid var(--chth-line);
   color: inherit;
+  display: flex;
   font-family: var(--chth-font-sans);
   font-size: 0.875rem;
+  justify-content: center;
   line-height: 1.5;
-  padding: 2.5rem 1.25rem calc(2rem + env(safe-area-inset-bottom, 0px));
+  padding: 1.5rem 1.25rem calc(1.5rem + env(safe-area-inset-bottom, 0px));
 }
-.chth-footer__inner {
-  display: grid;
-  gap: 2rem;
-  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
-  margin-inline: auto;
-  max-width: 72rem;
+.chth-footer__brand {
+  align-items: center;
+  color: inherit;
+  display: inline-flex;
+  font-weight: 600;
+  gap: 0.6rem;
+  min-height: 2.75rem;
+  opacity: 0.8;
+  text-decoration: none;
+  transition: color 150ms ease, opacity 150ms ease;
 }
-.chth-footer__brand { align-items: center; align-self: start; display: flex; gap: 0.75rem; }
-.chth-footer__brand small { opacity: 0.65; }
-.chth-footer__mark { color: var(--chth-product-accent); display: inline-flex; flex: none; height: 2rem; width: 4.4rem; }
+.chth-footer__brand:hover, .chth-footer__brand:focus-visible { color: var(--chth-product-accent); opacity: 1; }
+.chth-footer__mark { color: var(--chth-product-accent); display: inline-flex; flex: none; height: 1.5rem; width: 3.3rem; }
 .chth-footer__mark svg { height: 100%; width: 100%; }
-.chth-footer h2 {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  margin: 0 0 0.75rem;
-  opacity: 0.6;
-  text-transform: uppercase;
-}
-.chth-footer ul { display: grid; gap: 0.4rem; list-style: none; margin: 0; padding: 0; }
-.chth-footer a { color: inherit; opacity: 0.85; text-decoration: none; }
-.chth-footer a:hover, .chth-footer a:focus-visible { color: var(--chth-product-accent); opacity: 1; }
-.chth-footer p { margin: 0.75rem 0 0; }
-.chth-footer__col > p:first-child { margin-top: 0; }
-.chth-footer__langs { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.chth-footer__langs a,
-.chth-lang-switch button {
+
+/* Language menu: a round globe button in the navbar that opens the list of languages. */
+.chth-lang-menu { display: inline-block; flex: none; position: relative; }
+.chth-lang-menu > summary {
+  align-items: center;
   border: 1px solid var(--chth-line);
   border-radius: var(--chth-radius-full);
-  padding: 0.2rem 0.7rem;
-}
-.chth-footer__langs a[aria-current="true"],
-.chth-lang-switch button[aria-pressed="true"] {
-  background: var(--chth-product-accent);
-  border-color: var(--chth-product-accent);
-  color: var(--chth-product-on-accent);
-  opacity: 1;
-}
-
-.chth-lang-switch { display: inline-flex; flex-wrap: wrap; gap: 0.35rem; }
-.chth-lang-switch button {
-  background: transparent;
   color: inherit;
   cursor: pointer;
-  font: inherit;
-  font-size: 0.8125rem;
+  display: inline-grid;
+  height: 2.5rem;
+  justify-items: center;
+  list-style: none;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+  user-select: none;
+  -webkit-user-select: none;
+  width: 2.5rem;
+}
+.chth-lang-menu > summary::-webkit-details-marker { display: none; }
+.chth-lang-menu > summary svg { height: 1.15rem; width: 1.15rem; }
+.chth-lang-menu > summary:active { transform: scale(0.92); }
+.chth-lang-menu > summary:focus-visible { outline: 2px solid var(--chth-product-accent); outline-offset: 2px; }
+.chth-lang-menu[open] > summary { border-color: var(--chth-product-accent); color: var(--chth-product-accent); }
+.chth-lang-menu__list {
+  background: var(--chth-menu-bg, Canvas);
+  border: 1px solid var(--chth-line);
+  border-radius: var(--chth-radius-lg);
+  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.45);
+  color: var(--chth-menu-ink, CanvasText);
+  display: grid;
+  font-family: var(--chth-font-sans);
+  font-size: 0.875rem;
+  gap: 0.125rem;
+  inset-inline-end: 0;
+  min-width: 10rem;
+  padding: 0.375rem;
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  transform-origin: top;
+  z-index: 50;
+}
+.chth-lang-menu[open] .chth-lang-menu__list { animation: chth-menu-in 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+.chth-lang-menu__list a {
+  border-radius: var(--chth-radius-md);
+  color: inherit;
+  display: block;
+  padding: 0.55rem 0.75rem;
+  text-decoration: none;
+}
+.chth-lang-menu__list a:hover, .chth-lang-menu__list a:focus-visible { background: color-mix(in srgb, currentColor 8%, transparent); outline: none; }
+.chth-lang-menu__list a:is(:lang(fa), :lang(ar)) { font-family: var(--chth-font-rtl); letter-spacing: 0; }
+.chth-lang-menu__list a[aria-current="true"] { color: var(--chth-product-accent); font-weight: 700; }
+@keyframes chth-menu-in { from { opacity: 0; transform: translateY(-4px) scale(0.97); } }
+@media (prefers-reduced-motion: reduce) { .chth-lang-menu[open] .chth-lang-menu__list { animation: none; } }
+@media (hover: hover) and (pointer: fine) {
+  .chth-lang-menu > summary:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
 }

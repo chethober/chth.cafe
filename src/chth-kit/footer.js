@@ -1,12 +1,12 @@
 // Generated from the CHTH kit (chth.hub/kit) by `npm run sync`. Do not edit here: edit the kit and sync.
-// The shared "Part of CHTH" footer: the data every site renders, and a plain-HTML version for
-// the server-rendered sites. React sites map footerModel() to their own markup and reuse the
-// .chth-footer styles from brand.css, so every footer looks the same. The footer doesn't list the
-// other CHTH sites and bots; it points to chth.wtf, which does.
+// The shared CHTH footer: the minimal CHTH logo and "Part of CHTH", linking to chth.wtf, which
+// lists the other CHTH sites and bots. footerHtml() is for the server-rendered sites; React
+// sites map footerModel() to the same markup and reuse the .chth-footer styles from brand.css.
+// Language choice lives in the navbar (language-menu.js), not here.
 
-import { LOCALES, translator } from './locales.js';
+import { translator } from './locales.js';
 
-/** Where "more about CHTH" goes. */
+/** Where "Part of CHTH" goes. */
 export const CHTH_INFO_URL = 'https://chth.wtf';
 
 /** The minimal CHTH logo (from chth.shop/chth-logo-minimal.svg), drawn in currentColor. */
@@ -19,70 +19,31 @@ export const FOOTER_LOGO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox=
 
 export const FOOTER_STRINGS = {
   partOf: { en: 'Part of CHTH', fa: 'بخشی از CHTH', ar: 'جزء من CHTH', ru: 'Часть CHTH', es: 'Parte de CHTH' },
-  moreInfo: {
-    en: 'More about CHTH',
-    fa: 'دربارهٔ CHTH بیشتر بدانید',
-    ar: 'المزيد عن CHTH',
-    ru: 'Подробнее о CHTH',
-    es: 'Más sobre CHTH',
-  },
-  language: { en: 'Language', fa: 'زبان', ar: 'اللغة', ru: 'Язык', es: 'Idioma' },
-  source: { en: 'Source code', fa: 'کد منبع', ar: 'الكود المصدري', ru: 'Исходный код', es: 'Código fuente' },
-  openSource: {
-    en: 'Free and open source',
-    fa: 'رایگان و متن‌باز',
-    ar: 'مجاني ومفتوح المصدر',
-    ru: 'Бесплатно и с открытым кодом',
-    es: 'Gratis y de código abierto',
-  },
 };
 
 /**
  * Everything a footer shows, already translated.
  * @param {string} locale
  * @param {string} self   this product's id, sent to chth.wtf as the link ref
- * @param {{ sourceUrl?: string }} [opts]
  */
-export function footerModel(locale, self, opts = {}) {
+export function footerModel(locale, self) {
   const t = translator(FOOTER_STRINGS, locale);
   return {
     partOf: t('partOf'),
-    openSource: t('openSource'),
-    moreInfoLabel: t('moreInfo'),
     infoUrl: `${CHTH_INFO_URL}/?ref=${encodeURIComponent(self)}`,
     logoSvg: FOOTER_LOGO_SVG,
-    languageLabel: t('language'),
-    sourceLabel: t('source'),
-    sourceUrl: opts.sourceUrl ?? null,
-    locales: LOCALES.map((l) => ({ code: l.code, label: l.native, current: l.code === locale })),
   };
 }
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-/**
- * The footer as HTML. Language links go to `langHref(code)`; by default `?lang=<code>`, which
- * each server-rendered site turns into the chth_lang cookie.
- */
-export function footerHtml(locale, self, opts = {}) {
-  const m = footerModel(locale, self, opts);
-  const langHref = opts.langHref ?? ((code) => `?lang=${code}`);
-  const langs = m.locales.map((l) =>
-    `<a href="${esc(langHref(l.code))}" hreflang="${l.code}" lang="${l.code}"${l.current ? ' aria-current="true"' : ''}>${esc(l.label)}</a>`).join('');
+/** The footer as HTML. */
+export function footerHtml(locale, self) {
+  const m = footerModel(locale, self);
   return `<footer class="chth-footer" data-chth-footer>
-  <div class="chth-footer__inner">
-    <a class="chth-footer__brand" href="${esc(m.infoUrl)}">
-      <span class="chth-footer__mark" aria-hidden="true">${m.logoSvg}</span>
-      <span><strong>${esc(m.partOf)}</strong><br><small>${esc(m.openSource)}</small></span>
-    </a>
-    <div class="chth-footer__col">
-      <p class="chth-footer__more"><a href="${esc(m.infoUrl)}">${esc(m.moreInfoLabel)} · chth.wtf ↗</a></p>
-      ${m.sourceUrl ? `<p><a href="${esc(m.sourceUrl)}">${esc(m.sourceLabel)} ↗</a></p>` : ''}
-    </div>
-    <div class="chth-footer__col">
-      <h2>${esc(m.languageLabel)}</h2>
-      <div class="chth-footer__langs">${langs}</div>
-    </div>
-  </div>
+  <a class="chth-footer__brand" href="${esc(m.infoUrl)}">
+    <span class="chth-footer__mark" aria-hidden="true">${m.logoSvg}</span>
+    <span>${esc(m.partOf)}</span>
+  </a>
 </footer>`;
 }

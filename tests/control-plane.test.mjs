@@ -139,6 +139,14 @@ try {
   check(/<html lang="fa"[^>]*dir="rtl"/.test(persianPage), true);
   check(persianPage.includes('ورود با کلادفلر'), true);
   check(persianPage.includes('class="chth-footer"'), true);
+  // One footer (the CHTH mark, linking to chth.wtf), the language menu in the navbar, and the brand fonts.
+  check(persianPage.match(/<footer\b/g).length, 1);
+  check(persianPage.includes('href="https://chth.wtf/?ref=cafe"') && persianPage.includes('بخشی از CHTH'), true);
+  const menuAt = persianPage.indexOf('<details class="chth-lang-menu">');
+  check(menuAt > persianPage.indexOf('<nav class="top"') && menuAt < persianPage.indexOf('<header class="hero"'), true);
+  check(persianPage.includes('hreflang="fa" lang="fa" aria-current="true"'), true);
+  check(landing.includes('fonts.googleapis.com/css2?family=Plus+Jakarta+Sans'), true);
+  check(/font-src https:\/\/fonts\.gstatic\.com/.test(persian.headers.get('content-security-policy') || ''), true);
   check((await (await browser()('/', undefined, { 'Accept-Language': 'es-ES,es;q=0.9' })).text()).includes('Preguntas'), true);
   check((await mf.dispatchFetch(`${HOST}/internal/stats`)).status, 403);
   // There are no control plane accounts to sign up for.

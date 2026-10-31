@@ -270,8 +270,6 @@ html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !i
 .pm-empty h2 { font: 600 22px var(--pm-display); }
 .pm-empty p { max-width: 36ch; font-size: 14px; }
 .pm-empty .pm-button { margin-top: 6px; }
-.pm-endnote { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding-top: 22px; border-top: 1px solid var(--pm-line); color: var(--menu-muted); }
-.pm-endnote > span { font: italic 20px var(--pm-display); }
 
 .pm-cart-bar { position: fixed; z-index: 40; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); animation: pm-cart-in 440ms cubic-bezier(0.34, 1.3, 0.64, 1); }
 @media (min-width: 768px) { .pm-cart-bar { left: auto; right: 24px; width: 380px; } }
@@ -422,17 +420,23 @@ html .menu-paper-dialog .pm-checkout-field input:focus { border-color: var(--men
   .pm-spin { transform: none; }
 }
 
-/* Language picker, beside the theme toggle. */
+/* Language picker, beside the theme toggle: a globe icon over the native select, which keeps the
+   phone's own picker and keyboard support. */
 .pm-lang {
   position: absolute; top: clamp(14px, 2.4vw, 24px); right: calc(clamp(14px, 2.4vw, 24px) + 52px); z-index: 1;
-}
-.pm-lang select {
-  height: 44px; padding: 0 14px; border-radius: 999px; font: inherit; font-size: 14px;
+  display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
   border: 1px solid var(--pm-line); color: var(--menu-ink);
   background: color-mix(in srgb, var(--menu-sheet) 72%, transparent);
+  transition: transform 160ms var(--ease-out), background-color 150ms ease;
+}
+.pm-lang:active { transform: scale(0.94); }
+.pm-lang:has(select:focus-visible) { outline: 2px solid var(--menu-accent); outline-offset: 2px; }
+.pm-lang select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; font: inherit; font-size: 16px; }
+@media (hover: hover) and (pointer: fine) {
+  .pm-lang:hover { background: var(--pm-soft); }
 }
 /* Persian and Arabic use the CHTH RTL font. */
 :root[dir='rtl'] .public-menu, :root[dir='rtl'] .chth-footer { font-family: var(--chth-font-rtl); }
 :root[dir='rtl'] .public-menu :is(h1, h2, h3) { font-family: var(--chth-font-rtl); }
-.chth-footer { color: var(--menu-ink); padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px)); }
+.chth-footer { color: var(--menu-ink); --chth-line: var(--pm-line); --chth-product-accent: var(--menu-accent); margin-top: 32px; padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px)); }
 :root[dir='rtl'] .public-menu :is(.pm-tagline, em, i) { font-style: normal; }

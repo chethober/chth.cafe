@@ -118,7 +118,7 @@ export const guarded: MiddlewareHandler = async (c, next) => {
   await ensureSchema((c.env as Bindings).DB);
   c.header('X-Frame-Options', 'DENY');
   // The only script is the theme toggle, allowed by its hash.
-  c.header('Content-Security-Policy', `default-src 'none'; script-src ${await themeScriptSource()}; style-src 'unsafe-inline'; img-src 'self' data:; form-action 'self' https://dash.cloudflare.com; frame-ancestors 'none'; base-uri 'none'`);
+  c.header('Content-Security-Policy', `default-src 'none'; script-src ${await themeScriptSource()}; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; form-action 'self' https://dash.cloudflare.com; frame-ancestors 'none'; base-uri 'none'`);
   // same-origin, not no-referrer: with no-referrer, browsers send "Origin: null" on form posts, which the origin check refuses.
   c.header('Referrer-Policy', 'same-origin');
   if (c.req.method === 'POST') {

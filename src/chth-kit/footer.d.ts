@@ -2,11 +2,7 @@
 import type { Locale, Text } from './locales.js';
 export const CHTH_INFO_URL: string;
 export const FOOTER_LOGO_SVG: string;
-export const FOOTER_STRINGS: Record<'partOf' | 'moreInfo' | 'language' | 'source' | 'openSource', Text>;
-export interface FooterModel {
-  partOf: string; openSource: string; moreInfoLabel: string; infoUrl: string; logoSvg: string;
-  languageLabel: string; sourceLabel: string; sourceUrl: string | null;
-  locales: { code: Locale; label: string; current: boolean }[];
-}
-export function footerModel(locale: Locale, self: string, opts?: { sourceUrl?: string }): FooterModel;
-export function footerHtml(locale: Locale, self: string, opts?: { sourceUrl?: string; langHref?: (code: Locale) => string }): string;
+export const FOOTER_STRINGS: Record<'partOf', Text>;
+export interface FooterModel { partOf: string; infoUrl: string; logoSvg: string }
+export function footerModel(locale: Locale, self: string): FooterModel;
+export function footerHtml(locale: Locale, self: string): string;

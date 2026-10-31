@@ -1,5 +1,7 @@
 import { html, raw } from 'hono/html';
 import type { HtmlEscapedString } from 'hono/utils/html';
+import { BRAND_CSS } from '../../src/chth-kit/brand.js';
+import { footerHtml } from '../../src/chth-kit/footer.js';
 
 /**
  * The page shell every control plane page shares: tokens for both themes, the nav with the theme
@@ -9,6 +11,9 @@ import type { HtmlEscapedString } from 'hono/utils/html';
 export type View = HtmlEscapedString | Promise<HtmlEscapedString>;
 
 export const THEME_COOKIE = 'cp_theme';
+
+/** The brand fonts, as the café app loads them: Plus Jakarta Sans, Fraunces, JetBrains Mono and Vazirmatn for Persian and Arabic. */
+export const FONTS_URL = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300..800&family=Fraunces:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400..600&family=Vazirmatn:wght@300..800&display=swap';
 /** Set for one page load after the theme changes, so that page reveals itself in a circle. */
 export const THEME_SWITCH_COOKIE = 'cp_theme_switch';
 export const THEME_COLORS = { dark: '#100b08', light: '#f7f1e8' } as const;
@@ -17,13 +22,13 @@ const DARK = '--bg:#100b08;--bg2:#17110c;--panel:#1d1610;--panel2:#241b14;--line
 const LIGHT = '--bg:#f7f1e8;--bg2:#efe6d8;--panel:#fffaf3;--panel2:#fbf3e8;--line:#e3d5c2;--line2:#cdb9a0;--ink:#23180f;--muted:#6b5848;--dim:#86715e;--accent:#b4612a;--accent2:#9a4f1d;--em1:#c87a3c;--em2:#a2531f;--em3:#7a3a14;--mint:#1d8a5a;--red:#c2412f;--warn:#8a5a00;--field:#fffdf9;--shadow:rgba(80,50,20,.28);--glass:rgba(247,241,232,.78);--soft:rgba(60,35,15,.035);--soft2:rgba(60,35,15,.07);--chat:#e6f1fb;--chat-line:#c3dcf0;--chat-meta:#4f7799;color-scheme:light';
 
 const BASE = `
-:root{${DARK};--serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+:root{${DARK};--serif:"Fraunces","Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;--mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 --ease-out:cubic-bezier(0.23,1,0.32,1);--ease-in-out:cubic-bezier(0.77,0,0.175,1);--spring:cubic-bezier(0.34,1.56,0.64,1);interpolate-size:allow-keywords}
 @media (prefers-color-scheme:light){:root:not([data-theme="dark"]){${LIGHT}}}
 :root[data-theme="light"]{${LIGHT}}
 .force-dark{${DARK}}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
-body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font:16px/1.6 var(--chth-font-sans,system-ui,sans-serif);-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:var(--accent);text-underline-offset:3px;text-decoration-thickness:1px;transition:color 150ms ease}
 .wrap{max-width:1160px;margin:0 auto;padding:0 20px;width:100%}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -82,8 +87,10 @@ details>summary{cursor:pointer}
 details::details-content{height:0;overflow:clip;transition:height 250ms var(--ease-out),content-visibility 250ms allow-discrete}
 details[open]::details-content{height:auto}
 
-footer.site{margin-top:auto;border-top:1px solid var(--line);padding:28px 0 40px;color:var(--dim);font-size:14px}
-footer.site .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}footer.site a{color:var(--muted)}
+/* The shared CHTH footer and navbar language menu, in this page's colors */
+:root[data-chth-product]{--chth-product-accent:var(--accent);--chth-line:var(--line);--chth-menu-bg:var(--panel);--chth-menu-ink:var(--ink)}
+.chth-footer{margin-top:auto;color:var(--muted)}
+.chth-lang-menu>summary{background:var(--soft);color:var(--ink)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 
 @media (hover:hover) and (pointer:fine){
@@ -178,7 +185,7 @@ export function page(body: View, options: PageOptions) {
     ? html`${options.account ? html`<span class="account">${options.account}</span>` : ''}<form class="inline" method="post" action="/signout"><input type="hidden" name="csrf" value="${options.csrf}"><button class="btn ghost small" type="submit">Sign out</button></form>`
     : options.signInHref ? html`<a class="btn cf small" href="${options.signInHref}">${CLOUD} Sign in</a>` : '';
   return html`<!doctype html>
-<html lang="en">
+<html lang="en" data-chth-product="cafe">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -187,8 +194,11 @@ ${options.description ? html`<meta name="description" content="${options.descrip
 <meta name="theme-color" content="${THEME_COLORS.dark}" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="${THEME_COLORS.light}" media="(prefers-color-scheme: light)">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="${FONTS_URL}">
 <title>${options.title} · CHTH Café Cloud</title>
-<style>${raw(BASE)}${raw(options.styles || '')}</style>
+<style>${raw(BRAND_CSS)}${raw(BASE)}${raw(options.styles || '')}</style>
 </head>
 <body>
 <nav class="top" aria-label="Main">
@@ -196,6 +206,7 @@ ${options.description ? html`<meta name="description" content="${options.descrip
     <a class="brand" href="/">${CUP}<span>CHTH Café Cloud</span></a>
     <div class="nav-end">
       ${options.links || ''}${end}
+      <!--chth-lang-->
       ${options.themeToggle === false ? '' : html`<form class="theme" method="post" action="/theme">
         <button class="to-light" type="submit" name="theme" value="light" aria-label="Switch to light appearance">${SUN}</button>
         <button class="to-dark" type="submit" name="theme" value="dark" aria-label="Switch to dark appearance">${MOON}</button>
@@ -205,12 +216,7 @@ ${options.description ? html`<meta name="description" content="${options.descrip
 </nav>
 ${body}
 <script>${raw(THEME_SCRIPT)}</script>
-<footer class="site">
-  <div class="wrap">
-    <span>CHTH Café Cloud · open source café management on Cloudflare</span>
-    <a href="https://github.com/chethober/chth.cafe" rel="noopener">GitHub</a>
-  </div>
-</footer>
+${raw(footerHtml('en', 'cafe'))}
 </body>
 </html>`;
 }

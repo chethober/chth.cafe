@@ -11,7 +11,6 @@ import internal from './internal';
 import * as views from './views';
 import { landingLocale, localizeLanding } from './i18n';
 import { track } from './hub';
-import { BRAND_CSS } from '../../src/chth-kit/brand.js';
 
 /** Owners are Cloudflare accounts: whoever can reach an account with OAuth or a token manages its cafés. */
 type Owner = { id: string; name: string };
@@ -107,7 +106,7 @@ const landing = async (c: C, error?: string, status: 200 | 400 | 429 = 200) => {
     error: error ?? (c.req.query('error') === 'oauth' ? 'Cloudflare did not sign you in. Try again, or use an API token.' : undefined),
     message: c.req.query('done') === 'disconnected' ? 'Signed out and forgot your Cloudflare access. Your cafés keep running.' : undefined
   });
-  return c.html(localizeLanding(String(page), locale, BRAND_CSS), status);
+  return c.html(localizeLanding(String(page), locale), status);
 };
 
 app.get('/', c => c.get('owner') ? c.redirect('/dashboard') : landing(c));

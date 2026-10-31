@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Coffee, GlassWater, Leaf, Cake, Utensils, Search, Plus, Minus, ShoppingBag, CheckCircle2, X, MapPin, Phone, ChevronRight, Heart, ArrowUp, SlidersHorizontal, Sparkles, Shuffle, Sun, Moon, type LucideIcon } from 'lucide-react';
+import { Coffee, GlassWater, Leaf, Cake, Utensils, Search, Plus, Minus, ShoppingBag, CheckCircle2, X, MapPin, Phone, ChevronRight, Heart, SlidersHorizontal, Sparkles, Shuffle, Sun, Moon, Globe, type LucideIcon } from 'lucide-react';
 import { CategorySelect, MenuItemSelect, MenuVariantSelect, SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { getOpeningStatus } from '../utils/openingHours';
@@ -43,20 +43,14 @@ function chooseLocale() {
   setLocale(detectLocale(), new URLSearchParams(window.location.search).has('lang'));
 }
 
-/** The shared CHTH footer: the CHTH logo and a link to chth.wtf, and the language picker. */
-function ChthFooter({ locale, onLocale }: { locale: Locale; onLocale: (l: Locale) => void }) {
-  const m = footerModel(locale, 'cafe', { sourceUrl: 'https://github.com/chethober/chth.cafe' });
+/** The shared CHTH footer: the CHTH mark, linking to chth.wtf. */
+function ChthFooter({ locale }: { locale: Locale }) {
+  const m = footerModel(locale, 'cafe');
   return <footer className="chth-footer" data-chth-footer>
-    <div className="chth-footer__inner">
-      <a className="chth-footer__brand" href={m.infoUrl}><span className="chth-footer__mark" aria-hidden="true" dangerouslySetInnerHTML={{ __html: m.logoSvg }} /><span><strong>{m.partOf}</strong><br /><small>{m.openSource}</small></span></a>
-      <div className="chth-footer__col">
-        <p className="chth-footer__more"><a href={m.infoUrl}>{m.moreInfoLabel} · chth.wtf ↗</a></p>
-        {m.sourceUrl && <p><a href={m.sourceUrl}>{m.sourceLabel} ↗</a></p>}
-      </div>
-      <div className="chth-footer__col"><h2>{m.languageLabel}</h2>
-        <div className="chth-lang-switch">{m.locales.map(l => <button type="button" key={l.code} lang={l.code} aria-pressed={l.current} onClick={() => onLocale(l.code)}>{l.label}</button>)}</div>
-      </div>
-    </div>
+    <a className="chth-footer__brand" href={m.infoUrl}>
+      <span className="chth-footer__mark" aria-hidden="true" dangerouslySetInnerHTML={{ __html: m.logoSvg }} />
+      <span>{m.partOf}</span>
+    </a>
   </footer>;
 }
 
@@ -420,7 +414,8 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
           <Sun className="pm-theme-sun" size={19} aria-hidden="true" />
           <Moon className="pm-theme-moon" size={19} aria-hidden="true" />
         </button>
-        <label className="pm-lang">
+        <label className="pm-lang" title={t('Language')}>
+          <Globe size={19} aria-hidden="true" />
           <span className="sr-only">{t('Language')}</span>
           <select value={locale} onChange={event => setLocale(event.target.value as Locale)}>
             {LOCALES.map(l => <option key={l.code} value={l.code} lang={l.code}>{l.native}</option>)}
@@ -548,11 +543,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
         </section>)}
       </div>}
 
-      <footer className="pm-endnote">
-        <span>{t('Good things take a little pause.')}</span>
-        <button type="button" className="pm-link-button" onClick={() => document.getElementById('menu-top')?.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' })}>{t('Back to the top')}<ArrowUp size={16} /></button>
-      </footer>
-      <ChthFooter locale={locale} onLocale={code => setLocale(code)} />
+<ChthFooter locale={locale} />
 
       {cartCount > 0 && <div className="pm-cart-bar">
         <button ref={cartBarRef} type="button" onClick={() => setIsCartOpen(true)}>

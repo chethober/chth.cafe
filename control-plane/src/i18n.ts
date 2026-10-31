@@ -1,10 +1,11 @@
 // The chth.cafe landing page in five languages. The page is written in English; LANDING maps
 // each English text (or a small HTML fragment, where markup sits inside a sentence) to Persian,
 // Arabic, Russian and Spanish, and localizeLanding() translates the rendered page on the way out.
-// The control plane allows no scripts, so the language links are plain ?lang= links.
+// The control plane allows no scripts, so the navbar's language menu is a <details> of plain ?lang= links.
 
-import { dirOf, isLocale, localeCookie, localeFromCookie, pickLocale, LOCALES, type Locale } from '../../src/chth-kit/locales.js';
+import { dirOf, isLocale, localeCookie, localeFromCookie, pickLocale, type Locale } from '../../src/chth-kit/locales.js';
 import { footerHtml } from '../../src/chth-kit/footer.js';
+import { languageMenuHtml } from '../../src/chth-kit/language-menu.js';
 
 type Row = [fa: string, ar: string, ru: string, es: string];
 const COL: Record<Exclude<Locale, 'en'>, number> = { fa: 0, ar: 1, ru: 2, es: 3 };
@@ -131,16 +132,13 @@ export function landingLocale(req: Request): { locale: Locale; setCookie?: strin
 }
 
 const LANDING_CSS = `
-.chth-lang{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;padding:18px 16px 0}
-.chth-lang a{border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px;color:var(--muted);text-decoration:none}
-.chth-lang a[aria-current="true"]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
-.chth-footer{color:var(--ink);--chth-line:var(--line)}
 html[dir="rtl"] body{font-family:var(--chth-font-rtl)}html[dir="rtl"] .window,html[dir="rtl"] .phone,html[dir="rtl"] .board{direction:ltr}html[dir="rtl"] .display{font-family:var(--chth-font-rtl);letter-spacing:0}
 `;
 
-/** Translates the rendered landing page and adds the language links and the CHTH footer. */
-export function localizeLanding(page: string, locale: Locale, brandCss: string): string {
-  let out = page;
+/** Translates the rendered landing page, adds the navbar language menu and localizes the CHTH footer. */
+export function localizeLanding(page: string, locale: Locale): string {
+  // The footer is swapped before translating, so the translator never sees its English text.
+  let out = page.replace(footerHtml('en', 'cafe'), footerHtml(locale, 'cafe'));
   if (locale !== 'en') {
     const col = COL[locale];
     // Fragments with markup first, then plain text nodes and text attributes.
@@ -156,10 +154,8 @@ export function localizeLanding(page: string, locale: Locale, brandCss: string):
     ).join('');
     out = out.replace(/<title>([^<]*) · CHTH Café Cloud<\/title>/, (m, title: string) => { const t = tr(title); return t == null ? m : `<title>${t} · CHTH Café Cloud</title>`; });
   }
-  const langs = `<nav class="chth-lang" aria-label="Language">${LOCALES.map(l =>
-    `<a href="?lang=${l.code}" hreflang="${l.code}" lang="${l.code}"${l.code === locale ? ' aria-current="true"' : ''}>${l.native}</a>`).join('')}</nav>`;
   return out
-    .replace('<html lang="en">', `<html lang="${locale}" dir="${dirOf(locale)}" data-chth-product="cafe">`)
-    .replace('</head>', `<style>${brandCss}${LANDING_CSS}</style></head>`)
-    .replace('<footer class="site">', `${langs}${footerHtml(locale, 'cafe')}<footer class="site">`);
+    .replace('<html lang="en" data-chth-product="cafe">', `<html lang="${locale}" dir="${dirOf(locale)}" data-chth-product="cafe">`)
+    .replace('</head>', `<style>${LANDING_CSS}</style></head>`)
+    .replace('<!--chth-lang-->', languageMenuHtml(locale));
 }
