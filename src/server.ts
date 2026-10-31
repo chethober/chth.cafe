@@ -232,13 +232,14 @@ app.get('/api/auth/session', async c => {
   try { needsSetup = await setupRequired(c.env); } catch (e) { console.warn('Setup state unavailable:', e); }
   return c.json({ authenticated: c.get('authed') === true, workspace: c.get('workspace'), version, setupRequired: needsSetup });
 });
-// The platform's notice line, kept for ten minutes per isolate so cafés do not ask on every page load.
+// The platform's notice line, kept for a minute per isolate so cafés do not ask on every page load
+// but an admin's change shows up quickly.
 let platformNotice: { at: number; key: string; body: { notice: { text: string; url: string | null } | null } } | null = null;
 app.get('/api/platform-notice', async c => {
   const base = c.env.PLATFORM_URL;
   if (!base) return c.json({ notice: null });
   const key = `${base}|${c.env.PLATFORM_CAFE_ID || ''}`;
-  if (!platformNotice || platformNotice.key !== key || Date.now() - platformNotice.at > 10 * 60000) {
+  if (!platformNotice || platformNotice.key !== key || Date.now() - platformNotice.at > 60000) {
     let body: { notice: { text: string; url: string | null } | null } = { notice: null };
     try {
       const response = await fetch(`${base}/api/notice?cafe=${encodeURIComponent(c.env.PLATFORM_CAFE_ID || '')}`, { signal: AbortSignal.timeout(3000) });

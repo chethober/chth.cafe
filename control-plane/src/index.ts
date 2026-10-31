@@ -358,7 +358,7 @@ app.get('/api/notice', async c => {
   const cafe = c.req.query('cafe') || '';
   const { results } = await c.env.DB.prepare("SELECT scope, text, url FROM notices WHERE scope IN ('global', ?)").bind(cafe).all<{ scope: string; text: string; url: string | null }>();
   const row = results.find(r => r.scope === cafe && cafe) || results.find(r => r.scope === 'global');
-  c.header('Cache-Control', 'public, max-age=300');
+  c.header('Cache-Control', 'public, max-age=30');
   return c.json({ notice: row?.text ? { text: row.text, url: row.url || null } : null });
 });
 
