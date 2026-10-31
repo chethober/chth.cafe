@@ -64,9 +64,5 @@ CREATE TABLE IF NOT EXISTS notices (
   url TEXT,
   updated_at TEXT NOT NULL
 );
--- Platform admin sessions (admin.<host>). They end when a deploy sets a new admin password.
-CREATE TABLE IF NOT EXISTS admin_sessions (
-  id_hash TEXT PRIMARY KEY,
-  password_hash TEXT NOT NULL,
-  expires_at INTEGER NOT NULL
-);
+-- The platform admin moved to the CHTH hub's admin bot; its old sessions table goes.
+DROP TABLE IF EXISTS admin_sessions;
