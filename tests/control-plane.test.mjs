@@ -306,6 +306,16 @@ try {
   response = await refusedBrowser(`/connect/oauth/callback?state=${refusedAuthorize.searchParams.get('state')}&error=invalid_scope&error_description=${encodeURIComponent("The OAuth 2.0 Client is not allowed to request scope 'x'.")}`);
   check(response.status, 400);
   assert.match(await response.text(), /not allowed to request scope &#39;x&#39;/); checks++;
+  // Workers Admin includes the upload, so a grant with it is not stopped.
+  grantedScope = 'workers-scripts.admin workers-kv-storage.write d1.write account-settings.read';
+  const admin = browser();
+  const adminAuthorize = new URL((await admin('/connect/oauth')).headers.get('location'));
+  issuedChallenge = adminAuthorize.searchParams.get('code_challenge');
+  await admin(`/connect/oauth/callback?state=${adminAuthorize.searchParams.get('state')}&code=good-code`);
+  response = await admin('/cafes', { csrf: await csrfOf(await admin('/dashboard')), name: 'Admin Grant', demo: '1' });
+  assert.doesNotMatch(await response.text(), /sign in with an API token instead/); checks++;
+  await db.prepare("DELETE FROM cafes WHERE script_name = 'cafe-admin-grant'").run();
+  grantedScope = 'workers-scripts.write workers-kv-storage.write d1.write account-settings.read';
   // Disconnecting revokes the OAuth grant and signs the account out.
   check((await stranger('/disconnect', { csrf: strangerCsrf })).headers.get('location'), '/?done=disconnected');
   check(calls.find(call => call.path === '/oauth2/revoke').token, 'oauth-refresh');

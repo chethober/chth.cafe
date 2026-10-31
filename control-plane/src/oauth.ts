@@ -26,14 +26,15 @@ export type Credentials =
 // Cloudflare only lets a client ask for the scopes its registration allows, and CHTH's OAuth client
 // allows workers-scripts.edit but not workers-scripts.write (asking for it fails with invalid_scope).
 // So sign-in asks for what the client may request, and deploys check for the upload scope up front.
-// Once the client registration allows Workers Scripts Write, set CF_OAUTH_SCOPES to request it, e.g.
-// "workers-scripts.write workers-kv-storage.write d1.write account-settings.read zone.read workers-routes.write".
-export const SCRIPTS_SCOPE = 'workers-scripts.write';
+// Once the client registration allows Workers Scripts Write or Workers Admin, set CF_OAUTH_SCOPES to request
+// it, e.g. "workers-scripts.admin workers-kv-storage.write d1.write account-settings.read zone.read workers-routes.write".
+/** Either lets a grant upload a Worker: Workers Scripts Write, or Workers Admin, which includes it. */
+export const SCRIPTS_SCOPES = ['workers-scripts.write', 'workers-scripts.admin'];
 const DEFAULT_SCOPES = 'workers-scripts.edit workers-kv-storage.write d1.write account-settings.read zone.read workers-routes.write';
 
-/** An OAuth grant Cloudflare will refuse a Worker upload: it names its scopes, and Workers Scripts Write is not one. */
+/** An OAuth grant Cloudflare will refuse a Worker upload: it names its scopes, and none of SCRIPTS_SCOPES is among them. */
 export const lacksScriptsScope = (credentials: Credentials) =>
-  credentials.kind === 'oauth' && credentials.scope.trim() !== '' && !credentials.scope.split(/\s+/).includes(SCRIPTS_SCOPE);
+  credentials.kind === 'oauth' && credentials.scope.trim() !== '' && !credentials.scope.split(/\s+/).some(scope => SCRIPTS_SCOPES.includes(scope));
 
 export const oauthConfigured = (env: OAuthEnv) => Boolean(env.CF_OAUTH_CLIENT_ID);
 const authUrl = (env: OAuthEnv) => env.CF_OAUTH_AUTH_URL || 'https://dash.cloudflare.com/oauth2/auth';
