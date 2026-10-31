@@ -10,7 +10,6 @@ import { reducedMotion } from '../ui';
 import { applyDocumentLocale, detectLocale, setLocale, useLocale, useT, type Locale } from '../i18n';
 import { LOCALES } from '../chth-kit/locales.js';
 import { footerModel } from '../chth-kit/footer.js';
-import { LOGO_SVG } from '../chth-kit/brand.js';
 
 interface PublicMenuProps {
   settings: SettingsSelect;
@@ -44,17 +43,18 @@ function chooseLocale() {
   setLocale(detectLocale(), new URLSearchParams(window.location.search).has('lang'));
 }
 
-/** The shared CHTH footer: the other CHTH sites and bots, and the language picker. */
+/** The shared CHTH footer: the CHTH logo and a link to chth.wtf, and the language picker. */
 function ChthFooter({ locale, onLocale }: { locale: Locale; onLocale: (l: Locale) => void }) {
   const m = footerModel(locale, 'cafe', { sourceUrl: 'https://github.com/chethober/chth.cafe' });
   return <footer className="chth-footer" data-chth-footer>
     <div className="chth-footer__inner">
-      <div className="chth-footer__brand"><span className="chth-footer__mark" aria-hidden="true" dangerouslySetInnerHTML={{ __html: LOGO_SVG }} /><span><strong>{m.partOf}</strong><br /><small>{m.openSource}</small></span></div>
-      <nav className="chth-footer__col" aria-label={m.sitesTitle}><h2>{m.sitesTitle}</h2><ul>{m.sites.map(p => <li key={p.id}><a href={p.href} title={p.tagline}><span aria-hidden="true">{p.ico}</span> {p.name}</a></li>)}</ul></nav>
-      <nav className="chth-footer__col" aria-label={m.botsTitle}><h2>{m.botsTitle}</h2><ul>{m.bots.map(p => <li key={p.id}><a href={p.href} title={p.tagline}><span aria-hidden="true">{p.ico}</span> {p.name}</a></li>)}</ul></nav>
+      <a className="chth-footer__brand" href={m.infoUrl}><span className="chth-footer__mark" aria-hidden="true" dangerouslySetInnerHTML={{ __html: m.logoSvg }} /><span><strong>{m.partOf}</strong><br /><small>{m.openSource}</small></span></a>
+      <div className="chth-footer__col">
+        <p className="chth-footer__more"><a href={m.infoUrl}>{m.moreInfoLabel} · chth.wtf ↗</a></p>
+        {m.sourceUrl && <p><a href={m.sourceUrl}>{m.sourceLabel} ↗</a></p>}
+      </div>
       <div className="chth-footer__col"><h2>{m.languageLabel}</h2>
         <div className="chth-lang-switch">{m.locales.map(l => <button type="button" key={l.code} lang={l.code} aria-pressed={l.current} onClick={() => onLocale(l.code)}>{l.label}</button>)}</div>
-        {m.sourceUrl && <p><a href={m.sourceUrl}>{m.sourceLabel} ↗</a></p>}
       </div>
     </div>
   </footer>;

@@ -5,7 +5,6 @@
 
 import { dirOf, isLocale, localeCookie, localeFromCookie, pickLocale, LOCALES, type Locale } from '../../src/chth-kit/locales.js';
 import { footerHtml } from '../../src/chth-kit/footer.js';
-import { LOGO_SVG } from '../../src/chth-kit/brand.js';
 
 type Row = [fa: string, ar: string, ru: string, es: string];
 const COL: Record<Exclude<Locale, 'en'>, number> = { fa: 0, ar: 1, ru: 2, es: 3 };
@@ -162,5 +161,5 @@ export function localizeLanding(page: string, locale: Locale, brandCss: string):
   return out
     .replace('<html lang="en">', `<html lang="${locale}" dir="${dirOf(locale)}" data-chth-product="cafe">`)
     .replace('</head>', `<style>${brandCss}${LANDING_CSS}</style></head>`)
-    .replace('<footer class="site">', `${langs}${footerHtml(locale, 'cafe', { logoSvg: LOGO_SVG })}<footer class="site">`);
+    .replace('<footer class="site">', `${langs}${footerHtml(locale, 'cafe')}<footer class="site">`);
 }
