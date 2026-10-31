@@ -22,8 +22,18 @@ export type Credentials =
 
 // Cloudflare's scope IDs (GET /client/v4/oauth/scopes), the same permissions as the API token template:
 // Workers Scripts, KV and D1 to deploy, Account Settings to list accounts, and Zone Read and Workers Routes
-// for custom domains, which the client can mark optional.
-const DEFAULT_SCOPES = 'workers-scripts.edit workers-kv-storage.write d1.write account-settings.read zone.read workers-routes.write';
+// for custom domains, which the client can mark optional. Workers Scripts is workers-scripts.write (what
+// wrangler asks for): workers-scripts.edit is the "Workers Editor" scope, which can list Workers but is
+// refused uploads ("No access to the specified resource" on assets-upload-session).
+export const SCRIPTS_SCOPE = 'workers-scripts.write';
+const DEFAULT_SCOPES = `${SCRIPTS_SCOPE} workers-kv-storage.write d1.write account-settings.read zone.read workers-routes.write`;
+
+/**
+ * Sign-ins from before the scope fix hold workers-scripts.edit and cannot upload a café. Only that known
+ * grant is flagged: Cloudflare's scope strings are otherwise left to the API to judge.
+ */
+export const lacksScriptsScope = (credentials: Credentials) =>
+  credentials.kind === 'oauth' && credentials.scope.split(/\s+/).includes('workers-scripts.edit') && !credentials.scope.split(/\s+/).includes(SCRIPTS_SCOPE);
 
 export const oauthConfigured = (env: OAuthEnv) => Boolean(env.CF_OAUTH_CLIENT_ID);
 const authUrl = (env: OAuthEnv) => env.CF_OAUTH_AUTH_URL || 'https://dash.cloudflare.com/oauth2/auth';

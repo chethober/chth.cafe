@@ -37,7 +37,7 @@ export class CloudflareClient {
     const body = await response.json().catch(() => null) as Envelope<T> | null;
     if (!response.ok || !body?.success) {
       const errors = body?.errors || [];
-      const detail = errors.map(error => `${error.message} (${error.code})`).join('; ') || `HTTP ${response.status}`;
+      const detail = errors.map(error => error.code == null ? error.message : `${error.message} (${error.code})`).join('; ') || `HTTP ${response.status}`;
       throw new CloudflareError(`Cloudflare refused ${init.method || 'GET'} ${path.replace(/\?.*$/, '')}: ${detail}`, response.status, errors.map(error => error.code));
     }
     return body.result;

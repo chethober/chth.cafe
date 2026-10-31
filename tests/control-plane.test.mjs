@@ -26,6 +26,7 @@ const calls = [];
 const scripts = [];
 let setupRequired = true;
 let issuedChallenge = '';
+let grantedScope = 'workers-scripts.write workers-kv-storage.write d1.write account-settings.read';
 const ok = result => Response.json({ success: true, errors: [], result });
 async function cloudflare(request) {
   const url = new URL(request.url);
@@ -34,7 +35,7 @@ async function cloudflare(request) {
     calls.push({ method: 'POST', path: '/oauth2/token', grant: form.get('grant_type') });
     const challenge = createHash('sha256').update(form.get('code_verifier') || '').digest('base64url');
     if (form.get('code') !== 'good-code' || challenge !== issuedChallenge || form.get('client_id') !== 'test-client') return Response.json({ error: 'invalid_grant' }, { status: 400 });
-    return Response.json({ access_token: 'oauth-access', refresh_token: 'oauth-refresh', expires_in: 3600, scope: 'workers:write d1:write' });
+    return Response.json({ access_token: 'oauth-access', refresh_token: 'oauth-refresh', expires_in: 3600, scope: grantedScope });
   }
   if (url.hostname === 'dash.cloudflare.com' && url.pathname === '/oauth2/revoke') { calls.push({ method: 'POST', path: '/oauth2/revoke', token: new URLSearchParams(await request.text()).get('token') }); return new Response(null, { status: 200 }); }
   if (url.hostname.endsWith('.workers.dev')) return Response.json({ authenticated: false, setupRequired });
@@ -261,7 +262,7 @@ try {
   response = await stranger('/connect/oauth');
   const authorize = new URL(response.headers.get('location'));
   check([authorize.origin + authorize.pathname, authorize.searchParams.get('client_id'), authorize.searchParams.get('code_challenge_method')], ['https://dash.cloudflare.com/oauth2/auth', 'test-client', 'S256']);
-  check(authorize.searchParams.get('scope').split(' ').sort(), ['account-settings.read', 'd1.write', 'workers-kv-storage.write', 'workers-routes.write', 'workers-scripts.edit', 'zone.read']);
+  check(authorize.searchParams.get('scope').split(' ').sort(), ['account-settings.read', 'd1.write', 'workers-kv-storage.write', 'workers-routes.write', 'workers-scripts.write', 'zone.read']);
   check(authorize.searchParams.get('redirect_uri'), `${HOST}/connect/oauth/callback`);
   issuedChallenge = authorize.searchParams.get('code_challenge');
   const state = authorize.searchParams.get('state');
@@ -285,6 +286,20 @@ try {
   check(response.status, 502);
   assert.match(await response.text(), /cannot be read/); checks++;
   await db.prepare('UPDATE connections SET credentials = ? WHERE owner_id = ?').bind(connection.credentials, connection.owner_id).run();
+  // A sign-in from before the scope fix (Workers Editor, workers-scripts.edit) is told to sign in again,
+  // instead of Cloudflare refusing the asset upload halfway through a deploy.
+  grantedScope = 'workers-scripts.edit workers-kv-storage.write d1.write account-settings.read';
+  const legacy = browser();
+  const legacyAuthorize = new URL((await legacy('/connect/oauth')).headers.get('location'));
+  issuedChallenge = legacyAuthorize.searchParams.get('code_challenge');
+  check((await legacy(`/connect/oauth/callback?state=${legacyAuthorize.searchParams.get('state')}&code=good-code`)).headers.get('location'), '/dashboard?done=connected');
+  const uploadsBefore = calls.filter(call => /assets-upload-session/.test(call.path || '')).length;
+  response = await legacy('/cafes', { csrf: await csrfOf(await legacy('/dashboard')), name: 'Legacy Grant', demo: '1' });
+  check(response.status, 502);
+  assert.match(await response.text(), /Sign out, then sign in with Cloudflare again/); checks++;
+  check(calls.filter(call => /assets-upload-session/.test(call.path || '')).length, uploadsBefore);
+  await db.prepare("DELETE FROM cafes WHERE script_name = 'cafe-legacy-grant'").run();
+  grantedScope = 'workers-scripts.write workers-kv-storage.write d1.write account-settings.read';
   // Disconnecting revokes the OAuth grant and signs the account out.
   check((await stranger('/disconnect', { csrf: strangerCsrf })).headers.get('location'), '/?done=disconnected');
   check(calls.find(call => call.path === '/oauth2/revoke').token, 'oauth-refresh');

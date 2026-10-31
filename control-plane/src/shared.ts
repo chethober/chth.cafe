@@ -3,7 +3,7 @@ import { deleteCookie, getCookie } from 'hono/cookie';
 import schema from '../schema.sql';
 import { CloudflareClient, deployCafe, type CafeResources, type Release } from './cloudflare';
 import { decrypt, encrypt } from './crypto';
-import { refresh, type Credentials, type OAuthEnv } from './oauth';
+import { lacksScriptsScope, refresh, type Credentials, type OAuthEnv } from './oauth';
 import { applyTheme, THEME_COOKIE, THEME_SWITCH_COOKIE, themeScriptSource } from './design';
 import * as views from './views';
 
@@ -76,6 +76,9 @@ export async function clientFor(env: Bindings, connection: ConnectionRow) {
   let credentials = await decrypt<Credentials>(env.ENCRYPTION_KEY, ownerId, connection.credentials).catch(() => {
     throw new Error('The saved Cloudflare access cannot be read. Disconnect and connect your account again.');
   });
+  if (lacksScriptsScope(credentials)) {
+    throw new Error('Your Cloudflare sign-in is missing permission to upload Workers. Sign out, then sign in with Cloudflare again and approve the new permission.');
+  }
   if (credentials.kind === 'oauth' && credentials.expiresAt < Date.now() + 60000) {
     credentials = await refresh(env, credentials);
     await env.DB.prepare('UPDATE connections SET credentials = ?, updated_at = ? WHERE owner_id = ?').bind(await encrypt(env.ENCRYPTION_KEY, ownerId, credentials), now(), ownerId).run();
