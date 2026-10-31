@@ -421,3 +421,18 @@ html .menu-paper-dialog .pm-checkout-field input:focus { border-color: var(--men
   .pm *, .pm-detail *, .pm-checkout * { transition-property: color, background-color, border-color, opacity !important; }
   .pm-spin { transform: none; }
 }
+
+/* Language picker, beside the theme toggle. */
+.pm-lang {
+  position: absolute; top: clamp(14px, 2.4vw, 24px); right: calc(clamp(14px, 2.4vw, 24px) + 52px); z-index: 1;
+}
+.pm-lang select {
+  height: 44px; padding: 0 14px; border-radius: 999px; font: inherit; font-size: 14px;
+  border: 1px solid var(--pm-line); color: var(--menu-ink);
+  background: color-mix(in srgb, var(--menu-sheet) 72%, transparent);
+}
+/* Persian and Arabic use the CHTH RTL font. */
+:root[dir='rtl'] .public-menu, :root[dir='rtl'] .chth-footer { font-family: var(--chth-font-rtl); }
+:root[dir='rtl'] .public-menu :is(h1, h2, h3) { font-family: var(--chth-font-rtl); }
+.chth-footer { color: var(--menu-ink); padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px)); }
+:root[dir='rtl'] .public-menu :is(.pm-tagline, em, i) { font-style: normal; }

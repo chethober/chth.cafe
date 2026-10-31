@@ -9,6 +9,9 @@ import { LOGO_PNG } from './logo';
 import { attempts, audit as auditFor, clientFor as clientForEnv, currentRelease, deployRow, guarded, isAdminHost, message, now, resourcesOf, themed, type Bindings, type CafeRow, type ConnectionRow } from './shared';
 import admin from './admin';
 import * as views from './views';
+import { landingLocale, localizeLanding } from './i18n';
+import { hubStats, track } from './hub';
+import { BRAND_CSS } from '../../src/chth-kit/brand.js';
 
 /** Owners are Cloudflare accounts: whoever can reach an account with OAuth or a token manages its cafés. */
 type Owner = { id: string; name: string };
@@ -92,12 +95,23 @@ const requireOwner = async (c: C, next: () => Promise<void>) => {
   await next();
 };
 
-const landing = (c: C, error?: string, status: 200 | 400 | 429 = 200) =>
-  c.html(views.landing({
+const landing = async (c: C, error?: string, status: 200 | 400 | 429 = 200) => {
+  const { locale, setCookie } = landingLocale(c.req.raw);
+  if (setCookie) c.header('Set-Cookie', setCookie, { append: true });
+  c.header('Content-Language', locale);
+  c.header('Vary', 'Cookie, Accept-Language');
+  const ref = c.req.query('ref');
+  if (ref && /^[a-zA-Z0-9_]{1,40}$/.test(ref)) track(c, 'visit', { ref, lang: locale });
+  const page = await views.landing({
     oauth: oauthConfigured(c.env),
     error: error ?? (c.req.query('error') === 'oauth' ? 'Cloudflare did not sign you in. Try again, or use an API token.' : undefined),
     message: c.req.query('done') === 'disconnected' ? 'Signed out and forgot your Cloudflare access. Your cafés keep running.' : undefined
-  }), status);
+  });
+  return c.html(localizeLanding(String(page), locale, BRAND_CSS), status);
+};
+
+// Stats for the CHTH hub (signed requests only; see hub.ts).
+app.get('/internal/stats', c => hubStats(c));
 
 app.get('/', c => c.get('owner') ? c.redirect('/dashboard') : landing(c));
 
@@ -250,9 +264,11 @@ async function runDeploy(c: C, cafe: CafeRow, connection: ConnectionRow, demoDat
   try {
     const result = await deployRow(c.env, c.req.url, cafe, connection, { setupToken, demoData });
     await audit(c, firstDeploy ? 'deploy' : 'update', result.version, cafe.id);
+    track(c, 'deploy', { ok: true, kind: firstDeploy ? 'create' : 'update', version: result.version });
     return c.html(views.deployed({ csrf: await csrfFor(c.get('session')!), name: cafe.name, url: result.url, setupUrl: setupToken ? `${result.adminUrl}#setup=${setupToken}` : null, kind: firstDeploy ? 'deployed' : 'updated' }));
   } catch (error) {
     await audit(c, 'deploy-failed', message(error), cafe.id);
+    track(c, 'deploy', { ok: false, kind: firstDeploy ? 'create' : 'update', error: message(error).slice(0, 200) });
     return c.html(views.errorPage(`${message(error)} Fix it, then retry from your dashboard.`), 502);
   }
 }

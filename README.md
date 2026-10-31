@@ -111,6 +111,24 @@ To manage the café from the chat, deploy over HTTPS and press **Connect bot com
 
 The cron runs hourly. After midnight café time it sends yesterday's report, and from 09:00 it sends a low-stock check. Each runs once a day, tracked in KV.
 
+## Languages
+
+What customers see (the menu, ordering, order tracking, events and opening hours) and the
+chth.cafe landing page come in English, Persian, Arabic, Russian and Spanish, with right-to-left
+layout for Persian and Arabic. Guests pick a language from the menu's language picker or the
+footer; otherwise it follows `?lang=`, the `chth_lang` cookie shared by CHTH sites, or the
+browser. Customer strings live in `src/i18n/public.ts` (keyed by the English text, so a missing
+translation shows English); the landing page's are in `control-plane/src/i18n.ts`. Menu items
+are shown as the café wrote them. The admin and panel apps are English for now.
+
+## CHTH kit and hub
+
+`src/chth-kit/` is generated from the shared CHTH kit (brand tokens, logo, languages, product
+links and the "Part of CHTH" footer shown under the public menu): don't edit it here. The control
+plane can report landing visits from other CHTH products, sign-ins and deploys to a CHTH hub and
+answer signed `GET /internal/stats`; set `HUB_URL` and `HUB_SECRET` to switch that on. Without
+them nothing is sent and `/internal/stats` refuses every call. Self-hosted cafés send nothing.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md).

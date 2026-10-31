@@ -8,6 +8,7 @@ import {
 } from '../utils/events';
 import { EventCalendar } from './EventCalendar';
 import { Modal } from './Modal';
+import { useT } from '../i18n';
 
 const STORAGE_KEY = 'chth_event_bookings';
 const UPCOMING_DAYS = 120;
@@ -36,6 +37,7 @@ function DateTile({ date, calendar }: { date: string; calendar: ReturnType<typeo
 }
 
 export function PublicEvents({ settings }: { settings: SettingsSelect }) {
+  const t = useT();
   const timeZone = settings.timeZone || 'Asia/Tehran';
   const calendar = calendarOf(settings.calendarSystem);
   const secondary = isCalendarSystem(settings.secondaryCalendar) && settings.secondaryCalendar !== calendar ? settings.secondaryCalendar : '';
@@ -97,10 +99,10 @@ export function PublicEvents({ settings }: { settings: SettingsSelect }) {
   return (
     <section className="pm-events" aria-labelledby="pm-events-title">
       <header className="pm-events-head">
-        <h2 id="pm-events-title"><CalendarDays size={20} aria-hidden="true" />What’s on</h2>
+        <h2 id="pm-events-title"><CalendarDays size={20} aria-hidden="true" />{t('What’s on')}</h2>
         <div className="pm-events-actions">
-          {activeMine.length > 0 && <button type="button" className="pm-chip" onClick={() => setMineOpen(true)}><Ticket size={15} />Your bookings<b>{activeMine.length}</b></button>}
-          <button type="button" className="pm-chip" onClick={() => { setMonth(today); setDay(today); setCalendarOpen(true); }}><CalendarDays size={15} />Calendar</button>
+          {activeMine.length > 0 && <button type="button" className="pm-chip" onClick={() => setMineOpen(true)}><Ticket size={15} />{t('Your bookings')}<b>{activeMine.length}</b></button>}
+          <button type="button" className="pm-chip" onClick={() => { setMonth(today); setDay(today); setCalendarOpen(true); }}><CalendarDays size={15} />{t('Calendar')}</button>
         </div>
       </header>
 
@@ -109,9 +111,9 @@ export function PublicEvents({ settings }: { settings: SettingsSelect }) {
           <EventCard occurrence={o} calendar={calendar} seats={seats.get(seatKey(o.event.id, o.date))?.seats || 0} timeZone={timeZone} now={now} today={today} onOpen={() => openEvent(o)} />
         </li>)}
         {upcoming.length > STRIP_LIMIT && <li><button type="button" className="pm-ev-more" onClick={() => setCalendarOpen(true)}>+{upcoming.length - STRIP_LIMIT} more<ChevronRight size={16} /></button></li>}
-      </ul> : <p className="pm-events-none">No events coming up right now. Check back soon.</p>}
+      </ul> : <p className="pm-events-none">{t('No events coming up right now. Check back soon.')}</p>}
 
-      <Modal isOpen={calendarOpen && !active} onClose={() => setCalendarOpen(false)} maxWidth="max-w-lg" title={<span className="text-lg font-semibold flex items-center gap-2"><CalendarDays size={20} />Café calendar</span>}>
+      <Modal isOpen={calendarOpen && !active} onClose={() => setCalendarOpen(false)} maxWidth="max-w-lg" title={<span className="text-lg font-semibold flex items-center gap-2"><CalendarDays size={20} />{t('Café calendar')}</span>}>
         <div className="public-menu pm-ev-sheet">
           <EventCalendar events={events} calendar={calendar} secondary={secondary} today={today} month={month} onMonth={setMonth} selected={day} onSelect={setDay} />
           <h3 className="pm-ev-day">{formatDateKey(day, calendar, 'long')}{secondary && <small>{formatDateKey(day, secondary)}</small>}</h3>
@@ -119,7 +121,7 @@ export function PublicEvents({ settings }: { settings: SettingsSelect }) {
             const list = events.flatMap(e => expandOccurrences(e, day, day));
             return list.length ? <ul className="pm-ev-daylist">{list.map(o => <li key={o.event.id + o.date}>
               <EventCard occurrence={o} calendar={calendar} seats={seats.get(seatKey(o.event.id, o.date))?.seats || 0} timeZone={timeZone} now={now} today={today} onOpen={() => openEvent(o)} compact />
-            </li>)}</ul> : <p className="pm-events-none">Nothing on this day.</p>;
+            </li>)}</ul> : <p className="pm-events-none">{t('Nothing on this day.')}</p>;
           })()}
         </div>
       </Modal>
@@ -139,15 +141,16 @@ export function PublicEvents({ settings }: { settings: SettingsSelect }) {
 function EventCard({ occurrence: o, calendar, seats, timeZone, now, today, onOpen, compact }: {
   occurrence: Occurrence; calendar: ReturnType<typeof calendarOf>; seats: number; timeZone: string; now: Date; today: string; onOpen: () => void; compact?: boolean;
 }) {
+  const t = useT();
   const { event } = o;
   const state = event.bookingEnabled ? bookingState(event, o.date, seats, timeZone, now) : null;
-  const status = event.status === 'cancelled' ? 'Cancelled'
-    : state ? (state.open ? (state.seatsLeft !== null && state.seatsLeft <= 5 ? `${state.seatsLeft} left` : 'Book') : state.reason === 'Fully booked.' ? 'Fully booked' : 'Closed')
+  const status = event.status === 'cancelled' ? t('Cancelled')
+    : state ? (state.open ? (state.seatsLeft !== null && state.seatsLeft <= 5 ? t('{count} left', { count: state.seatsLeft }) : t('Book')) : state.reason === 'Fully booked.' ? t('Fully booked') : t('Closed'))
     : event.priceNote || '';
-  const when = o.date === today ? 'Today' : o.date === addDays(today, 1) ? 'Tomorrow' : formatDateKey(o.date, calendar, 'medium').split(',')[0];
+  const when = o.date === today ? t('Today') : o.date === addDays(today, 1) ? t('Tomorrow') : formatDateKey(o.date, calendar, 'medium').split(',')[0];
   return (
     <button type="button" className={`pm-ev-card${event.status === 'cancelled' ? ' is-cancelled' : ''}${compact ? ' is-compact' : ''}`} onClick={onOpen}
-      aria-label={`${event.title}, ${describeOccurrence(event, o.date, calendar)}${event.status === 'cancelled' ? ', cancelled' : ''}`}>
+      aria-label={`${event.title}, ${describeOccurrence(event, o.date, calendar)}${event.status === 'cancelled' ? t(', cancelled') : ''}`}>
       {!compact && <span className="pm-ev-art" style={{ '--pm-hue': hueFor(event.title) } as React.CSSProperties}>
         {event.imageUrl ? <img src={event.imageUrl} alt="" loading="lazy" decoding="async" /> : <CalendarDays size={28} aria-hidden="true" />}
         {event.tag && <span className="pm-badge">{event.tag}</span>}
@@ -170,6 +173,7 @@ function EventSheet({ event, date, onDate, onClose, calendar, secondary, timeZon
   calendar: ReturnType<typeof calendarOf>; secondary: ReturnType<typeof calendarOf> | ''; timeZone: string; today: string; seatsTaken: number;
   upcomingDates: string[]; onBooked: (booking: SavedBooking) => void;
 }) {
+  const t = useT();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [seats, setSeats] = useState(1);
@@ -196,7 +200,7 @@ function EventSheet({ event, date, onDate, onClose, calendar, secondary, timeZon
       onBooked(saved);
       setNote('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'We couldn’t make your booking. Please try again.');
+      setError(err instanceof Error ? err.message : t('We couldn’t make your booking. Please try again.'));
     } finally { setBusy(false); }
   };
   const share = async () => {
@@ -211,12 +215,12 @@ function EventSheet({ event, date, onDate, onClose, calendar, secondary, timeZon
     <Modal isOpen onClose={onClose} closeDisabled={busy} maxWidth="max-w-lg" title={<span className="text-lg font-semibold">{event.title}</span>}>
       <div className="public-menu pm-ev-sheet">
         {event.imageUrl && <img className="pm-ev-hero" src={event.imageUrl} alt="" />}
-        {event.status === 'cancelled' && <p className="pm-ev-cancelled" role="status">This event is cancelled. We’re sorry, and hope to see you soon.</p>}
+        {event.status === 'cancelled' && <p className="pm-ev-cancelled" role="status">{t('This event is cancelled. We’re sorry, and hope to see you soon.')}</p>}
         <dl className="pm-detail-facts">
-          <div><dt>When</dt><dd>{describeOccurrence(event, date, calendar, secondary)}{recurrence && <><br /><small>{recurrence}</small></>}</dd></div>
-          {event.location && <div><dt>Where</dt><dd>{event.location}</dd></div>}
-          {event.priceNote && <div><dt>Price</dt><dd>{event.priceNote}</dd></div>}
-          {event.bookingEnabled && event.capacity > 0 && event.status === 'published' && !past && <div><dt>Seats</dt><dd>{state.open && state.seatsLeft !== null ? `${state.seatsLeft} of ${event.capacity} left` : state.open ? 'Available' : state.reason.replace(/\.$/, '')}</dd></div>}
+          <div><dt>{t('When')}</dt><dd>{describeOccurrence(event, date, calendar, secondary)}{recurrence && <><br /><small>{recurrence}</small></>}</dd></div>
+          {event.location && <div><dt>{t('Where')}</dt><dd>{event.location}</dd></div>}
+          {event.priceNote && <div><dt>{t('Price')}</dt><dd>{event.priceNote}</dd></div>}
+          {event.bookingEnabled && event.capacity > 0 && event.status === 'published' && !past && <div><dt>{t('Seats')}</dt><dd>{state.open && state.seatsLeft !== null ? t('{left} of {capacity} left', { left: state.seatsLeft, capacity: event.capacity }) : state.open ? t('Available') : state.reason.replace(/\.$/, '')}</dd></div>}
         </dl>
         {event.description && <p className="pm-ev-description">{event.description}</p>}
         {upcomingDates.length > 1 && <label className="pm-ev-field">Date
@@ -227,31 +231,31 @@ function EventSheet({ event, date, onDate, onClose, calendar, secondary, timeZon
 
         {done ? <div className="pm-ev-done" role="status">
           <CheckCircle2 size={28} aria-hidden="true" />
-          <p><strong>You’re booked.</strong> {done.seats === 1 ? 'One seat' : `${done.seats} seats`} for {formatDateKey(done.date, calendar)}. Show this code at the door and pay at the café.</p>
+          <p><strong>{t('You’re booked.')}</strong> {t('{seats} for {date}. Show this code at the door and pay at the café.', { seats: done.seats === 1 ? t('One seat') : t('{count} seats', { count: done.seats }), date: formatDateKey(done.date, calendar) })}</p>
           <span className="pm-ev-code">{done.code}</span>
           <small>Saved on this device under “Your bookings”, where you can cancel until {formatDateKey(cafeToday(timeZone, bookingClosesAt(event, date, timeZone)), calendar, 'short')}.</small>
         </div> : event.bookingEnabled && event.status === 'published' && !past ? (state.open ? <form className="pm-ev-form" onSubmit={submit}>
           <fieldset disabled={busy}>
-            <legend>Book your seat</legend>
-            <label className="pm-ev-field">Your name<input required maxLength={100} autoComplete="name" value={name} onChange={e => setName(e.target.value)} /></label>
-            <label className="pm-ev-field">Phone<input required type="tel" inputMode="tel" maxLength={30} autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} /></label>
+            <legend>{t('Book your seat')}</legend>
+            <label className="pm-ev-field">{t('Your name')}<input required maxLength={100} autoComplete="name" value={name} onChange={e => setName(e.target.value)} /></label>
+            <label className="pm-ev-field">{t('Phone')}<input required type="tel" inputMode="tel" maxLength={30} autoComplete="tel" value={phone} onChange={e => setPhone(e.target.value)} /></label>
             {/* Hidden from people; bots fill it in. */}
             <label className="pm-ev-trap" aria-hidden="true">Website<input tabIndex={-1} autoComplete="off" value={website} onChange={e => setWebsite(e.target.value)} /></label>
-            <div className="pm-ev-seats"><span>Seats</span>
+            <div className="pm-ev-seats"><span>{t('Seats')}</span>
               <div className="pm-stepper">
-                <button type="button" aria-label="One fewer seat" disabled={seats <= 1} onClick={() => setSeats(s => Math.max(1, s - 1))}><Minus size={16} /></button>
+                <button type="button" aria-label={t('One fewer seat')} disabled={seats <= 1} onClick={() => setSeats(s => Math.max(1, s - 1))}><Minus size={16} /></button>
                 <span aria-live="polite">{seats}</span>
-                <button type="button" aria-label="One more seat" disabled={seats >= Math.min(event.maxParty, state.seatsLeft ?? event.maxParty)} onClick={() => setSeats(s => s + 1)}><Plus size={16} /></button>
+                <button type="button" aria-label={t('One more seat')} disabled={seats >= Math.min(event.maxParty, state.seatsLeft ?? event.maxParty)} onClick={() => setSeats(s => s + 1)}><Plus size={16} /></button>
               </div>
             </div>
-            <label className="pm-ev-field">Note <small>(optional)</small><textarea rows={2} maxLength={500} value={note} onChange={e => setNote(e.target.value)} placeholder="Accessibility needs, a birthday…" /></label>
+            <label className="pm-ev-field">{t('Note')} <small>{t('(optional)')}</small><textarea rows={2} maxLength={500} value={note} onChange={e => setNote(e.target.value)} placeholder={t('Accessibility needs, a birthday…')} /></label>
           </fieldset>
           {error && <p role="alert" className="pm-ev-error">{error}</p>}
-          <button type="submit" className="pm-button pm-ev-submit" disabled={busy || !name.trim() || !phone.trim()} aria-busy={busy}>{busy ? 'Booking…' : `Book ${seats === 1 ? 'a seat' : `${seats} seats`}`}</button>
-          <p className="pm-ev-fine">Free to book. {event.priceNote ? `${event.priceNote}, paid at the café.` : 'Pay at the café if there’s a charge.'}</p>
+          <button type="submit" className="pm-button pm-ev-submit" disabled={busy || !name.trim() || !phone.trim()} aria-busy={busy}>{busy ? t('Booking…') : seats === 1 ? t('Book a seat') : t('Book {count} seats', { count: seats })}</button>
+          <p className="pm-ev-fine">{t('Free to book.')} {event.priceNote ? t('{price}, paid at the café.', { price: event.priceNote }) : t('Pay at the café if there’s a charge.')}</p>
         </form> : <p className="pm-ev-closed">{state.reason}</p>) : null}
 
-        <button type="button" className="pm-link-button" onClick={share}><Link2 size={16} />{copied ? 'Link copied' : 'Share this event'}</button>
+        <button type="button" className="pm-link-button" onClick={share}><Link2 size={16} />{t(copied ? 'Link copied' : 'Share this event')}</button>
       </div>
     </Modal>
   );
@@ -261,6 +265,7 @@ function MyBookings({ open, onClose, bookings, events, calendar, timeZone, onUpd
   open: boolean; onClose: () => void; bookings: SavedBooking[]; events: CafeEvent[]; calendar: ReturnType<typeof calendarOf>; timeZone: string;
   onUpdate: (id: string, patch: Partial<SavedBooking>) => void; onChanged: () => void;
 }) {
+  const t = useT();
   const [busyId, setBusyId] = useState('');
   const [error, setError] = useState('');
   // Staff may have checked a guest in or cancelled; refresh what this device remembers.
@@ -272,14 +277,14 @@ function MyBookings({ open, onClose, bookings, events, calendar, timeZone, onUpd
   const cancel = async (b: SavedBooking) => {
     setBusyId(b.id); setError('');
     try { await eventsApi.cancelOwnBooking(b.id, b.token); onUpdate(b.id, { status: 'cancelled' }); onChanged(); }
-    catch (err) { setError(err instanceof Error ? err.message : 'We couldn’t cancel your booking.'); }
+    catch (err) { setError(err instanceof Error ? err.message : t('We couldn’t cancel your booking.')); }
     finally { setBusyId(''); }
   };
   return (
-    <Modal isOpen={open} onClose={onClose} maxWidth="max-w-lg" title={<span className="text-lg font-semibold flex items-center gap-2"><Ticket size={20} />Your bookings</span>}>
+    <Modal isOpen={open} onClose={onClose} maxWidth="max-w-lg" title={<span className="text-lg font-semibold flex items-center gap-2"><Ticket size={20} />{t('Your bookings')}</span>}>
       <div className="public-menu pm-ev-sheet">
         {error && <p role="alert" className="pm-ev-error">{error}</p>}
-        {bookings.length === 0 ? <p className="pm-events-none">No bookings on this device.</p> : <ul className="pm-ev-mine">
+        {bookings.length === 0 ? <p className="pm-events-none">{t('No bookings on this device.')}</p> : <ul className="pm-ev-mine">
           {bookings.map(b => {
             const event = events.find(e => e.id === b.eventId);
             const canCancel = b.status !== 'checked_in' && event && new Date() < bookingClosesAt(event, b.date, timeZone);
@@ -288,13 +293,13 @@ function MyBookings({ open, onClose, bookings, events, calendar, timeZone, onUpd
               <div>
                 <strong>{event?.title || b.title}</strong>
                 <span>{event ? describeOccurrence(event, b.date, calendar) : formatDateKey(b.date, calendar)} · {b.seats === 1 ? '1 seat' : `${b.seats} seats`}</span>
-                <span>Code <b className="pm-ev-code is-small">{b.code}</b>{b.status === 'checked_in' && ' · Checked in'}{event?.status === 'cancelled' && ' · Event cancelled'}</span>
+                <span>{t('Code')} <b className="pm-ev-code is-small">{b.code}</b>{b.status === 'checked_in' && t(' · Checked in')}{event?.status === 'cancelled' && t(' · Event cancelled')}</span>
               </div>
-              {canCancel && <button type="button" className="pm-icon-button" aria-label={`Cancel booking for ${b.title}`} disabled={busyId === b.id} onClick={() => cancel(b)}><X size={18} /></button>}
+              {canCancel && <button type="button" className="pm-icon-button" aria-label={t('Cancel booking for {title}', { title: b.title })} disabled={busyId === b.id} onClick={() => cancel(b)}><X size={18} /></button>}
             </li>;
           })}
         </ul>}
-        <p className="pm-ev-fine">Bookings are remembered on this device only. To change one after online changes close, call the café.</p>
+        <p className="pm-ev-fine">{t('Bookings are remembered on this device only. To change one after online changes close, call the café.')}</p>
       </div>
     </Modal>
   );

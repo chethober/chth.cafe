@@ -32,6 +32,16 @@ import { CustomerClub } from './components/CustomerClub';
 import { EventManager } from './components/EventManager';
 import { Button, Field, Input, Notice, NavItem, WorkspaceShell } from './ui';
 import { currentWorkspace, workspaceHome } from './utils/workspace';
+import { useT } from './i18n';
+
+/** The page footer's text, in the menu's language. */
+function CafeFooterText({ cafeName }: { cafeName: string }) {
+  const t = useT();
+  return <>
+    <p>© {new Date().getFullYear()} {cafeName}. {t('All rights reserved.')}</p>
+    <span className="cafe-footer-note">{t('See you at the café.')}</span>
+  </>;
+}
 
 type AdminTab = 'financials' | 'customers' | 'events' | 'tasks' | 'menu_admin' | 'stock' | 'staff' | 'settings';
 const ADMIN_TABS: AdminTab[] = ['financials', 'customers', 'events', 'tasks', 'menu_admin', 'stock', 'staff', 'settings'];
@@ -341,8 +351,7 @@ export const App: React.FC = () => {
 
       <footer className="bg-zinc-950 border-t border-zinc-900 py-5 text-center text-xs text-zinc-500 mt-8">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p>© {new Date().getFullYear()} {settings.cafeName}. All rights reserved.</p>
-          <span className="cafe-footer-note">See you at the café.</span>
+          <CafeFooterText cafeName={settings.cafeName} />
         </div>
       </footer>
     </div>

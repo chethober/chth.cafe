@@ -16,6 +16,9 @@ export type Bindings = OAuthEnv & {
   ENCRYPTION_KEY: string;
   /** SHA-256 (hex) of the platform admin password; npm run deploy:control-plane sets a new one on every deploy. */
   ADMIN_PASSWORD_HASH?: string;
+  /** CHTH hub reporting (optional): the hub's URL and this site's own secret. */
+  HUB_URL?: string;
+  HUB_SECRET?: string;
 };
 
 export type ConnectionRow = { owner_id: string; method: 'token' | 'oauth'; account_id: string; account_name: string; credentials: string; created_at: string; updated_at: string };

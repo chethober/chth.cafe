@@ -7,6 +7,10 @@ import { OrderTracking, OrderReceipt } from './OrderTracking';
 import { Modal } from './Modal';
 import { PublicEvents } from './PublicEvents';
 import { reducedMotion } from '../ui';
+import { applyDocumentLocale, detectLocale, setLocale, useLocale, useT, type Locale } from '../i18n';
+import { LOCALES } from '../chth-kit/locales.js';
+import { footerModel } from '../chth-kit/footer.js';
+import { LOGO_SVG } from '../chth-kit/brand.js';
 
 interface PublicMenuProps {
   settings: SettingsSelect;
@@ -31,6 +35,30 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = { Coffee, GlassWater, Leaf, C
 const categoryIcon = (name?: string | null) => CATEGORY_ICONS[name || 'Coffee'] || Coffee;
 
 const SAVED_ITEMS_KEY = 'chth_menu_saved_items';
+
+// The public menu picks its language once, before its first render (?lang= is remembered).
+let localeChosen = false;
+function chooseLocale() {
+  if (localeChosen || typeof window === 'undefined') return;
+  localeChosen = true;
+  setLocale(detectLocale(), new URLSearchParams(window.location.search).has('lang'));
+}
+
+/** The shared CHTH footer: the other CHTH sites and bots, and the language picker. */
+function ChthFooter({ locale, onLocale }: { locale: Locale; onLocale: (l: Locale) => void }) {
+  const m = footerModel(locale, 'cafe', { sourceUrl: 'https://github.com/chethober/chth.cafe' });
+  return <footer className="chth-footer" data-chth-footer>
+    <div className="chth-footer__inner">
+      <div className="chth-footer__brand"><span className="chth-footer__mark" aria-hidden="true" dangerouslySetInnerHTML={{ __html: LOGO_SVG }} /><span><strong>{m.partOf}</strong><br /><small>{m.openSource}</small></span></div>
+      <nav className="chth-footer__col" aria-label={m.sitesTitle}><h2>{m.sitesTitle}</h2><ul>{m.sites.map(p => <li key={p.id}><a href={p.href} title={p.tagline}><span aria-hidden="true">{p.ico}</span> {p.name}</a></li>)}</ul></nav>
+      <nav className="chth-footer__col" aria-label={m.botsTitle}><h2>{m.botsTitle}</h2><ul>{m.bots.map(p => <li key={p.id}><a href={p.href} title={p.tagline}><span aria-hidden="true">{p.ico}</span> {p.name}</a></li>)}</ul></nav>
+      <div className="chth-footer__col"><h2>{m.languageLabel}</h2>
+        <div className="chth-lang-switch">{m.locales.map(l => <button type="button" key={l.code} lang={l.code} aria-pressed={l.current} onClick={() => onLocale(l.code)}>{l.label}</button>)}</div>
+        {m.sourceUrl && <p><a href={m.sourceUrl}>{m.sourceLabel} ↗</a></p>}
+      </div>
+    </div>
+  </footer>;
+}
 
 function readSavedItems(): string[] {
   try {
@@ -93,6 +121,10 @@ function Confetti({ burst }: { burst: number }) {
 }
 
 export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, menuItems, menuVariants, onOrderCreated, theme, onToggleTheme }) => {
+  chooseLocale();
+  const locale = useLocale();
+  const t = useT();
+  useLayoutEffect(() => applyDocumentLocale(locale), [locale]);
   const [receipt, setReceipt] = useState<OrderReceipt | null>(() => {
     try { const saved = JSON.parse(localStorage.getItem('chth_order_receipt') || 'null'); return saved?.id && saved?.token && saved?.number ? saved : null; } catch { return null; }
   });
@@ -167,7 +199,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
   }, [menuItems, menuVariants, isSubmitting]);
 
   const opening = getOpeningStatus(settings.openHours, now, settings.timeZone || 'Asia/Tehran');
-  const greeting = greetingFor(now, settings.timeZone || 'Asia/Tehran');
+  const greeting = t(greetingFor(now, settings.timeZone || 'Asia/Tehran'));
   const money = (amount: number) => `${settings.currency}${amount.toFixed(2).replace(/\.00$/, '')}`;
   const query = searchQuery.trim().toLocaleLowerCase();
   const matchingItems = menuItems.filter(item =>
@@ -182,7 +214,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
     .map(category => ({ id: category.id, name: category.name, Icon: categoryIcon(category.icon), items: matchingItems.filter(item => item.categoryId === category.id) }))
     .filter(section => section.items.length > 0);
   const uncategorizedItems = matchingItems.filter(item => !categories.some(category => category.id === item.categoryId));
-  if (uncategorizedItems.length) sections.push({ id: 'uncategorized', name: 'More from our menu', Icon: Utensils, items: uncategorizedItems });
+  if (uncategorizedItems.length) sections.push({ id: 'uncategorized', name: t('More from our menu'), Icon: Utensils, items: uncategorizedItems });
   const sectionKey = sections.map(section => section.id).join('|');
   const currentSectionId = sections.some(section => section.id === activeSectionId) ? activeSectionId : sections[0]?.id || '';
 
@@ -265,7 +297,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
     const wasSaved = savedItemIds.includes(item.id);
     setSavedItemIds(previous => previous.includes(item.id) ? previous.filter(id => id !== item.id) : [...previous, item.id]);
     if (!wasSaved) setHeartBurst(previous => ({ id: item.id, n: (previous?.n || 0) + 1 }));
-    announce(wasSaved ? `${item.name} removed from your favorites` : `${item.name} saved for later`);
+    announce(t(wasSaved ? '{name} removed from your favorites' : '{name} saved for later', { name: item.name }));
   };
   const spinForMe = () => {
     if (spin.phase === 'spinning' || !pickableItems.length) return;
@@ -276,7 +308,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
     spinTimers.current = [];
     const land = () => {
       setSpin(previous => ({ phase: 'landed', itemId: winner.id, tick: previous.tick + 1 }));
-      announce(`The reel landed on ${winner.name}. Add it or spin again.`);
+      announce(t('The reel landed on {name}. Add it or spin again.', { name: winner.name }));
     };
     if (reducedMotion() || pickableItems.length < 2) { land(); return; }
     // The reel slows like a real one: each tick waits a little longer than the last.
@@ -300,7 +332,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
     clearTimeout(addedTimer.current);
     setLastAdded(previous => ({ id: item.id, n: (previous?.n || 0) + 1 }));
     addedTimer.current = setTimeout(() => setLastAdded(null), 900);
-    announce(quantity > 1 ? `${quantity} × ${item.name} added to your order` : `${item.name} added to your order`);
+    announce(quantity > 1 ? t('{count} × {name} added to your order', { count: quantity, name: item.name }) : t('{name} added to your order', { name: item.name }));
   };
   const updateQuantity = (id: string, delta: number) => {
     if (submittingRef.current) return;
@@ -331,9 +363,9 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
     const currentOpening = getOpeningStatus(settings.openHours, new Date(), settings.timeZone || 'Asia/Tehran');
     setNow(new Date());
     if (!currentOpening.isOpen) { setOrderError(currentOpening.detail); return; }
-    if (unavailableInCart) { setOrderError('Please remove unavailable items or options before placing your order.'); return; }
+    if (unavailableInCart) { setOrderError(t('Please remove unavailable items or options before placing your order.')); return; }
     const identity = orderType === 'dine_in' ? tableNumber.trim() : customerName.trim();
-    if (!identity) { setOrderError(orderType === 'dine_in' ? 'Please enter your table number.' : 'Please enter your name.'); return; }
+    if (!identity) { setOrderError(t(orderType === 'dine_in' ? 'Please enter your table number.' : 'Please enter your name.')); return; }
     const input = {
       customerName: orderType === 'dine_in' ? `Table ${identity}` : identity,
       orderType, paymentMethod,
@@ -365,11 +397,11 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
         clearTimeout(confettiTimer.current);
         confettiTimer.current = setTimeout(() => setConfetti(0), 1400);
       }
-      announce(`Order ${order.orderNumber} received. Please pay at the café.`);
+      announce(t('Order {number} received. Please pay at the café.', { number: order.orderNumber }));
       onOrderCreated?.();
     } catch (error) {
       void store.syncFromAPI();
-      setOrderError(error instanceof Error ? error.message : 'We couldn’t confirm your order. Please try again.');
+      setOrderError(error instanceof Error ? error.message : t('We couldn’t confirm your order. Please try again.'));
     } finally {
       submittingRef.current = false;
       setIsSubmitting(false);
@@ -382,16 +414,22 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
       {notice && !activeItem && !isCartOpen && <div key={notice} className="pm-toast" aria-hidden="true"><CheckCircle2 size={18} />{notice}</div>}
       <Confetti burst={confetti} />
 
-      <section aria-label="Café information" className="pm-hero">
+      <section aria-label={t('Café information')} className="pm-hero">
         <button type="button" className="pm-theme-toggle" data-theme={theme} onClick={e => onToggleTheme(e.currentTarget)}
-          aria-label={theme === 'dark' ? 'Switch to light appearance' : 'Switch to dark appearance'}>
+          aria-label={t(theme === 'dark' ? 'Switch to light appearance' : 'Switch to dark appearance')}>
           <Sun className="pm-theme-sun" size={19} aria-hidden="true" />
           <Moon className="pm-theme-moon" size={19} aria-hidden="true" />
         </button>
+        <label className="pm-lang">
+          <span className="sr-only">{t('Language')}</span>
+          <select value={locale} onChange={event => setLocale(event.target.value as Locale)}>
+            {LOCALES.map(l => <option key={l.code} value={l.code} lang={l.code}>{l.native}</option>)}
+          </select>
+        </label>
         <div className="pm-hero-copy">
           <p className="pm-eyebrow"><Sparkles size={14} />{greeting}</p>
           <h1>{settings.cafeName}</h1>
-          <p className="pm-tagline">Find your usual. Find a new usual.</p>
+          <p className="pm-tagline">{t('Find your usual. Find a new usual.')}</p>
           <div className="pm-status">
             <span className={`pm-open-pill ${opening.isOpen ? 'is-open' : ''}`}><i />{opening.label}</span>
             <span>{opening.detail}</span>
@@ -405,16 +443,16 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
         <div className="pm-hero-side">
           {settings.logoUrl ? <img src={settings.logoUrl} alt={settings.cafeName} className="pm-logo" /> : <SteamingCup />}
           <div className={`pm-spin is-${spin.phase}`}>
-            <p className="pm-spin-label">Can’t decide?</p>
+            <p className="pm-spin-label">{t('Can’t decide?')}</p>
             <div className="pm-reel" aria-hidden={spin.phase === 'spinning'}>
-              <span key={spin.tick} className="pm-reel-name">{spinItem ? spinItem.name : 'Let the menu choose'}</span>
+              <span key={spin.tick} className="pm-reel-name">{spinItem ? spinItem.name : t('Let the menu choose')}</span>
             </div>
             {spin.phase === 'landed' && spinItem ? <div className="pm-spin-actions">
               <span className="pm-spin-price">{money(spinItem.basePrice)}</span>
-              <button type="button" className="pm-button" disabled={isSubmitting} onClick={() => quickAdd(spinItem)}>{hasVariants(spinItem) ? 'Make it yours' : 'Add it'}<Plus size={16} /></button>
-              <button type="button" className="pm-icon-button" onClick={spinForMe} aria-label="Spin again"><Shuffle size={18} /></button>
+              <button type="button" className="pm-button" disabled={isSubmitting} onClick={() => quickAdd(spinItem)}>{t(hasVariants(spinItem) ? 'Make it yours' : 'Add it')}<Plus size={16} /></button>
+              <button type="button" className="pm-icon-button" onClick={spinForMe} aria-label={t('Spin again')}><Shuffle size={18} /></button>
             </div> : <button type="button" className="pm-button pm-spin-button" onClick={spinForMe} disabled={!pickableItems.length || spin.phase === 'spinning' || isSubmitting}>
-              <Shuffle size={16} />{spin.phase === 'spinning' ? 'Spinning…' : 'Spin for me'}
+              <Shuffle size={16} />{t(spin.phase === 'spinning' ? 'Spinning…' : 'Spin for me')}
             </button>}
           </div>
         </div>
@@ -427,26 +465,26 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
       <div className="pm-tools">
         <div className="pm-search">
           <Search size={18} aria-hidden="true" />
-          <label htmlFor="menu-search" className="sr-only">Search the menu</label>
-          <input id="menu-search" type="search" enterKeyHint="search" placeholder="What are you craving?" value={searchQuery}
+          <label htmlFor="menu-search" className="sr-only">{t('Search the menu')}</label>
+          <input id="menu-search" type="search" enterKeyHint="search" placeholder={t('What are you craving?')} value={searchQuery}
             onChange={event => setSearchQuery(event.target.value)}
             onKeyDown={event => { if (event.key === 'Enter') event.currentTarget.blur(); }} />
-          {searchQuery && <button type="button" aria-label="Clear search" onClick={() => setSearchQuery('')}><X size={18} /></button>}
+          {searchQuery && <button type="button" aria-label={t('Clear search')} onClick={() => setSearchQuery('')}><X size={18} /></button>}
         </div>
         <div className="pm-toggles">
-          <button type="button" className="pm-chip" aria-pressed={onlyInStock} onClick={() => setOnlyInStock(value => !value)}>Available now</button>
-          <button type="button" className="pm-chip" aria-pressed={savedOnly} onClick={() => setSavedOnly(previous => !previous)}><Heart size={15} fill={savedOnly ? 'currentColor' : 'none'} />Saved<b>{savedCount}</b></button>
-          <button type="button" className={`pm-chip ${activeFilterCount ? 'has-filters' : ''}`} aria-expanded={filtersOpen} aria-controls="menu-filters" onClick={() => setFiltersOpen(open => !open)}><SlidersHorizontal size={15} />Filters{activeFilterCount > 0 && <b>{activeFilterCount}</b>}</button>
+          <button type="button" className="pm-chip" aria-pressed={onlyInStock} onClick={() => setOnlyInStock(value => !value)}>{t('Available now')}</button>
+          <button type="button" className="pm-chip" aria-pressed={savedOnly} onClick={() => setSavedOnly(previous => !previous)}><Heart size={15} fill={savedOnly ? 'currentColor' : 'none'} />{t('Saved')}<b>{savedCount}</b></button>
+          <button type="button" className={`pm-chip ${activeFilterCount ? 'has-filters' : ''}`} aria-expanded={filtersOpen} aria-controls="menu-filters" onClick={() => setFiltersOpen(open => !open)}><SlidersHorizontal size={15} />{t('Filters')}{activeFilterCount > 0 && <b>{activeFilterCount}</b>}</button>
         </div>
       </div>
 
       {filtersOpen && <div id="menu-filters" className="pm-filters">
-        <label>Dietary preference<select value={dietaryFilter} onChange={e => setDietaryFilter(e.target.value)}><option value="">All items</option>{['vegan', 'vegetarian', 'gluten-free', 'decaf', 'caffeine-free'].map(v => <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}</select></label>
-        <label>Exclude allergen<select value={excludedAllergen} onChange={e => setExcludedAllergen(e.target.value)}><option value="">No exclusion</option>{['milk', 'nuts', 'gluten', 'egg', 'soy'].map(v => <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}</option>)}</select></label>
-        <p>Labels are supplied by café staff. Ask staff about substitutions and cross-contact. Allergen exclusions hide items with unconfirmed labels.</p>
+        <label>{t('Dietary preference')}<select value={dietaryFilter} onChange={e => setDietaryFilter(e.target.value)}><option value="">{t('All items')}</option>{['vegan', 'vegetarian', 'gluten-free', 'decaf', 'caffeine-free'].map(v => <option key={v} value={v}>{t(v[0].toUpperCase() + v.slice(1))}</option>)}</select></label>
+        <label>{t('Exclude allergen')}<select value={excludedAllergen} onChange={e => setExcludedAllergen(e.target.value)}><option value="">{t('No exclusion')}</option>{['milk', 'nuts', 'gluten', 'egg', 'soy'].map(v => <option key={v} value={v}>{t(v[0].toUpperCase() + v.slice(1))}</option>)}</select></label>
+        <p>{t('Labels are supplied by café staff. Ask staff about substitutions and cross-contact. Allergen exclusions hide items with unconfirmed labels.')}</p>
       </div>}
 
-      {sections.length > 0 && <nav ref={railRef} aria-label="Menu categories" className="pm-rail">
+      {sections.length > 0 && <nav ref={railRef} aria-label={t('Menu categories')} className="pm-rail">
         <div className="pm-rail-scroller">
           <span ref={indicatorRef} className="pm-rail-indicator" aria-hidden="true" />
           {sections.map(section => <a key={section.id} href={`#section-${section.id}`} aria-current={currentSectionId === section.id ? 'true' : undefined}
@@ -458,15 +496,15 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
 
       {sections.length === 0 ? <div className="pm-empty">
         <Coffee size={36} aria-hidden="true" />
-        <h2>{savedOnly && savedCount === 0 ? 'Your usuals start here.' : query ? `Nothing matches “${searchQuery.trim()}”.` : 'Nothing on this page yet.'}</h2>
-        <p>{savedOnly && savedCount === 0 ? 'Tap a heart on anything you like. It’ll be waiting here next time.' : query ? 'Try a shorter word, or clear your search and filters.' : 'Try resetting your filters.'}</p>
-        <button type="button" className="pm-button" onClick={resetFilters}>Reset filters</button>
+        <h2>{savedOnly && savedCount === 0 ? t('Your usuals start here.') : query ? t('Nothing matches “{query}”.', { query: searchQuery.trim() }) : t('Nothing on this page yet.')}</h2>
+        <p>{t(savedOnly && savedCount === 0 ? 'Tap a heart on anything you like. It’ll be waiting here next time.' : query ? 'Try a shorter word, or clear your search and filters.' : 'Try resetting your filters.')}</p>
+        <button type="button" className="pm-button" onClick={resetFilters}>{t('Reset filters')}</button>
       </div> : <div className="pm-sections">
         {sections.map(section => <section key={section.id} id={`section-${section.id}`} aria-labelledby={`category-${section.id}`} className="pm-section">
           <header className="pm-section-head">
             <span className="pm-section-icon"><section.Icon size={22} /></span>
             <h2 id={`category-${section.id}`}>{section.name}</h2>
-            <span className="pm-section-count">{section.items.length} to try</span>
+            <span className="pm-section-count">{t('{count} to try', { count: section.items.length })}</span>
           </header>
           <div className="pm-grid">
             {section.items.map((item, index) => {
@@ -477,11 +515,11 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
               const saved = savedItemIds.includes(item.id);
               const labels = item.dietaryLabels?.split(',').map(label => label.trim()).filter(Boolean) || [];
               return <article key={item.id} className={`pm-card ${!item.isInStock ? 'is-sold-out' : ''} ${quantity > 0 ? 'is-in-order' : ''}`} style={{ '--pm-i': Math.min(index, 8) } as React.CSSProperties}>
-                <button type="button" className="pm-card-open" onClick={() => openDetail(item)} aria-label={`${item.name}, ${money(item.basePrice + minimumModifiers)}. View details`}>
+                <button type="button" className="pm-card-open" onClick={() => openDetail(item)} aria-label={t('{name}, {price}. View details', { name: item.name, price: money(item.basePrice + minimumModifiers) })}>
                   <div className="pm-art">
                     <ItemArt item={item} Icon={section.Icon} />
                     {item.badge && <span className="pm-badge">{item.badge}</span>}
-                    {!item.isInStock && <span className="pm-sold-out">Sold out</span>}
+                    {!item.isInStock && <span className="pm-sold-out">{t('Sold out')}</span>}
                   </div>
                   <div className="pm-card-body">
                     <h3>{item.name}</h3>
@@ -489,18 +527,18 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
                     {labels.length > 0 && <ul className="pm-tags">{labels.map(label => <li key={label}>{label}</li>)}</ul>}
                   </div>
                 </button>
-                <button type="button" className={`pm-heart ${saved ? 'is-saved' : ''}`} aria-label={`${saved ? 'Unsave' : 'Save'} ${item.name}`} aria-pressed={saved} onClick={() => toggleSaved(item)}>
+                <button type="button" className={`pm-heart ${saved ? 'is-saved' : ''}`} aria-label={t(saved ? 'Unsave {name}' : 'Save {name}', { name: item.name })} aria-pressed={saved} onClick={() => toggleSaved(item)}>
                   <Heart size={18} fill={saved ? 'currentColor' : 'none'} />
                   {heartBurst?.id === item.id && <span key={heartBurst.n} className="pm-heart-burst" aria-hidden="true" />}
                 </button>
                 <div className="pm-card-foot">
-                  <span className="pm-price">{variants.length > 0 && <small>from</small>}{money(item.basePrice + minimumModifiers)}</span>
+                  <span className="pm-price">{variants.length > 0 && <small>{t('from')}</small>}{money(item.basePrice + minimumModifiers)}</span>
                   {lastAdded?.id === item.id && <span key={lastAdded.n} className="pm-plus-one" aria-hidden="true">+1</span>}
                   {simpleLine ? <div className="pm-stepper">
-                    <button type="button" aria-label={`Remove one ${item.name}`} disabled={isSubmitting} onClick={() => updateQuantity(simpleLine.id, -1)}><Minus size={16} /></button>
+                    <button type="button" aria-label={t('Remove one {name}', { name: item.name })} disabled={isSubmitting} onClick={() => updateQuantity(simpleLine.id, -1)}><Minus size={16} /></button>
                     <span>{simpleLine.quantity}</span>
-                    <button type="button" aria-label={`Add one ${item.name}`} disabled={!item.isInStock || isSubmitting} onClick={() => updateQuantity(simpleLine.id, 1)}><Plus size={16} /></button>
-                  </div> : <button type="button" className="pm-add" aria-label={variants.length ? `Customize ${item.name}` : `Add ${item.name}`} disabled={!item.isInStock || isSubmitting} onClick={() => quickAdd(item)}>
+                    <button type="button" aria-label={t('Add one {name}', { name: item.name })} disabled={!item.isInStock || isSubmitting} onClick={() => updateQuantity(simpleLine.id, 1)}><Plus size={16} /></button>
+                  </div> : <button type="button" className="pm-add" aria-label={t(variants.length ? 'Customize {name}' : 'Add {name}', { name: item.name })} disabled={!item.isInStock || isSubmitting} onClick={() => quickAdd(item)}>
                     <Plus size={20} />{quantity > 0 && <b>{quantity}</b>}
                   </button>}
                 </div>
@@ -511,14 +549,15 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
       </div>}
 
       <footer className="pm-endnote">
-        <span>Good things take a little pause.</span>
-        <button type="button" className="pm-link-button" onClick={() => document.getElementById('menu-top')?.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' })}>Back to the top<ArrowUp size={16} /></button>
+        <span>{t('Good things take a little pause.')}</span>
+        <button type="button" className="pm-link-button" onClick={() => document.getElementById('menu-top')?.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' })}>{t('Back to the top')}<ArrowUp size={16} /></button>
       </footer>
+      <ChthFooter locale={locale} onLocale={code => setLocale(code)} />
 
       {cartCount > 0 && <div className="pm-cart-bar">
         <button ref={cartBarRef} type="button" onClick={() => setIsCartOpen(true)}>
           <span className="pm-cart-count"><ShoppingBag size={18} /><b>{cartCount}</b></span>
-          <span className="pm-cart-label">Your order</span>
+          <span className="pm-cart-label">{t('Your order')}</span>
           <span className="pm-cart-total">{money(total)}<ChevronRight size={18} /></span>
         </button>
       </div>}
@@ -529,8 +568,8 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
           {activeItem.badge && <span className="pm-detail-badge">{activeItem.badge}</span>}
           {activeItem.description && <p className="text-zinc-400 leading-relaxed">{activeItem.description}</p>}
           <dl className="pm-detail-facts">
-            <div><dt>Allergens</dt><dd>{activeItem.allergens || 'Not confirmed — ask staff'}</dd></div>
-            {activeItem.dietaryLabels && <div><dt>Dietary</dt><dd>{activeItem.dietaryLabels}</dd></div>}
+            <div><dt>{t('Allergens')}</dt><dd>{activeItem.allergens || t('Not confirmed — ask staff')}</dd></div>
+            {activeItem.dietaryLabels && <div><dt>{t('Dietary')}</dt><dd>{activeItem.dietaryLabels}</dd></div>}
           </dl>
           {[...new Set(menuVariants.filter(variant => variant.menuItemId === activeItem.id).map(variant => variant.groupName))].map(group => <fieldset key={group}>
             <legend className="font-semibold text-zinc-100 mb-3">{group}</legend>
@@ -541,58 +580,58 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
               </label>)}
             </div>
           </fieldset>)}
-          {!activeItem.isInStock ? <p className="pm-detail-soldout">Sold out for now — check back soon.</p> : <div className="pm-detail-foot">
+          {!activeItem.isInStock ? <p className="pm-detail-soldout">{t('Sold out for now — check back soon.')}</p> : <div className="pm-detail-foot">
             <div className="pm-stepper">
-              <button type="button" aria-label="One fewer" disabled={detailQuantity <= 1} onClick={() => setDetailQuantity(value => Math.max(1, value - 1))}><Minus size={16} /></button>
+              <button type="button" aria-label={t('One fewer')} disabled={detailQuantity <= 1} onClick={() => setDetailQuantity(value => Math.max(1, value - 1))}><Minus size={16} /></button>
               <span>{detailQuantity}</span>
-              <button type="button" aria-label="One more" disabled={detailQuantity >= 20} onClick={() => setDetailQuantity(value => Math.min(20, value + 1))}><Plus size={16} /></button>
+              <button type="button" aria-label={t('One more')} disabled={detailQuantity >= 20} onClick={() => setDetailQuantity(value => Math.min(20, value + 1))}><Plus size={16} /></button>
             </div>
-            <button type="button" disabled={isSubmitting || !menuItems.find(item => item.id === activeItem.id)?.isInStock} onClick={() => { addItem(activeItem, Object.values(selectedVariants), detailQuantity); setActiveItem(null); }} className="pm-button pm-detail-add">Add · {money(customizedPrice * detailQuantity)}</button>
+            <button type="button" disabled={isSubmitting || !menuItems.find(item => item.id === activeItem.id)?.isInStock} onClick={() => { addItem(activeItem, Object.values(selectedVariants), detailQuantity); setActiveItem(null); }} className="pm-button pm-detail-add">{t('Add · {price}', { price: money(customizedPrice * detailQuantity) })}</button>
           </div>}
         </div>}
       </Modal>
 
-      <Modal appearance="paper" isOpen={isCartOpen} closeDisabled={isSubmitting} onClose={() => { if (!submittingRef.current) setIsCartOpen(false); }} title={<span className="text-lg font-semibold flex items-center gap-2"><ShoppingBag size={20} />Your order</span>} maxWidth="max-w-lg">
-        {!cart.length ? <div className="pm-checkout-empty"><ShoppingBag aria-hidden="true" /><p>Your order is empty. Choose something from the menu.</p></div> : <form onSubmit={handlePlaceOrder} className="public-menu pm-checkout">
+      <Modal appearance="paper" isOpen={isCartOpen} closeDisabled={isSubmitting} onClose={() => { if (!submittingRef.current) setIsCartOpen(false); }} title={<span className="text-lg font-semibold flex items-center gap-2"><ShoppingBag size={20} />{t('Your order')}</span>} maxWidth="max-w-lg">
+        {!cart.length ? <div className="pm-checkout-empty"><ShoppingBag aria-hidden="true" /><p>{t('Your order is empty. Choose something from the menu.')}</p></div> : <form onSubmit={handlePlaceOrder} className="public-menu pm-checkout">
           <fieldset disabled={isSubmitting} className="pm-checkout-fields">
-            <legend className="sr-only">Order details</legend>
+            <legend className="sr-only">{t('Order details')}</legend>
             <ul className="pm-checkout-lines">
               {cart.map(line => {
                 const available = menuItems.find(item => item.id === line.item.id)?.isInStock;
                 return <li key={line.id} className="pm-checkout-line" data-unavailable={!available || undefined}>
                   <div className="pm-checkout-line-text"><b>{line.item.name}</b>
                     {!!line.variants.length && <small>{line.variants.map(variant => `${variant.groupName}: ${variant.name}`).join(', ')}</small>}
-                    {!available && <small className="pm-checkout-warn">Sold out · please remove this item</small>}
+                    {!available && <small className="pm-checkout-warn">{t('Sold out · please remove this item')}</small>}
                     <span className="pm-price">{money(line.unitPrice * line.quantity)}</span>
                   </div>
                   <div className="pm-stepper">
-                    <button type="button" aria-label={`Remove one ${line.item.name}`} onClick={() => updateQuantity(line.id, -1)}><Minus size={16} /></button>
+                    <button type="button" aria-label={t('Remove one {name}', { name: line.item.name })} onClick={() => updateQuantity(line.id, -1)}><Minus size={16} /></button>
                     <span>{line.quantity}</span>
-                    <button type="button" disabled={!available} aria-label={`Add one ${line.item.name}`} onClick={() => updateQuantity(line.id, 1)}><Plus size={16} /></button>
+                    <button type="button" disabled={!available} aria-label={t('Add one {name}', { name: line.item.name })} onClick={() => updateQuantity(line.id, 1)}><Plus size={16} /></button>
                   </div>
                 </li>;
               })}
             </ul>
-            <fieldset className="pm-checkout-group"><legend>Order type</legend>
-              <div className="pm-checkout-choices" style={{ '--cols': 3 } as React.CSSProperties}>{([['dine_in', 'Dine-in'], ['takeout', 'Takeaway'], ['pickup', 'Pickup']] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={orderType === value} onClick={() => { setOrderType(value); setOrderError(''); }} className="pm-chip">{label}</button>)}</div>
+            <fieldset className="pm-checkout-group"><legend>{t('Order type')}</legend>
+              <div className="pm-checkout-choices" style={{ '--cols': 3 } as React.CSSProperties}>{([['dine_in', 'Dine-in'], ['takeout', 'Takeaway'], ['pickup', 'Pickup']] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={orderType === value} onClick={() => { setOrderType(value); setOrderError(''); }} className="pm-chip">{t(label)}</button>)}</div>
             </fieldset>
-            <label className="pm-checkout-field"><span>{orderType === 'dine_in' ? 'Table number' : 'Your name'}</span>
-              <input id="order-identity" type="text" autoComplete={orderType === 'dine_in' ? 'off' : 'name'} required maxLength={100} placeholder={orderType === 'dine_in' ? 'e.g. 04' : 'Your name'} value={orderType === 'dine_in' ? tableNumber : customerName} onChange={event => { if (orderType === 'dine_in') setTableNumber(event.target.value); else setCustomerName(event.target.value); setOrderError(''); }} />
+            <label className="pm-checkout-field"><span>{t(orderType === 'dine_in' ? 'Table number' : 'Your name')}</span>
+              <input id="order-identity" type="text" autoComplete={orderType === 'dine_in' ? 'off' : 'name'} required maxLength={100} placeholder={t(orderType === 'dine_in' ? 'e.g. 04' : 'Your name')} value={orderType === 'dine_in' ? tableNumber : customerName} onChange={event => { if (orderType === 'dine_in') setTableNumber(event.target.value); else setCustomerName(event.target.value); setOrderError(''); }} />
             </label>
-            <fieldset className="pm-checkout-group"><legend>Pay at the café</legend>
-              <div className="pm-checkout-choices">{(['card', 'cash'] as const).map(value => <button type="button" key={value} aria-pressed={paymentMethod === value} onClick={() => setPaymentMethod(value)} className="pm-chip">{value === 'card' ? 'Card' : 'Cash'}</button>)}</div>
-              <p className="pm-checkout-fine">Payment is collected at the café when you receive your order.</p>
+            <fieldset className="pm-checkout-group"><legend>{t('Pay at the café')}</legend>
+              <div className="pm-checkout-choices">{(['card', 'cash'] as const).map(value => <button type="button" key={value} aria-pressed={paymentMethod === value} onClick={() => setPaymentMethod(value)} className="pm-chip">{t(value === 'card' ? 'Card' : 'Cash')}</button>)}</div>
+              <p className="pm-checkout-fine">{t('Payment is collected at the café when you receive your order.')}</p>
             </fieldset>
           </fieldset>
           <dl className="pm-checkout-totals">
-            <div><dt>Subtotal</dt><dd>{money(subtotal)}</dd></div>
-            {settings.taxRate > 0 && <div><dt>Tax ({settings.taxRate}%)</dt><dd>{money(tax)}</dd></div>}
-            <div className="is-total"><dt>Total</dt><dd>{money(total)}</dd></div>
+            <div><dt>{t('Subtotal')}</dt><dd>{money(subtotal)}</dd></div>
+            {settings.taxRate > 0 && <div><dt>{t('Tax ({rate}%)', { rate: settings.taxRate })}</dt><dd>{money(tax)}</dd></div>}
+            <div className="is-total"><dt>{t('Total')}</dt><dd>{money(total)}</dd></div>
           </dl>
-          {!opening.isOpen && <p className="pm-checkout-note">{opening.label}. {opening.detail} You can keep browsing and order when we’re open.</p>}
-          {unavailableInCart && <p className="pm-checkout-error">Please remove unavailable items or options before placing your order.</p>}
+          {!opening.isOpen && <p className="pm-checkout-note">{opening.label}. {opening.detail} {t('You can keep browsing and order when we’re open.')}</p>}
+          {unavailableInCart && <p className="pm-checkout-error">{t('Please remove unavailable items or options before placing your order.')}</p>}
           {orderError && <p role="alert" className="pm-checkout-error">{orderError}</p>}
-          <button type="submit" disabled={isSubmitting || !opening.isOpen || unavailableInCart} aria-busy={isSubmitting} className="pm-button pm-checkout-submit">{isSubmitting ? 'Sending your order…' : `Place order · ${money(total)}`}</button>
+          <button type="submit" disabled={isSubmitting || !opening.isOpen || unavailableInCart} aria-busy={isSubmitting} className="pm-button pm-checkout-submit">{isSubmitting ? t('Sending your order…') : t('Place order · {price}', { price: money(total) })}</button>
         </form>}
       </Modal>
     </div>

@@ -1,3 +1,4 @@
+import { getLocale, tr } from '../i18n/translate';
 /**
  * Café events: occurrence expansion, booking windows and calendar formatting.
  * Pure and shared by the Worker and the browser. Dates are café wall-clock "YYYY-MM-DD" keys,
@@ -186,11 +187,13 @@ export const calendarOf = (value: unknown): CalendarSystem => isCalendarSystem(v
 
 const formatters = new Map<string, Intl.DateTimeFormat>();
 function formatter(calendar: CalendarSystem, options: Intl.DateTimeFormatOptions) {
-  const key = calendar + JSON.stringify(options);
+  // Dates follow the public menu's language (English everywhere else).
+  const lang = getLocale();
+  const key = lang + calendar + JSON.stringify(options);
   let f = formatters.get(key);
   if (!f) {
-    try { f = new Intl.DateTimeFormat(`en-u-ca-${calendar}`, { ...options, timeZone: 'UTC' }); }
-    catch { f = new Intl.DateTimeFormat('en', { ...options, timeZone: 'UTC' }); }
+    try { f = new Intl.DateTimeFormat(`${lang}-u-ca-${calendar}`, { ...options, timeZone: 'UTC' }); }
+    catch { f = new Intl.DateTimeFormat(lang, { ...options, timeZone: 'UTC' }); }
     formatters.set(key, f);
   }
   return f;
@@ -246,11 +249,11 @@ export function monthGrid(key: string, calendar: CalendarSystem): string[][] {
 export function weekdayLabels(calendar: CalendarSystem) {
   const start = weekStart(calendar);
   // 2023-01-01 was a Sunday.
-  return Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat('en', { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2023, 0, 1 + (start + i) % 7))));
+  return Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat(getLocale(), { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2023, 0, 1 + (start + i) % 7))));
 }
 
 export function formatTimeRange(event: Pick<CafeEvent, 'allDay' | 'startTime' | 'endTime'>) {
-  if (event.allDay) return 'All day';
+  if (event.allDay) return tr('All day');
   return event.endTime ? `${event.startTime}–${event.endTime}` : event.startTime;
 }
 
@@ -264,7 +267,7 @@ export function describeOccurrence(event: CafeEvent, date: string, calendar: Cal
 
 export function describeRecurrence(event: CafeEvent, calendar: CalendarSystem) {
   if (event.recurrence === 'none') return '';
-  const weekday = new Intl.DateTimeFormat('en', { weekday: 'long', timeZone: 'UTC' }).format(new Date(keyToUTC(event.startDate)));
-  const base = event.recurrence === 'weekly' ? `Every ${weekday}` : `Monthly on day ${Number(event.startDate.slice(8))}`;
-  return event.recurrenceUntil ? `${base} until ${formatDateKey(event.recurrenceUntil, calendar, 'short')}` : base;
+  const weekday = new Intl.DateTimeFormat(getLocale(), { weekday: 'long', timeZone: 'UTC' }).format(new Date(keyToUTC(event.startDate)));
+  const base = event.recurrence === 'weekly' ? tr('Every {weekday}', { weekday }) : tr('Monthly on day {day}', { day: Number(event.startDate.slice(8)) });
+  return event.recurrenceUntil ? tr('{base} until {date}', { base, date: formatDateKey(event.recurrenceUntil, calendar, 'short') }) : base;
 }
