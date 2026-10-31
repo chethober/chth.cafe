@@ -20,20 +20,20 @@ export type Credentials =
   | { kind: 'token'; token: string }
   | { kind: 'oauth'; accessToken: string; refreshToken: string; expiresAt: number; scope: string };
 
-// Cloudflare's scope IDs (GET /client/v4/oauth/scopes), the same permissions as the API token template:
-// Workers Scripts, KV and D1 to deploy, Account Settings to list accounts, and Zone Read and Workers Routes
-// for custom domains, which the client can mark optional. Workers Scripts is workers-scripts.write (what
-// wrangler asks for): workers-scripts.edit is the "Workers Editor" scope, which can list Workers but is
-// refused uploads ("No access to the specified resource" on assets-upload-session).
+// Cloudflare's scope IDs (GET /client/v4/oauth/scopes). Uploading a café needs Workers Scripts Write
+// (workers-scripts.write, what wrangler asks for); Workers Editor (workers-scripts.edit) can list Workers
+// but is refused the upload ("No access to the specified resource" on assets-upload-session).
+// Cloudflare only lets a client ask for the scopes its registration allows, and CHTH's OAuth client
+// allows workers-scripts.edit but not workers-scripts.write (asking for it fails with invalid_scope).
+// So sign-in asks for what the client may request, and deploys check for the upload scope up front.
+// Once the client registration allows Workers Scripts Write, set CF_OAUTH_SCOPES to request it, e.g.
+// "workers-scripts.write workers-kv-storage.write d1.write account-settings.read zone.read workers-routes.write".
 export const SCRIPTS_SCOPE = 'workers-scripts.write';
-const DEFAULT_SCOPES = `${SCRIPTS_SCOPE} workers-kv-storage.write d1.write account-settings.read zone.read workers-routes.write`;
+const DEFAULT_SCOPES = 'workers-scripts.edit workers-kv-storage.write d1.write account-settings.read zone.read workers-routes.write';
 
-/**
- * Sign-ins from before the scope fix hold workers-scripts.edit and cannot upload a café. Only that known
- * grant is flagged: Cloudflare's scope strings are otherwise left to the API to judge.
- */
+/** An OAuth grant Cloudflare will refuse a Worker upload: it names its scopes, and Workers Scripts Write is not one. */
 export const lacksScriptsScope = (credentials: Credentials) =>
-  credentials.kind === 'oauth' && credentials.scope.split(/\s+/).includes('workers-scripts.edit') && !credentials.scope.split(/\s+/).includes(SCRIPTS_SCOPE);
+  credentials.kind === 'oauth' && credentials.scope.trim() !== '' && !credentials.scope.split(/\s+/).includes(SCRIPTS_SCOPE);
 
 export const oauthConfigured = (env: OAuthEnv) => Boolean(env.CF_OAUTH_CLIENT_ID);
 const authUrl = (env: OAuthEnv) => env.CF_OAUTH_AUTH_URL || 'https://dash.cloudflare.com/oauth2/auth';

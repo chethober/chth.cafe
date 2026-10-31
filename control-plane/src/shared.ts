@@ -76,9 +76,6 @@ export async function clientFor(env: Bindings, connection: ConnectionRow) {
   let credentials = await decrypt<Credentials>(env.ENCRYPTION_KEY, ownerId, connection.credentials).catch(() => {
     throw new Error('The saved Cloudflare access cannot be read. Disconnect and connect your account again.');
   });
-  if (lacksScriptsScope(credentials)) {
-    throw new Error('Your Cloudflare sign-in is missing permission to upload Workers. Sign out, then sign in with Cloudflare again and approve the new permission.');
-  }
   if (credentials.kind === 'oauth' && credentials.expiresAt < Date.now() + 60000) {
     credentials = await refresh(env, credentials);
     await env.DB.prepare('UPDATE connections SET credentials = ?, updated_at = ? WHERE owner_id = ?').bind(await encrypt(env.ENCRYPTION_KEY, ownerId, credentials), now(), ownerId).run();
@@ -94,6 +91,10 @@ export const resourcesOf = (cafe: CafeRow): CafeResources => ({
 export async function deployRow(env: Bindings, requestUrl: string, cafe: CafeRow, connection: ConnectionRow, options: { setupToken?: string; demoData?: boolean } = {}) {
   const release = await currentRelease(env);
   try {
+    // Checked before anything is created, so a café is not left half deployed.
+    if (connection.method === 'oauth' && lacksScriptsScope(await decrypt<Credentials>(env.ENCRYPTION_KEY, connection.owner_id, connection.credentials).catch(() => ({ kind: 'token', token: '' }) as Credentials))) {
+      throw new Error('Signing in with Cloudflare cannot deploy cafés yet: Cloudflare only lets this app read your Workers, not upload them. Sign out, then sign in with an API token instead (the token link fills in the permissions). Your cafés keep running.');
+    }
     const result = await deployCafe(await clientFor(env, connection), resourcesOf(cafe), release, releaseFile(env), { ...options, platform: { url: platformOrigin(requestUrl), cafeId: cafe.id } });
     await env.DB.prepare("UPDATE cafes SET database_id = ?, kv_namespace_id = ?, url = ?, admin_url = ?, version = ?, status = 'live', last_error = NULL, updated_at = ? WHERE id = ?")
       .bind(result.databaseId, result.kvNamespaceId, result.url, result.adminUrl, release.version, now(), cafe.id).run();

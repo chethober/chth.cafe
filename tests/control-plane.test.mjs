@@ -262,7 +262,7 @@ try {
   response = await stranger('/connect/oauth');
   const authorize = new URL(response.headers.get('location'));
   check([authorize.origin + authorize.pathname, authorize.searchParams.get('client_id'), authorize.searchParams.get('code_challenge_method')], ['https://dash.cloudflare.com/oauth2/auth', 'test-client', 'S256']);
-  check(authorize.searchParams.get('scope').split(' ').sort(), ['account-settings.read', 'd1.write', 'workers-kv-storage.write', 'workers-routes.write', 'workers-scripts.write', 'zone.read']);
+  check(authorize.searchParams.get('scope').split(' ').sort(), ['account-settings.read', 'd1.write', 'workers-kv-storage.write', 'workers-routes.write', 'workers-scripts.edit', 'zone.read']);
   check(authorize.searchParams.get('redirect_uri'), `${HOST}/connect/oauth/callback`);
   issuedChallenge = authorize.searchParams.get('code_challenge');
   const state = authorize.searchParams.get('state');
@@ -286,8 +286,8 @@ try {
   check(response.status, 502);
   assert.match(await response.text(), /cannot be read/); checks++;
   await db.prepare('UPDATE connections SET credentials = ? WHERE owner_id = ?').bind(connection.credentials, connection.owner_id).run();
-  // A sign-in from before the scope fix (Workers Editor, workers-scripts.edit) is told to sign in again,
-  // instead of Cloudflare refusing the asset upload halfway through a deploy.
+  // A grant without Workers Scripts Write (Workers Editor only) is told to use an API token before
+  // anything is created, instead of Cloudflare refusing the asset upload halfway through a deploy.
   grantedScope = 'workers-scripts.edit workers-kv-storage.write d1.write account-settings.read';
   const legacy = browser();
   const legacyAuthorize = new URL((await legacy('/connect/oauth')).headers.get('location'));
@@ -296,10 +296,16 @@ try {
   const uploadsBefore = calls.filter(call => /assets-upload-session/.test(call.path || '')).length;
   response = await legacy('/cafes', { csrf: await csrfOf(await legacy('/dashboard')), name: 'Legacy Grant', demo: '1' });
   check(response.status, 502);
-  assert.match(await response.text(), /Sign out, then sign in with Cloudflare again/); checks++;
+  assert.match(await response.text(), /sign in with an API token instead/); checks++;
   check(calls.filter(call => /assets-upload-session/.test(call.path || '')).length, uploadsBefore);
   await db.prepare("DELETE FROM cafes WHERE script_name = 'cafe-legacy-grant'").run();
   grantedScope = 'workers-scripts.write workers-kv-storage.write d1.write account-settings.read';
+  // When Cloudflare refuses the sign-in, the page says why.
+  const refusedBrowser = browser();
+  const refusedAuthorize = new URL((await refusedBrowser('/connect/oauth')).headers.get('location'));
+  response = await refusedBrowser(`/connect/oauth/callback?state=${refusedAuthorize.searchParams.get('state')}&error=invalid_scope&error_description=${encodeURIComponent("The OAuth 2.0 Client is not allowed to request scope 'x'.")}`);
+  check(response.status, 400);
+  assert.match(await response.text(), /not allowed to request scope &#39;x&#39;/); checks++;
   // Disconnecting revokes the OAuth grant and signs the account out.
   check((await stranger('/disconnect', { csrf: strangerCsrf })).headers.get('location'), '/?done=disconnected');
   check(calls.find(call => call.path === '/oauth2/revoke').token, 'oauth-refresh');

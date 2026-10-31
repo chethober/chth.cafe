@@ -214,7 +214,9 @@ app.get('/connect/oauth/callback', async c => {
   deleteCookie(c, OAUTH_COOKIE, { path: '/connect/oauth' });
   // The state is single use.
   const row = await c.env.DB.prepare('DELETE FROM oauth_logins WHERE state_hash = ? AND expires_at > ? RETURNING verifier').bind(await sha256(state), Date.now()).first<{ verifier: string }>();
-  if (!row || !code || c.req.query('error')) return c.redirect('/?error=oauth', 303);
+  const refused = c.req.query('error');
+  if (refused) return landing(c, `Cloudflare did not sign you in: ${(c.req.query('error_description') || refused).slice(0, 300)} Use an API token instead.`, 400);
+  if (!row || !code) return c.redirect('/?error=oauth', 303);
   try {
     const credentials = await exchangeCode(c.env, code, row.verifier, new URL('/connect/oauth/callback', c.req.url).toString());
     await signIn(c, 'oauth', credentials);
