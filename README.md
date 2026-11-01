@@ -1,33 +1,88 @@
+<div align="center">
+
+<img src="public/favicon.svg" alt="CHTH Cafe logo" width="72" height="72">
+
 # CHTH Cafe
 
-Cafe management with a public menu, staff workspace, and daily operations panel. Built with React, TypeScript, Tailwind CSS, and Hono on Cloudflare Workers, D1, and KV.
+**Café management: a public menu with ordering, a staff panel for the day, and an admin workspace for the books.**
+
+Built with React, TypeScript and Tailwind CSS, served by Hono on Cloudflare Workers, D1 and KV.
+
+[![CI](https://github.com/chethober/chth.cafe/actions/workflows/ci.yml/badge.svg)](https://github.com/chethober/chth.cafe/actions/workflows/ci.yml)
+[![Release](https://github.com/chethober/chth.cafe/actions/workflows/release.yml/badge.svg)](https://github.com/chethober/chth.cafe/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-f5b83d.svg)](LICENSE)
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-f38020?logo=cloudflare&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)
+![Languages](https://img.shields.io/badge/i18n-en%20·%20fa%20·%20ar%20·%20ru%20·%20es-6b819e)
+
+[Café Cloud](https://chth.cafe) · [Screenshots](#screenshots) · [Quick start](#quick-start) · [Deploy](#deploy) · [Contributing](CONTRIBUTING.md)
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/chethober/chth.cafe)
 
+<img src="docs/screenshots/panel.png" alt="Daily panel live order board" width="100%">
+
+</div>
+
+---
+
+## Features
+
+| | |
+|---|---|
+| ☕ **Public menu** | Categories, search, filters, favourites, "Spin for me", ordering and order tracking, opening hours and events |
+| 📋 **Daily panel** | A live order board (waiting, preparing, ready), new orders at the till, the checklist, the customer club and clock in/out |
+| 📈 **Finances** | Revenue, expenses, wages and margin, payment mix, best sellers and closing the day |
+| 🍰 **Menu and stock** | Items with cost, margin and availability; raw materials with recipes, automatic deduction and low-stock alerts |
+| 👥 **Staff and shifts** | Team rates, clocked shifts and wages |
+| 🤖 **Telegram bot** | Sales, shift, checklist and low-stock alerts, plus commands to run the café from the chat |
+| ☁️ **One-click deploys** | CHTH Café Cloud deploys and updates a café in the owner's own Cloudflare account |
+| 🌍 **Five languages** | The customer side in English, Persian, Arabic, Russian and Spanish, right-to-left where needed |
+| 🧩 **Part of CHTH** | The shared CHTH brand kit and "Part of CHTH" footer |
+
 ## Screenshots
 
-Screenshots use the demo data from `schema.sql`.
+Screenshots use the demo menu from `schema.sql` with two weeks of sample orders, shown as a café that hasn't uploaded photos yet.
 
-**Public menu**
+<table>
+  <tr>
+    <td width="72%"><img src="docs/screenshots/menu.png" alt="Public menu on desktop"></td>
+    <td width="28%"><img src="docs/screenshots/menu-mobile.png" alt="Public menu on mobile"></td>
+  </tr>
+  <tr>
+    <td colspan="2"><sub><b>Public menu</b>: what guests see on the café's own domain, on desktop and phone</sub></td>
+  </tr>
+</table>
 
-<p>
-  <img src="docs/screenshots/menu.png" alt="Public menu on desktop" width="72%">
-  <img src="docs/screenshots/menu-mobile.png" alt="Public menu on mobile" width="24%">
-</p>
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/panel-pos.png" alt="Panel new order screen"><br><sub><b>Panel, new order</b>: take orders at the till by category</sub></td>
+    <td width="50%"><img src="docs/screenshots/admin-financials.png" alt="Admin finances"><br><sub><b>Admin, finances</b>: revenue, expenses, profit and payment mix</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/admin-menu.png" alt="Admin menu editor"><br><sub><b>Admin, menu</b>: cost, margin and availability per item</sub></td>
+    <td width="50%"><img src="docs/screenshots/admin-stock.png" alt="Admin stock"><br><sub><b>Admin, stock</b>: raw materials with low-stock alerts</sub></td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/admin-staff.png" alt="Admin staff and shifts"><br><sub><b>Admin, staff and shifts</b>: who's on shift, hours and wages</sub></td>
+    <td width="50%"><img src="docs/screenshots/cloud-landing.png" alt="CHTH Café Cloud landing page"><br><sub><b>Café Cloud</b>: sign in with Cloudflare and deploy in one click</sub></td>
+  </tr>
+</table>
 
-**Daily panel**: a live order board (waiting, preparing, ready), plus new orders, the checklist, and clock in/out.
+## Tech stack
 
-![Daily panel live order board](docs/screenshots/panel.png)
+| Layer | Technology |
+|---|---|
+| Runtime | Cloudflare Workers |
+| Backend | Hono, Drizzle ORM |
+| Database | Cloudflare D1 (SQLite) |
+| Cache and state | Cloudflare KV |
+| Frontend | React 18, Vite, Tailwind CSS 4, Lucide |
+| Control plane | A separate Worker in [`control-plane/`](control-plane/README.md) |
 
-**Admin workspace**: menu items with cost, margin, and availability, plus raw-material stock with low-stock alerts.
+## Quick start
 
-![Admin menu editor](docs/screenshots/admin-menu.png)
-
-![Admin stock and inventory](docs/screenshots/admin-stock.png)
-
-## Development
-
-Requires Node.js 22+ and npm.
+**Requirements:** Node.js 22+ and npm.
 
 ```bash
 git clone https://github.com/chethober/chth.cafe.git
@@ -41,16 +96,16 @@ npm start
 
 Database seed staff credentials are random and demo staff PINs are unset; set staff PINs in the admin workspace before using clock actions.
 
-Local apps:
+| App | URL |
+|---|---|
+| Menu | http://localhost:3000 |
+| Admin | http://admin.localhost:3000 or http://localhost:3000/admin |
+| Daily panel | http://panel.localhost:3000 or http://localhost:3000/panel |
 
-- Menu: http://localhost:3000
-- Admin: http://admin.localhost:3000
-- Daily panel: http://panel.localhost:3000
-
-Vite runs on port 3000 and proxies `/api` to the local Worker on port 8787. The startup scripts enable `CAFE_DEV_PROXY` locally to preserve the staff subdomain through Wrangler; do not enable this binding in deployment. Staff apps use their subdomains; because `wrangler.jsonc` sets `CAFE_WORKSPACE_PATHS`, they also open at http://localhost:3000/admin and http://localhost:3000/panel, as on workers.dev.
+Vite runs on port 3000 and proxies `/api` to the local Worker on port 8787. The startup scripts enable `CAFE_DEV_PROXY` locally to preserve the staff subdomain through Wrangler; do not enable this binding in deployment. Staff apps use their subdomains; because `wrangler.jsonc` sets `CAFE_WORKSPACE_PATHS`, they also open at `/admin` and `/panel`, as on workers.dev.
 
 | Command | Purpose |
-| --- | --- |
+|---|---|
 | `npm start` / `npm run dev` | Generate passwords and start the UI and Worker together |
 | `npm run dev:ui` | Start only Vite |
 | `npm run dev:worker` | Start only the local Worker (build first) |
@@ -61,6 +116,10 @@ Vite runs on port 3000 and proxies `/api` to the local Worker on port 8787. The 
 | `npm run build` | Check types and build production assets |
 | `npm run release` | Build and package a versioned release for the control plane in `release/` |
 | `npm run deploy:control-plane` | Package a release and deploy the control plane |
+
+## Staff apps and access
+
+Admin and panel use separate passwords and sessions. Admin manages finances, menu, inventory, staff and settings. Panel manages daily orders, menu availability, tasks and clock actions; its API access cannot change admin settings or financial and staff records. Set `PANEL_PASSWORD` separately from `ADMIN_PASSWORD`.
 
 ## Deploy
 
@@ -86,18 +145,27 @@ npm run deploy
 
 To start with the demo menu instead of an empty café, run `npm run db:seed:remote` before the first visit.
 
-Passwords chosen at setup can be changed later in **Settings → Sign-in**. Deployments that set `ADMIN_PASSWORD` and `PANEL_PASSWORD` as Worker secrets keep using them instead, and skip setup. `SESSION_SECRET` is optional: without it the Worker generates one and keeps it in D1.
+## Configuration
 
-Telegram notifications optionally use `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Set the cafe timezone and opening hours in Settings before accepting orders.
+Passwords chosen at setup can be changed later in **Settings → Sign-in**. Set the café timezone and opening hours in Settings before accepting orders.
 
-### Telegram bot
+| Variable | Description |
+|---|---|
+| `SETUP_TOKEN` | One-time code for choosing the admin and panel passwords on the first visit to `/admin` (secret) |
+| `ADMIN_PASSWORD`, `PANEL_PASSWORD` | Optional fixed passwords instead of setup; the admin cannot change them then (secrets) |
+| `SESSION_SECRET` | Optional; without it the Worker generates one and keeps it in D1 (secret) |
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | Optional Telegram notifications, also settable in **Settings → Notifications** |
+
+See [`.dev.vars.example`](.dev.vars.example) for local values.
+
+## Telegram bot
 
 Add a bot token and chat ID in **Settings → Notifications** (or set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`) to receive sales, shift, checklist and low-stock alerts. Pending orders arrive with buttons to start, finish or cancel them.
 
 To manage the café from the chat, deploy over HTTPS and press **Connect bot commands**. That registers `/telegram/webhook` with Telegram, protected by a secret derived from `SESSION_SECRET`. Only the configured chat can use the commands; any other chat can only send `/chatid` to find its ID.
 
 | Command | What it does |
-| --- | --- |
+|---|---|
 | `/today` | Revenue, expenses, payment mix and top sellers so far |
 | `/orders` | Open orders, with a button to move each one along |
 | `/stock`, `/stock all` | Ingredients at or below their reorder level, or everything |
@@ -129,10 +197,33 @@ plane can report landing visits from other CHTH products, sign-ins and deploys t
 answer signed `GET /internal/stats`; set `HUB_URL` and `HUB_SECRET` to switch that on. Without
 them nothing is sent and `/internal/stats` refuses every call. Self-hosted cafés send nothing.
 
+## Project structure
+
+```
+├── control-plane/       CHTH Café Cloud: sign in with Cloudflare, deploy and update cafés
+├── migrations/          D1 migrations
+├── public/              Static assets (favicon, manifest, service worker)
+├── scripts/             Dev startup, release packaging, control plane deploy
+├── src/
+│   ├── components/      Public menu, panel and admin screens
+│   ├── chth-kit/        Generated CHTH brand kit (do not edit)
+│   ├── db/              Drizzle schema, offline store and seed
+│   ├── i18n/            Customer-facing translations
+│   ├── services/        API clients
+│   ├── App.tsx          Menu, admin and panel shell
+│   └── server.ts        Hono Worker: API, auth, Telegram, cron
+├── tests/               Node integration tests
+├── schema.sql           Database schema and demo data
+├── docs/screenshots/    README screenshots
+└── wrangler.jsonc       Cloudflare Workers configuration
+```
+
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), and [SECURITY.md](SECURITY.md).
+Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md).
 
-[MIT License](LICENSE).
+Report security issues through a [private security advisory](https://github.com/chethober/chth.cafe/security/advisories/new); see [SECURITY.md](SECURITY.md).
 
-Admin and panel use separate passwords and sessions. Admin manages finances, menu, inventory, staff, and settings. Panel manages daily orders, menu availability, tasks, and clock actions; its API access cannot change admin settings or financial and staff records. Set `PANEL_PASSWORD` separately from `ADMIN_PASSWORD`.
+## License
+
+[MIT](LICENSE).
