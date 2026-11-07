@@ -1,5 +1,6 @@
 // Generated from the CHTH kit (chth.hub/kit) by `npm run sync`. Do not edit here: edit the kit and sync.
 export const MAX_SKEW_SECONDS: number;
+export function urlPath(url: string): string;
 export function safeEqual(a: string, b: string): boolean;
 export function signature(secret: string, timestamp: string, method: string, path: string, body?: string): Promise<string>;
 export function signedHeaders(opts: { source: string; secret: string; method?: string; url: string; body?: string; now?: number }): Promise<Record<string, string>>;
@@ -13,3 +14,6 @@ export interface Reporter {
 }
 export function createReporter(cfg: { url?: string; source: string; secret?: string; fetch?: typeof fetch }): Reporter;
 export function startSource(param: unknown): string | null;
+export function signCommand(secret: string, command: { id: string; cmd: string; args?: Record<string, unknown>; now?: number }): Promise<string>;
+export function verifyCommand(secret: string, text: unknown, now?: number):
+  Promise<{ id: string; cmd: string; args: Record<string, unknown>; at: number } | null>;

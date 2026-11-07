@@ -105,13 +105,13 @@
   color: inherit;
   cursor: pointer;
   display: inline-grid;
-  height: 2.5rem;
+  height: var(--chth-control-size, 2.5rem);
   justify-items: center;
   list-style: none;
   transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
   user-select: none;
   -webkit-user-select: none;
-  width: 2.5rem;
+  width: var(--chth-control-size, 2.5rem);
 }
 .chth-lang-menu > summary::-webkit-details-marker { display: none; }
 .chth-lang-menu > summary svg { height: 1.15rem; width: 1.15rem; }
@@ -137,16 +137,22 @@
   z-index: 50;
 }
 .chth-lang-menu[open] .chth-lang-menu__list { animation: chth-menu-in 160ms cubic-bezier(0.23, 1, 0.32, 1); }
-.chth-lang-menu__list a {
+.chth-lang-menu__list :is(a, button) {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+  width: 100%;
   border-radius: var(--chth-radius-md);
   color: inherit;
   display: block;
   padding: 0.55rem 0.75rem;
   text-decoration: none;
 }
-.chth-lang-menu__list a:hover, .chth-lang-menu__list a:focus-visible { background: color-mix(in srgb, currentColor 8%, transparent); outline: none; }
-.chth-lang-menu__list a:is(:lang(fa), :lang(ar)) { font-family: var(--chth-font-rtl); letter-spacing: 0; }
-.chth-lang-menu__list a[aria-current="true"] { color: var(--chth-product-accent); font-weight: 700; }
+.chth-lang-menu__list :is(a, button):hover, .chth-lang-menu__list :is(a, button):focus-visible { background: color-mix(in srgb, currentColor 8%, transparent); outline: none; }
+.chth-lang-menu__list :is(a, button):is(:lang(fa), :lang(ar)) { font-family: var(--chth-font-rtl); letter-spacing: 0; }
+.chth-lang-menu__list :is(a, button)[aria-current="true"] { color: var(--chth-product-accent); font-weight: 700; }
 @keyframes chth-menu-in { from { opacity: 0; transform: translateY(-4px) scale(0.97); } }
 @media (prefers-reduced-motion: reduce) { .chth-lang-menu[open] .chth-lang-menu__list { animation: none; } }
 @media (hover: hover) and (pointer: fine) {

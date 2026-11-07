@@ -13,6 +13,9 @@
 const enc = new TextEncoder();
 export const MAX_SKEW_SECONDS = 300;
 
+/** The path of an absolute URL. Telegram Serverless has no URL global, so it's parsed by hand. */
+export const urlPath = (url) => String(url).replace(/^[a-z][a-z0-9+.-]*:\/\/[^/?#]*/i, '').split(/[?#]/)[0] || '/';
+
 const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 
 async function hmac(secret, message) {
@@ -35,7 +38,7 @@ export const signature = (secret, timestamp, method, path, body = '') =>
 /** Headers for a signed request from `source`. */
 export async function signedHeaders({ source, secret, method = 'POST', url, body = '', now = Date.now() }) {
   const ts = String(Math.floor(now / 1000));
-  const path = new URL(url).pathname;
+  const path = urlPath(url);
   return {
     'X-Chth-Source': source,
     'X-Chth-Timestamp': ts,
@@ -122,4 +125,29 @@ export function createReporter(cfg) {
 export function startSource(param) {
   const m = /^src_([a-zA-Z0-9_]{1,40})$/.exec(String(param ?? ''));
   return m ? m[1] : null;
+}
+
+// Commands from the hub to a bot. Bots can't be called over HTTP, so the admin bot sends the
+// command as a private Telegram message (Bot-to-Bot Communication Mode, on for both bots):
+//   chth1 <hex HMAC-SHA256(secret, "command." + json)>\n<json>
+// The json is { id, cmd, args, at }. The "command." prefix keeps these signatures apart from
+// request signatures. Plain JSON, not base64: bots run in an isolate that may not have btoa.
+const COMMAND = /^chth1 ([0-9a-f]{64})\n([\s\S]+)$/;
+
+/** The message text for a command, signed with the target bot's own secret. */
+export async function signCommand(secret, { id, cmd, args = {}, now = Date.now() }) {
+  const json = JSON.stringify({ id, cmd, args, at: Math.floor(now / 1000) });
+  return `chth1 ${await hmac(secret, `command.${json}`)}\n${json}`;
+}
+
+/** Checks a command message. Resolves to `{ id, cmd, args, at }`, or null if it's forged or stale. */
+export async function verifyCommand(secret, text, now = Date.now()) {
+  const m = COMMAND.exec(String(text ?? ''));
+  if (!secret || !m) return null;
+  if (!safeEqual(await hmac(secret, `command.${m[2]}`), m[1])) return null;
+  let command;
+  try { command = JSON.parse(m[2]); } catch { return null; }
+  if (typeof command?.id !== 'string' || typeof command.cmd !== 'string') return null;
+  if (!(Math.abs(now / 1000 - Number(command.at)) <= MAX_SKEW_SECONDS)) return null;
+  return { id: command.id, cmd: command.cmd, args: command.args ?? {}, at: command.at };
 }
