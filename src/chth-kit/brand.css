@@ -158,3 +158,138 @@
 @media (hover: hover) and (pointer: fine) {
   .chth-lang-menu > summary:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
 }
+
+/* Theme toggle: a round button showing the theme it switches to (the sun in dark mode). */
+.chth-theme {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--chth-line);
+  border-radius: var(--chth-radius-full);
+  color: inherit;
+  cursor: pointer;
+  display: inline-grid;
+  flex: none;
+  height: var(--chth-control-size, 2.5rem);
+  justify-items: center;
+  padding: 0;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+  width: var(--chth-control-size, 2.5rem);
+}
+.chth-theme svg { grid-area: 1 / 1; height: 1.15rem; transition: opacity 200ms ease, transform 300ms cubic-bezier(0.23, 1, 0.32, 1); width: 1.15rem; }
+.chth-theme__moon, :root[data-theme="light"] .chth-theme__sun { opacity: 0; transform: rotate(-90deg) scale(0.6); }
+:root[data-theme="light"] .chth-theme__moon { opacity: 1; transform: none; }
+/* No choice yet and no script to set one: the toggle follows the system. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .chth-theme__sun { opacity: 0; transform: rotate(-90deg) scale(0.6); }
+  :root:not([data-theme]) .chth-theme__moon { opacity: 1; transform: none; }
+}
+.chth-theme:active { transform: scale(0.92); }
+.chth-theme:focus-visible { outline: 2px solid var(--chth-product-accent); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .chth-theme:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+  .chth-theme:hover .chth-theme__sun { transform: rotate(45deg); }
+}
+/* While the new theme spreads out, nothing else animates. */
+:root.chth-theme-switching::view-transition-old(root), :root.chth-theme-switching::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+
+/* Toasts: bottom centre, stacked, one accent stripe on the leading edge and a line for the time left. */
+.chth-toasts {
+  align-items: center;
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  inset-inline: 0;
+  padding-inline: 1rem;
+  pointer-events: none;
+  position: fixed;
+  z-index: 2147483000;
+}
+.chth-toast {
+  --chth-toast-tone: var(--chth-product-accent);
+  align-items: center;
+  animation: chth-toast-in 320ms cubic-bezier(0.23, 1, 0.32, 1);
+  background: var(--chth-toast-bg, var(--chth-ink-soft));
+  border: 1px solid var(--chth-toast-line, rgba(255, 255, 255, 0.08));
+  border-radius: var(--chth-radius-lg);
+  box-shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.6), inset 3px 0 0 var(--chth-toast-tone);
+  color: var(--chth-toast-ink, var(--chth-paper));
+  display: flex;
+  font-family: var(--chth-font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  gap: 0.625rem;
+  line-height: 1.4;
+  max-width: min(26rem, 100%);
+  overflow: hidden;
+  padding-block: 0.7rem;
+  padding-inline: 0.9rem 0.6rem;
+  pointer-events: auto;
+  position: relative;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+[dir="rtl"] .chth-toast { box-shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.6), inset -3px 0 0 var(--chth-toast-tone); }
+:root[data-theme="light"] .chth-toast { --chth-toast-bg: #fff; --chth-toast-ink: var(--chth-ink); --chth-toast-line: rgba(0, 0, 0, 0.08); box-shadow: 0 18px 44px -20px rgba(0, 0, 0, 0.35), inset 3px 0 0 var(--chth-toast-tone); }
+:root[data-theme="light"][dir="rtl"] .chth-toast { box-shadow: 0 18px 44px -20px rgba(0, 0, 0, 0.35), inset -3px 0 0 var(--chth-toast-tone); }
+.chth-toast--success { --chth-toast-tone: var(--chth-success); }
+.chth-toast--danger { --chth-toast-tone: var(--chth-danger); }
+.chth-toast--warning { --chth-toast-tone: var(--chth-warning); }
+.chth-toast--info { --chth-toast-tone: var(--chth-telegram); }
+.chth-toast__icon {
+  background: color-mix(in srgb, var(--chth-toast-tone) 16%, transparent);
+  border-radius: var(--chth-radius-full);
+  color: var(--chth-toast-tone);
+  display: inline-grid;
+  flex: none;
+  height: 1.75rem;
+  place-items: center;
+  width: 1.75rem;
+}
+.chth-toast__icon svg { height: 1rem; width: 1rem; }
+.chth-toast__text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.chth-toast__action {
+  background: var(--chth-toast-tone);
+  border: 0;
+  border-radius: var(--chth-radius-full);
+  color: var(--chth-on-accent);
+  cursor: pointer;
+  flex: none;
+  font: inherit;
+  font-weight: 700;
+  padding: 0.35rem 0.85rem;
+}
+.chth-toast__close {
+  background: none;
+  border: 0;
+  border-radius: var(--chth-radius-full);
+  color: inherit;
+  cursor: pointer;
+  display: inline-grid;
+  flex: none;
+  height: 1.75rem;
+  opacity: 0.55;
+  padding: 0;
+  place-items: center;
+  width: 1.75rem;
+}
+.chth-toast__close svg { height: 0.9rem; width: 0.9rem; }
+.chth-toast__close:hover, .chth-toast__close:focus-visible { background: color-mix(in srgb, currentColor 10%, transparent); opacity: 1; outline: none; }
+.chth-toast__time {
+  animation: chth-toast-time linear forwards;
+  background: var(--chth-toast-tone);
+  bottom: 0;
+  height: 2px;
+  inset-inline: 0;
+  opacity: 0.55;
+  position: absolute;
+  transform-origin: left;
+}
+[dir="rtl"] .chth-toast__time { transform-origin: right; }
+.chth-toast--paused .chth-toast__time { animation-play-state: paused; }
+.chth-toast--out { opacity: 0; transform: translateY(6px) scale(0.97); }
+@keyframes chth-toast-in { from { opacity: 0; transform: translateY(12px) scale(0.96); } }
+@keyframes chth-toast-time { to { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .chth-toast { animation: none; transition: none; }
+  .chth-theme svg { transition: none; }
+}

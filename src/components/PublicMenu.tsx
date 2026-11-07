@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Coffee, GlassWater, Leaf, Cake, Utensils, Search, Plus, Minus, ShoppingBag, CheckCircle2, X, MapPin, Phone, ChevronRight, Heart, SlidersHorizontal, Sparkles, Shuffle, Sun, Moon, Globe, type LucideIcon } from 'lucide-react';
+import { Coffee, GlassWater, Leaf, Cake, Utensils, Search, Plus, Minus, ShoppingBag, X, MapPin, Phone, ChevronRight, Heart, SlidersHorizontal, Sparkles, Shuffle, Globe, type LucideIcon } from 'lucide-react';
 import { CategorySelect, MenuItemSelect, MenuVariantSelect, SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { getOpeningStatus } from '../utils/openingHours';
@@ -10,6 +10,7 @@ import { reducedMotion } from '../ui';
 import { applyDocumentLocale, detectLocale, setLocale, useLocale, useT, type Locale } from '../i18n';
 import { LOCALES } from '../chth-kit/locales.js';
 import { footerModel } from '../chth-kit/footer.js';
+import { themeToggleModel, toast } from '../chth-kit/shell.js';
 
 interface PublicMenuProps {
   settings: SettingsSelect;
@@ -19,7 +20,6 @@ interface PublicMenuProps {
   onOrderCreated?: () => void;
   theme: 'dark' | 'light';
   /** Switches the theme; the change spreads out from the button that was pressed. */
-  onToggleTheme: (button: HTMLElement) => void;
 }
 
 interface CartItem {
@@ -114,9 +114,10 @@ function Confetti({ burst }: { burst: number }) {
   </div>;
 }
 
-export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, menuItems, menuVariants, onOrderCreated, theme, onToggleTheme }) => {
+export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, menuItems, menuVariants, onOrderCreated, theme }) => {
   chooseLocale();
   const locale = useLocale();
+  const toggle = themeToggleModel(locale);
   const t = useT();
   useLayoutEffect(() => applyDocumentLocale(locale), [locale]);
   const [receipt, setReceipt] = useState<OrderReceipt | null>(() => {
@@ -142,14 +143,12 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
   const [tableNumber, setTableNumber] = useState('');
   const [orderType, setOrderType] = useState<'dine_in' | 'takeout' | 'pickup'>('dine_in');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('card');
-  const [notice, setNotice] = useState('');
   const [orderError, setOrderError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confetti, setConfetti] = useState(0);
   const [now, setNow] = useState(() => new Date());
   const submittingRef = useRef(false);
   const submissionRef = useRef<{ signature: string; id: string } | null>(null);
-  const noticeTimer = useRef<ReturnType<typeof setTimeout>>();
   const addedTimer = useRef<ReturnType<typeof setTimeout>>();
   const spinTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const confettiTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -171,7 +170,6 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
     document.addEventListener('visibilitychange', updateTime);
     return () => {
       clearInterval(timer);
-      clearTimeout(noticeTimer.current);
       clearTimeout(addedTimer.current);
       clearTimeout(confettiTimer.current);
       spinTimers.current.forEach(clearTimeout);
@@ -282,11 +280,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
     window.scrollTo({ top: window.scrollY + target.getBoundingClientRect().top - railBottom - 8, behavior: reducedMotion() ? 'auto' : 'smooth' });
   };
 
-  const announce = (message: string) => {
-    clearTimeout(noticeTimer.current);
-    setNotice(message);
-    noticeTimer.current = setTimeout(() => setNotice(''), 4000);
-  };
+  const announce = (message: string) => { toast.success(message); };
   const toggleSaved = (item: MenuItemSelect) => {
     const wasSaved = savedItemIds.includes(item.id);
     setSavedItemIds(previous => previous.includes(item.id) ? previous.filter(id => id !== item.id) : [...previous, item.id]);
@@ -404,16 +398,11 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
 
   return (
     <div className="public-menu pm" id="menu-top">
-      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">{notice}</div>
-      {notice && !activeItem && !isCartOpen && <div key={notice} className="pm-toast" aria-hidden="true"><CheckCircle2 size={18} />{notice}</div>}
       <Confetti burst={confetti} />
 
       <section aria-label={t('Café information')} className="pm-hero">
-        <button type="button" className="pm-theme-toggle" data-theme={theme} onClick={e => onToggleTheme(e.currentTarget)}
-          aria-label={t(theme === 'dark' ? 'Switch to light appearance' : 'Switch to dark appearance')}>
-          <Sun className="pm-theme-sun" size={19} aria-hidden="true" />
-          <Moon className="pm-theme-moon" size={19} aria-hidden="true" />
-        </button>
+        <button type="button" className="chth-theme pm-theme-toggle" data-chth-theme-toggle aria-pressed={theme === 'dark'}
+          aria-label={toggle.label} title={toggle.label} dangerouslySetInnerHTML={{ __html: toggle.iconsSvg }} />
         <label className="pm-lang" title={t('Language')}>
           <Globe size={19} aria-hidden="true" />
           <span className="sr-only">{t('Language')}</span>

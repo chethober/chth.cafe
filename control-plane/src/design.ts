@@ -2,15 +2,21 @@ import { html, raw } from 'hono/html';
 import type { HtmlEscapedString } from 'hono/utils/html';
 import { BRAND_CSS } from '../../src/chth-kit/brand.js';
 import { footerHtml } from '../../src/chth-kit/footer.js';
+import { themeToggleModel } from '../../src/chth-kit/shell.js';
+import { SHELL_JS } from '../../src/chth-kit/shell-script.js';
 
 /**
- * The page shell every control plane page shares: tokens for both themes, the nav with the theme
- * toggle, and the motion. The CSP allows no scripts, so the theme toggle is a form, and page changes
- * animate with cross-document View Transitions, which browsers without them simply skip.
+ * The page shell every control plane page shares: tokens for both themes, the nav with the CHTH
+ * theme toggle, and the motion. The CSP allows one script, the CHTH shell (by its hash). The theme
+ * toggle is still a form, so it works without it, and page changes animate with cross-document
+ * View Transitions, which browsers without them simply skip.
  */
 export type View = HtmlEscapedString | Promise<HtmlEscapedString>;
 
-export const THEME_COOKIE = 'cp_theme';
+/** The theme cookie every CHTH site uses (the shell sets it too). */
+export const THEME_COOKIE = 'chth_theme';
+/** The cookie this control plane used before the shared one. */
+export const OLD_THEME_COOKIE = 'cp_theme';
 
 /** The brand fonts, as the café app loads them: Plus Jakarta Sans, Fraunces, JetBrains Mono and Vazirmatn for Persian and Arabic. */
 export const FONTS_URL = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300..800&family=Fraunces:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400..600&family=Vazirmatn:wght@300..800&display=swap';
@@ -45,12 +51,7 @@ form.inline{display:inline-flex;align-items:center;gap:10px;margin:0}
 
 /* Theme toggle: shows the sun in dark and the moon in light, like the café's. */
 .theme{display:inline-flex;margin:0}
-.theme button{display:grid;place-items:center;width:40px;height:40px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--soft);color:var(--ink);cursor:pointer;transition:transform 160ms var(--ease-out),background-color 150ms ease,border-color 150ms ease}
-.theme button:active{transform:scale(.92) rotate(-20deg)}
-.theme svg{width:19px;height:19px}.theme .to-light svg{color:var(--accent)}
-.theme .to-dark{display:none}
-:root[data-theme="light"] .theme .to-light{display:none}:root[data-theme="light"] .theme .to-dark{display:grid}
-@media (prefers-color-scheme:light){:root:not([data-theme]) .theme .to-light{display:none}:root:not([data-theme]) .theme .to-dark{display:grid}}
+.chth-theme{background:var(--soft);color:var(--ink);border-color:var(--line)}.chth-theme .chth-theme__sun{color:var(--accent)}
 
 .btn{font:inherit;font-weight:650;display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:12px 20px;border-radius:999px;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap;color:var(--ink);background:var(--soft);transition:transform 160ms var(--ease-out),box-shadow 200ms ease,background-color 150ms ease,border-color 150ms ease,color 150ms ease}
 .btn:active:not(:disabled){transform:scale(.97)}
@@ -100,7 +101,7 @@ details[open]::details-content{height:auto}
   .btn.cf:hover{box-shadow:0 14px 40px -10px rgba(243,128,32,.9),inset 0 1px 0 rgba(255,255,255,.35)}
   .btn.ghost:hover{border-color:var(--line2);background:var(--soft)}
   .btn.danger:hover{background:#ad2c21}
-  .theme button:hover{background:var(--soft2);border-color:var(--line2)}
+  .chth-theme:hover{background:var(--soft2);border-color:var(--line2)}
 }
 
 /* Page changes crossfade; a theme change spreads out of the toggle, which sits at the right end of the nav. */
@@ -108,7 +109,7 @@ details[open]::details-content{height:auto}
 ::view-transition-old(root){animation:vt-out 150ms ease-out both}
 ::view-transition-new(root){animation:vt-in 220ms var(--ease-out) both}
 @keyframes vt-out{to{opacity:0}}@keyframes vt-in{from{opacity:0}}
-:root[data-theme-switch]::view-transition-old(root),.theme-switching::view-transition-old(root),.theme-switching::view-transition-new(root){animation:none}
+:root[data-theme-switch]::view-transition-old(root),.chth-theme-switching::view-transition-old(root),.chth-theme-switching::view-transition-new(root){animation:none}
 :root[data-theme-switch]::view-transition-new(root){animation:vt-reveal 400ms var(--ease-out) both}
 @keyframes vt-reveal{from{clip-path:circle(0 at calc(50% + min(50%,580px) - 40px) 32px)}to{clip-path:circle(150vmax at calc(50% + min(50%,580px) - 40px) 32px)}}
 
@@ -124,41 +125,18 @@ const CUP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fil
 export const FAVICON = CUP_SVG;
 export const CUP = raw(CUP_SVG.replace('<svg ', '<svg aria-hidden="true" '));
 export const CLOUD = raw(`<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.6 18.5H6.2a4.2 4.2 0 0 1-.6-8.36A6 6 0 0 1 17.1 8.6a4.95 4.95 0 0 1 .5 9.9Z"/></svg>`);
-const SUN = raw(`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>`);
-const MOON = raw(`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>`);
 
 /**
  * The one script the CSP allows, pinned by its hash: switches the theme in place, without the reload
  * the form falls back to, and spreads it out from the toggle like the café's. It saves the same cookie.
  */
-export const THEME_SCRIPT = `document.addEventListener('submit', event => {
-  const form = event.target, button = event.submitter;
-  if (!form.matches('form.theme') || !button) return;
-  event.preventDefault();
-  const root = document.documentElement, next = button.value;
-  document.cookie = '${THEME_COOKIE}=' + next + '; path=/; max-age=31536000; samesite=lax' + (location.protocol === 'https:' ? '; secure' : '');
-  const apply = () => {
-    root.dataset.theme = next;
-    for (const meta of document.querySelectorAll('meta[name="theme-color"]')) { meta.removeAttribute('media'); meta.content = next === 'dark' ? '${THEME_COLORS.dark}' : '${THEME_COLORS.light}'; }
-    form.querySelector('button:not([value="' + next + '"])').focus({ preventScroll: true });
-  };
-  if (!document.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) return apply();
-  const { left, top, width, height } = button.getBoundingClientRect();
-  const x = left + width / 2, y = top + height / 2;
-  const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-  root.classList.add('theme-switching');
-  const transition = document.startViewTransition(apply);
-  transition.ready.then(() => root.animate(
-    { clipPath: ['circle(0px at ' + x + 'px ' + y + 'px)', 'circle(' + radius + 'px at ' + x + 'px ' + y + 'px)'] },
-    { duration: 400, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', pseudoElement: '::view-transition-new(root)' }
-  )).catch(() => {});
-  transition.finished.finally(() => root.classList.remove('theme-switching'));
-});`;
+/** The pages' only script: the CHTH shell (theme toggle, and later the banner and notices). */
+export const PAGE_SCRIPT = SHELL_JS;
 
 let scriptHash: Promise<string> | null = null;
-/** The CSP source that allows THEME_SCRIPT and nothing else. */
+/** The CSP source that allows PAGE_SCRIPT and nothing else. */
 export function themeScriptSource() {
-  scriptHash ??= crypto.subtle.digest('SHA-256', new TextEncoder().encode(THEME_SCRIPT))
+  scriptHash ??= crypto.subtle.digest('SHA-256', new TextEncoder().encode(PAGE_SCRIPT))
     .then(digest => `'sha256-${btoa(String.fromCharCode(...new Uint8Array(digest)))}'`);
   return scriptHash;
 }
@@ -180,6 +158,8 @@ export interface PageOptions {
   themeToggle?: boolean;
 }
 
+const TOGGLE = themeToggleModel('en');
+
 export function page(body: View, options: PageOptions) {
   const end = options.csrf
     ? html`${options.account ? html`<span class="account">${options.account}</span>` : ''}<form class="inline" method="post" action="/signout"><input type="hidden" name="csrf" value="${options.csrf}"><button class="btn ghost small" type="submit">Sign out</button></form>`
@@ -191,8 +171,8 @@ export function page(body: View, options: PageOptions) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="same-origin">
 ${options.description ? html`<meta name="description" content="${options.description}">` : ''}
-<meta name="theme-color" content="${THEME_COLORS.dark}" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="${THEME_COLORS.light}" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="${THEME_COLORS.dark}" media="(prefers-color-scheme: dark)" data-chth-dark="${THEME_COLORS.dark}" data-chth-light="${THEME_COLORS.light}">
+<meta name="theme-color" content="${THEME_COLORS.light}" media="(prefers-color-scheme: light)" data-chth-dark="${THEME_COLORS.dark}" data-chth-light="${THEME_COLORS.light}">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -208,14 +188,13 @@ ${options.description ? html`<meta name="description" content="${options.descrip
       ${options.links || ''}${end}
       <!--chth-lang-->
       ${options.themeToggle === false ? '' : html`<form class="theme" method="post" action="/theme">
-        <button class="to-light" type="submit" name="theme" value="light" aria-label="Switch to light appearance">${SUN}</button>
-        <button class="to-dark" type="submit" name="theme" value="dark" aria-label="Switch to dark appearance">${MOON}</button>
+        <button class="chth-theme" data-chth-theme-toggle type="submit" name="theme" value="toggle" aria-label="${TOGGLE.label}" title="${TOGGLE.label}">${raw(TOGGLE.iconsSvg)}</button>
       </form>`}
     </div>
   </div>
 </nav>
 ${body}
-<script>${raw(THEME_SCRIPT)}</script>
+<script>${raw(PAGE_SCRIPT)}</script>
 ${raw(footerHtml('en', 'cafe'))}
 </body>
 </html>`;
@@ -226,5 +205,5 @@ export function applyTheme(document: string, theme: string | undefined, switched
   if (theme !== 'light' && theme !== 'dark') return document;
   return document
     .replace(/<html lang="([a-z]{2})"/, `<html lang="$1" data-theme="${theme}"${switched ? ' data-theme-switch' : ''}`)
-    .replace(/<meta name="theme-color"[^>]*>\s*<meta name="theme-color"[^>]*>/, `<meta name="theme-color" content="${THEME_COLORS[theme]}">`);
+    .replace(/<meta name="theme-color"[^>]*>\s*<meta name="theme-color"[^>]*>/, `<meta name="theme-color" content="${THEME_COLORS[theme]}" data-chth-dark="${THEME_COLORS.dark}" data-chth-light="${THEME_COLORS.light}">`);
 }

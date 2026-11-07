@@ -4,7 +4,7 @@ import schema from '../schema.sql';
 import { CloudflareClient, deployCafe, type CafeResources, type Release } from './cloudflare';
 import { decrypt, encrypt } from './crypto';
 import { lacksScriptsScope, refresh, type Credentials, type OAuthEnv } from './oauth';
-import { applyTheme, THEME_COOKIE, THEME_SWITCH_COOKIE, themeScriptSource } from './design';
+import { applyTheme, OLD_THEME_COOKIE, THEME_COOKIE, THEME_SWITCH_COOKIE, themeScriptSource } from './design';
 import * as views from './views';
 
 /** What the owner site (chth.cafe) and the hub's internal API share. */
@@ -113,7 +113,7 @@ export const themed: MiddlewareHandler = async (c, next) => {
   const res = c.res;
   const headers = new Headers(res.headers);
   headers.delete('Content-Length');
-  c.res = new Response(applyTheme(await res.text(), getCookie(c, THEME_COOKIE), switched), { status: res.status, headers });
+  c.res = new Response(applyTheme(await res.text(), getCookie(c, THEME_COOKIE) ?? getCookie(c, OLD_THEME_COOKIE), switched), { status: res.status, headers });
   if (switched) deleteCookie(c, THEME_SWITCH_COOKIE, { path: '/' });
 };
 
@@ -121,7 +121,7 @@ export const themed: MiddlewareHandler = async (c, next) => {
 export const guarded: MiddlewareHandler = async (c, next) => {
   await ensureSchema((c.env as Bindings).DB);
   c.header('X-Frame-Options', 'DENY');
-  // The only script is the theme toggle, allowed by its hash.
+  // The only script is the CHTH shell, allowed by its hash.
   c.header('Content-Security-Policy', `default-src 'none'; script-src ${await themeScriptSource()}; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; form-action 'self' https://dash.cloudflare.com; frame-ancestors 'none'; base-uri 'none'`);
   // same-origin, not no-referrer: with no-referrer, browsers send "Origin: null" on form posts, which the origin check refuses.
   c.header('Referrer-Policy', 'same-origin');

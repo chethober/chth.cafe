@@ -55,10 +55,7 @@
   transition: transform 160ms var(--ease-out), background-color 150ms ease;
 }
 .pm-theme-toggle:active { transform: scale(0.94); }
-.pm-theme-toggle svg { grid-area: 1 / 1; transition: transform 260ms var(--ease-out), opacity 180ms ease; }
-.pm-theme-sun { color: var(--menu-accent); }
-.pm-theme-toggle[data-theme='light'] .pm-theme-sun { opacity: 0; transform: rotate(90deg) scale(0.6); }
-.pm-theme-toggle[data-theme='dark'] .pm-theme-moon { opacity: 0; transform: rotate(-90deg) scale(0.6); }
+.pm-theme-toggle .chth-theme__sun { color: var(--menu-accent); }
 @media (hover: hover) and (pointer: fine) {
   .pm-theme-toggle:hover { background: var(--pm-soft); }
 }
@@ -285,14 +282,6 @@ html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !i
 .pm-cart-label { flex: 1; text-align: left; }
 .pm-cart-total { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-.pm-toast {
-  position: fixed; z-index: 10000; left: 16px; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom, 0px));
-  display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 16px;
-  background: var(--menu-ink); color: var(--menu-paper); font: 600 13px var(--font-sans);
-  box-shadow: 0 16px 36px -16px rgb(0 0 0 / .55);
-  animation: pm-toast-in 260ms var(--ease-out);
-}
-@media (min-width: 640px) { .pm-toast { left: auto; right: 24px; max-width: 380px; } }
 
 .pm-confetti { position: fixed; z-index: 10001; left: 50%; top: 42%; width: 0; height: 0; pointer-events: none; }
 .pm-confetti i { position: absolute; width: 8px; height: 12px; border-radius: 2px; background: hsl(var(--h) 80% 60%); animation: pm-confetti 1200ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards; }
@@ -386,7 +375,6 @@ html .menu-paper-dialog .pm-checkout-field input:focus { border-color: var(--men
 @keyframes pm-pop-in { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes pm-float { 0% { transform: translateY(6px) scale(0.8); opacity: 0; } 20% { transform: translateY(-4px) scale(1.1); opacity: 1; } 100% { transform: translateY(-30px) scale(1); opacity: 0; } }
 @keyframes pm-cart-in { from { transform: translateY(calc(100% + 24px)); } to { transform: translateY(0); } }
-@keyframes pm-toast-in { from { transform: translateY(8px) scale(0.97); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
 @keyframes pm-confetti {
   0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
   55% { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: 1; }

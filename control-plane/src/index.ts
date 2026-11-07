@@ -4,7 +4,7 @@ import { safeEqual } from '../../src/utils/passwords';
 import { CloudflareClient, CloudflareError, checkAccess, deleteCafe, setSetupToken } from './cloudflare';
 import { decrypt, encrypt, randomToken, sha256 } from './crypto';
 import { authorizeUrl, exchangeCode, newVerifier, oauthConfigured, revoke, type Credentials } from './oauth';
-import { FAVICON, THEME_COOKIE, THEME_SWITCH_COOKIE } from './design';
+import { FAVICON, OLD_THEME_COOKIE, THEME_COOKIE, THEME_SWITCH_COOKIE } from './design';
 import { LOGO_PNG } from './logo';
 import { attempts, audit as auditFor, clientFor as clientForEnv, currentRelease, deployRow, guarded, message, now, resourcesOf, themed, type Bindings, type CafeRow, type ConnectionRow } from './shared';
 import internal from './internal';
@@ -119,7 +119,10 @@ app.get('/logo.png', c => c.body(Uint8Array.from(atob(LOGO_PNG), ch => ch.charCo
 /** Saves the theme and goes back to the page it was chosen on, which then reveals it from the toggle. */
 app.post('/theme', async c => {
   const form = await c.req.parseBody();
-  const theme = form.theme === 'light' ? 'light' : 'dark';
+  // 'toggle' (the shared toggle without its script) flips the saved theme; with none saved, the
+  // page was following the system, which the browser may tell us.
+  const saved = getCookie(c, THEME_COOKIE) ?? getCookie(c, OLD_THEME_COOKIE) ?? (c.req.header('Sec-CH-Prefers-Color-Scheme') === 'light' ? 'light' : 'dark');
+  const theme = form.theme === 'toggle' ? (saved === 'light' ? 'dark' : 'light') : form.theme === 'light' ? 'light' : 'dark';
   const secure = new URL(c.req.url).protocol === 'https:';
   setCookie(c, THEME_COOKIE, theme, { secure, sameSite: 'Lax', path: '/', maxAge: 365 * 86400 });
   setCookie(c, THEME_SWITCH_COOKIE, '1', { secure, sameSite: 'Lax', path: '/', maxAge: 30 });
