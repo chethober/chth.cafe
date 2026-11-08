@@ -1,8 +1,8 @@
 import { html, raw } from 'hono/html';
 import type { HtmlEscapedString } from 'hono/utils/html';
 import { BRAND_CSS } from '../../src/chth-kit/brand.js';
-import { footerHtml } from '../../src/chth-kit/footer.js';
-import { appSwitcherHtml, cookieNoticeHtml, themeToggleModel } from '../../src/chth-kit/shell.js';
+import { cookieNoticeHtml, navbarHtml } from '../../src/chth-kit/shell.js';
+import type { Locale } from '../../src/chth-kit/locales.js';
 import { SHELL_JS } from '../../src/chth-kit/shell-script.js';
 
 /**
@@ -39,20 +39,10 @@ a{color:var(--accent);text-underline-offset:3px;text-decoration-thickness:1px;tr
 .wrap{max-width:1160px;margin:0 auto;padding:0 20px;width:100%}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
-nav.top{position:sticky;top:0;z-index:10;backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);background:var(--glass);border-bottom:1px solid var(--line)}
-nav.top .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px}
-.brand{display:flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
-.brand svg{width:28px;height:28px;flex:none;transition:transform 300ms var(--spring)}
-.nav-end{display:flex;align-items:center;gap:18px;font-size:14px;min-width:0}
-.nav-end>a:not(.btn){color:var(--muted);text-decoration:none}
-.account{color:var(--muted);max-width:22ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media (max-width:760px){.nav-end>a:not(.btn),.account{display:none}.brand span{display:none}}
 form.inline{display:inline-flex;align-items:center;gap:10px;margin:0}
 
-/* Theme toggle: shows the sun in dark and the moon in light, like the café's. */
-.theme{display:inline-flex;margin:0}
-.chth-apps>summary{background:var(--soft);color:var(--ink);border-color:var(--line)}
-.chth-theme{background:var(--soft);color:var(--ink);border-color:var(--line)}.chth-theme .chth-theme__sun{color:var(--accent)}
+/* The CHTH navbar and footer in this page's accent */
+.chth-nav .chth-theme__sun{color:var(--accent)}
 
 .btn{font:inherit;font-weight:650;display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:12px 20px;border-radius:999px;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap;color:var(--ink);background:var(--soft);transition:transform 160ms var(--ease-out),box-shadow 200ms ease,background-color 150ms ease,border-color 150ms ease,color 150ms ease}
 .btn:active:not(:disabled){transform:scale(.97)}
@@ -97,22 +87,20 @@ details[open]::details-content{height:auto}
 
 @media (hover:hover) and (pointer:fine){
   a:hover{color:var(--accent2)}
-  .nav-end>a:not(.btn):hover{color:var(--ink)}
-  .brand:hover svg{transform:rotate(-8deg) scale(1.06)}
   .btn.cf:hover{box-shadow:0 14px 40px -10px rgba(243,128,32,.9),inset 0 1px 0 rgba(255,255,255,.35)}
   .btn.ghost:hover{border-color:var(--line2);background:var(--soft)}
   .btn.danger:hover{background:#ad2c21}
   .chth-theme:hover{background:var(--soft2);border-color:var(--line2)}
 }
 
-/* Page changes crossfade; a theme change spreads out of the toggle, which sits at the right end of the nav. */
+/* Page changes crossfade; a theme change spreads out of the toggle, in the navbar's right end. */
 @view-transition{navigation:auto}
 ::view-transition-old(root){animation:vt-out 150ms ease-out both}
 ::view-transition-new(root){animation:vt-in 220ms var(--ease-out) both}
 @keyframes vt-out{to{opacity:0}}@keyframes vt-in{from{opacity:0}}
 :root[data-theme-switch]::view-transition-old(root),.chth-theme-switching::view-transition-old(root),.chth-theme-switching::view-transition-new(root){animation:none}
 :root[data-theme-switch]::view-transition-new(root){animation:vt-reveal 400ms var(--ease-out) both}
-@keyframes vt-reveal{from{clip-path:circle(0 at calc(50% + min(50%,580px) - 40px) 32px)}to{clip-path:circle(150vmax at calc(50% + min(50%,580px) - 40px) 32px)}}
+@keyframes vt-reveal{from{clip-path:circle(0 at calc(50% + min(50%,32rem) - 60px) 40px)}to{clip-path:circle(150vmax at calc(50% + min(50%,32rem) - 60px) 40px)}}
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:1ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:1ms!important}
@@ -149,22 +137,52 @@ export interface PageOptions {
   title: string;
   description?: string;
   styles?: string;
-  /** Links shown before the sign-in button, for the landing page. */
-  links?: View;
   signInHref?: string;
   /** Signed in: the account name and the CSRF token for signing out. */
   account?: string;
   csrf?: string;
   /** Off on pages that come from a form, such as a one-time setup link, which reloading would lose. */
   themeToggle?: boolean;
+  /** The navbar's language menu, on the pages that are translated (the landing). */
+  languageMenu?: boolean;
 }
 
-const TOGGLE = themeToggleModel('en');
+/** What the navbar needs from a page, carried in a comment until the page's language is known. */
+export interface NavSpec { signIn?: string; account?: string; csrf?: string; theme: boolean; language: boolean }
+
+const LOGOUT = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></svg>';
+const escAttr = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+/**
+ * The shared CHTH navbar for a page: the café words on the left (to How it works), the CHTH
+ * mark in the middle, then the account (your cafés, or sign in), theme and language. Signed in,
+ * a sign-out button comes first. The theme toggle is a form, so it works without the script.
+ */
+export function cafeNav(locale: Locale, spec: NavSpec) {
+  const signOut = spec.csrf
+    ? `<form class="chth-theme-form" method="post" action="/signout"><input type="hidden" name="csrf" value="${escAttr(spec.csrf)}"><button class="chth-nav__icon" type="submit" aria-label="Sign out" title="Sign out">${LOGOUT}</button></form>`
+    : '';
+  return navbarHtml(locale, 'cafe', {
+    leadHref: '/#how',
+    account: spec.csrf ? { href: '/dashboard', label: spec.account || 'Your cafés' } : { href: spec.signIn || '/#start', label: 'Sign in' },
+    extra: signOut,
+    theme: spec.theme,
+    themeFormAction: '/theme',
+    language: spec.language,
+  });
+}
+
+/** Pages carry their navbar as <!--chth-nav …-->; the themed middleware renders it in the page's language. */
+export const navSlot = (spec: NavSpec) => `<!--chth-nav ${encodeURIComponent(JSON.stringify(spec))}-->`;
+export function fillNav(page: string, locale: Locale) {
+  return page.replace(/<!--chth-nav ([^>]*?)-->/, (_, spec: string) => cafeNav(locale, JSON.parse(decodeURIComponent(spec)) as NavSpec));
+}
 
 export function page(body: View, options: PageOptions) {
-  const end = options.csrf
-    ? html`${options.account ? html`<span class="account">${options.account}</span>` : ''}<form class="inline" method="post" action="/signout"><input type="hidden" name="csrf" value="${options.csrf}"><button class="btn ghost small" type="submit">Sign out</button></form>`
-    : options.signInHref ? html`<a class="btn cf small" href="${options.signInHref}">${CLOUD} Sign in</a>` : '';
+  const nav: NavSpec = {
+    signIn: options.signInHref, account: options.account, csrf: options.csrf,
+    theme: options.themeToggle !== false, language: Boolean(options.languageMenu),
+  };
   return html`<!doctype html>
 <html lang="en" data-chth-product="cafe">
 <head>
@@ -182,23 +200,11 @@ ${options.description ? html`<meta name="description" content="${options.descrip
 <style>${raw(BRAND_CSS)}${raw(BASE)}${raw(options.styles || '')}</style>
 </head>
 <body>
-<nav class="top" aria-label="Main">
-  <div class="wrap">
-    <a class="brand" href="/">${CUP}<span>CHTH Café Cloud</span></a>
-    <div class="nav-end">
-      ${options.links || ''}${end}
-      <!--chth-lang-->
-      ${options.themeToggle === false ? '' : html`<form class="theme" method="post" action="/theme">
-        <button class="chth-theme" data-chth-theme-toggle type="submit" name="theme" value="toggle" aria-label="${TOGGLE.label}" title="${TOGGLE.label}">${raw(TOGGLE.iconsSvg)}</button>
-      </form>`}
-      ${raw(appSwitcherHtml('en', 'cafe'))}
-    </div>
-  </div>
-</nav>
+${raw(navSlot(nav))}
 ${body}
 ${raw(cookieNoticeHtml('en'))}
 <script>${raw(PAGE_SCRIPT)}</script>
-${raw(footerHtml('en', 'cafe'))}
+<!--chth-footer-->
 </body>
 </html>`;
 }

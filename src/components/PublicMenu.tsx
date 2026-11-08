@@ -43,14 +43,22 @@ function chooseLocale() {
   setLocale(detectLocale(), new URLSearchParams(window.location.search).has('lang'));
 }
 
-/** The shared CHTH footer: the CHTH mark, linking to chth.wtf. */
+/**
+ * The shared CHTH footer: the call to CHTH and the app's source and docs. No privacy or terms
+ * links: this menu is the café's, and so are its policies.
+ */
 function ChthFooter({ locale }: { locale: Locale }) {
-  const m = footerModel(locale, 'cafe');
+  const m = footerModel(locale, 'cafe', { legal: false });
   return <footer className="chth-footer" data-chth-footer>
-    <a className="chth-footer__brand" href={m.infoUrl}>
+    <div className="chth-footer__cta">
       <span className="chth-footer__mark" aria-hidden="true" dangerouslySetInnerHTML={{ __html: m.logoSvg }} />
-      <span>{m.partOf}</span>
-    </a>
+      <p className="chth-footer__pitch"><strong>{m.partOf}</strong><span>{m.pitch}</span></p>
+      <a className="chth-footer__btn" href={m.infoUrl}>{m.explore} <span aria-hidden="true">→</span></a>
+    </div>
+    <nav className="chth-footer__links" aria-label={m.partOf}>
+      {m.links.map(l => <a key={l.id} href={l.href}>{l.label}</a>)}
+      <span className="chth-footer__year">© {m.year} CHTH</span>
+    </nav>
   </footer>;
 }
 

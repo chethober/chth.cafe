@@ -143,8 +143,10 @@ try {
   // One footer (the CHTH mark, linking to chth.wtf), the language menu in the navbar, and the brand fonts.
   check(persianPage.match(/<footer\b/g).length, 1);
   check(persianPage.includes('href="https://chth.wtf/?ref=cafe"') && persianPage.includes('بخشی از CHTH'), true);
-  const menuAt = persianPage.indexOf('<details class="chth-lang-menu">');
-  check(menuAt > persianPage.indexOf('<nav class="top"') && menuAt < persianPage.indexOf('<header class="hero"'), true);
+  // The shared CHTH navbar, in Persian: the café words, the language menu, the theme form.
+  const menuAt = persianPage.indexOf('<details class="chth-lang-menu chth-nav__lang">');
+  check(menuAt > persianPage.indexOf('<header class="chth-nav"') && menuAt < persianPage.indexOf('<header class="hero"'), true);
+  check(persianPage.includes('کافه CHTH') && persianPage.includes('action="/theme"'), true);
   check(persianPage.includes('hreflang="fa" lang="fa" aria-current="true"'), true);
   check(landing.includes('fonts.googleapis.com/css2?family=Plus+Jakarta+Sans'), true);
   check(/font-src https:\/\/fonts\.gstatic\.com/.test(persian.headers.get('content-security-policy') || ''), true);

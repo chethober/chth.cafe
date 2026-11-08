@@ -6,7 +6,8 @@ import { decrypt, encrypt } from './crypto';
 import { lacksScriptsScope, refresh, type Credentials, type OAuthEnv } from './oauth';
 import { bannerHtml } from '../../src/chth-kit/shell.js';
 import { isLocale } from '../../src/chth-kit/locales.js';
-import { applyTheme, OLD_THEME_COOKIE, THEME_COOKIE, THEME_SWITCH_COOKIE, themeScriptSource } from './design';
+import { footerHtml } from '../../src/chth-kit/footer.js';
+import { applyTheme, fillNav, OLD_THEME_COOKIE, THEME_COOKIE, THEME_SWITCH_COOKIE, themeScriptSource } from './design';
 import * as views from './views';
 
 /** What the owner site (chth.cafe) and the hub's internal API share. */
@@ -121,10 +122,11 @@ export const themed: MiddlewareHandler = async (c, next) => {
   let page = applyTheme(await res.text(), getCookie(c, THEME_COOKIE) ?? getCookie(c, OLD_THEME_COOKIE), switched);
   const banner = await (c.env as Bindings).DB.prepare('SELECT text, url FROM notices WHERE scope = ?').bind(BANNER_SCOPE)
     .first<{ text: string; url: string | null }>().catch(() => null);
-  if (banner?.text) {
-    const lang = /<html lang="([a-z]{2})"/.exec(page)?.[1] ?? 'en';
-    page = page.replace(/<body[^>]*>/, tag => tag + bannerHtml(banner, isLocale(lang) ? lang : 'en'));
-  }
+  const lang = /<html lang="([a-z]{2})"/.exec(page)?.[1];
+  const locale = isLocale(lang) ? lang : 'en';
+  // The CHTH navbar and footer, in the page's language.
+  page = fillNav(page, locale).replace('<!--chth-footer-->', () => footerHtml(locale, 'cafe'));
+  if (banner?.text) page = page.replace(/<body[^>]*>/, tag => tag + bannerHtml(banner, locale));
   c.res = new Response(page, { status: res.status, headers });
   if (switched) deleteCookie(c, THEME_SWITCH_COOKIE, { path: '/' });
 };

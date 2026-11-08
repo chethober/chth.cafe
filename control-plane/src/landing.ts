@@ -392,6 +392,6 @@ ${params.error || params.message ? html`<div class="wrap banner">${notice(params
     description: 'Menu, orders, stock, staff and finances for your café, deployed in one click to your own Cloudflare account.',
     styles: STYLES,
     signInHref,
-    links: html`<a href="#demo">Product</a><a href="#how">How it works</a><a href="#ownership">Ownership</a><a href="#faq">FAQ</a>`
+    languageMenu: true,
   });
 }

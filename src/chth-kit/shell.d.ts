@@ -17,18 +17,15 @@ export const THEME_KEY: 'chth_theme';
 export const THEME_INIT_JS: string;
 export const SUN_SVG: string;
 export const MOON_SVG: string;
-export const SHELL_STRINGS: Record<'theme' | 'apps' | 'sites' | 'bots' | 'here' | 'about' | 'tagline' | 'close' | 'announcement' | 'cookies' | 'gotIt' | 'privacy', Text>;
-export const APPS_SVG: string;
-export interface AppItem { id: string; ico: string; name: string; tagline: string; href: string; current: boolean }
-export interface AppSwitcherModel {
-  label: string; sitesLabel: string; botsLabel: string; hereLabel: string; title: string; tagline: string;
-  iconSvg: string; logoSvg: string; sites: AppItem[]; bots: AppItem[]; about: { label: string; href: string; current: boolean };
-}
-export function appSwitcherModel(locale: Locale, self: string): AppSwitcherModel;
-export function appSwitcherHtml(locale: Locale, self: string, opts?: { className?: string; prefs?: boolean; langHref?: (code: Locale) => string }): string;
-export function shellToolsHtml(locale: Locale, self: string, opts?: { className?: string; language?: boolean; theme?: boolean; compact?: boolean; langHref?: (code: Locale) => string }): string;
+export const SHELL_STRINGS: Record<'theme' | 'home' | 'account' | 'close' | 'announcement' | 'cookies' | 'gotIt' | 'privacy', Text>;
+export const NAV_LEADS: Record<string, Record<Locale, string[]>>;
+export const USER_SVG: string;
+export interface NavbarOptions { home?: string; leadHref?: string; words?: string[]; account?: { href: string; label?: string } | null }
+export interface NavbarModel { home: string; homeLabel: string; logoSvg: string; words: string[]; leadHref: string; account: { href: string; label: string } | null; userSvg: string }
+export function navbarModel(locale: Locale, self: string, opts?: NavbarOptions): NavbarModel;
+export function navbarHtml(locale: Locale, self: string, opts?: NavbarOptions & { extra?: string; theme?: boolean; themeFormAction?: string; language?: boolean; overlay?: boolean; className?: string; langHref?: (code: Locale) => string }): string;
 export function themeToggleModel(locale: Locale): { label: string; iconsSvg: string };
-export function themeToggleHtml(locale: Locale, opts?: { className?: string }): string;
+export function themeToggleHtml(locale: Locale, opts?: { className?: string; formAction?: string }): string;
 export interface Announcement { text: string; url: string | null }
 export function parseAnnouncement(body: unknown): { ok: true; announcement: Announcement | null } | { ok: false; error: string };
 export function bannerId(a: Announcement): string;
@@ -41,7 +38,7 @@ export function toggleTheme(origin?: Element | null): void;
 export function currentTheme(): Theme;
 declare global {
   interface Window {
-    chthShell?: { theme(): Theme; setTheme(theme: Theme, origin?: Element | null): void; toggleTheme(origin?: Element | null): void; toast: ToastFn; applyDismissed(scope?: ParentNode): void };
+    chthShell?: { theme(): Theme; setTheme(theme: Theme, origin?: Element | null): void; toggleTheme(origin?: Element | null): void; toast: ToastFn; applyDismissed(scope?: ParentNode): void; startNav(scope?: ParentNode): void };
     chthToast?: ToastFn;
     chthApplyTheme?: (theme: Theme) => void;
   }

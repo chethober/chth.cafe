@@ -1,5 +1,5 @@
 // Generated from the CHTH kit (chth.hub/kit) by `npm run sync`. Do not edit here: edit the kit and sync.
-// The CHTH shell in the browser: the theme toggle, toasts, the banner and the cookie notice.
+// The CHTH shell in the browser: the navbar, the theme toggle, toasts, the banner and the cookie notice.
 // A classic script with no imports, so the same file runs inlined in a server-rendered page
 // (SHELL_JS) and imported for its side effect by a React site. Everything is wired by
 // delegated listeners on data-chth-* attributes, so markup can come from the server, React or
@@ -219,13 +219,13 @@
       setTimeout(function () { box.remove(); }, reduced() ? 0 : 220);
       return;
     }
-    // A menu (language, apps) closes when something outside it is clicked.
-    var menus = d.querySelectorAll('details.chth-lang-menu[open], details.chth-apps[open]');
+    // The language menu closes when something outside it is clicked.
+    var menus = d.querySelectorAll('details.chth-lang-menu[open]');
     for (var i = 0; i < menus.length; i++) if (!menus[i].contains(target)) menus[i].removeAttribute('open');
   });
   d.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
-    var open = d.querySelector('details.chth-lang-menu[open], details.chth-apps[open]');
+    var open = d.querySelector('details.chth-lang-menu[open]');
     if (open) { open.removeAttribute('open'); var s = open.querySelector('summary'); if (s) s.focus(); }
   });
   // Server-rendered strips are hidden until checked, so a dismissed one never flashes.
@@ -235,11 +235,65 @@
     new MutationObserver(function (list) {
       for (var i = 0; i < list.length; i++) for (var j = 0; j < list[i].addedNodes.length; j++) {
         var n = list[i].addedNodes[j];
-        if (n.nodeType === 1 && (n.hasAttribute('data-chth-dismiss') || n.querySelector('[data-chth-dismiss]'))) applyDismissed(n.parentNode || d);
+        if (n.nodeType !== 1) continue;
+        if (n.hasAttribute('data-chth-dismiss') || n.querySelector('[data-chth-dismiss]')) applyDismissed(n.parentNode || d);
+        if (n.hasAttribute('data-chth-type') || n.querySelector('[data-chth-type]')) startNav(n.parentNode || d);
       }
     }).observe(root, { childList: true, subtree: true });
   }
 
-  w.chthShell = { theme: currentTheme, setTheme: setTheme, toggleTheme: toggleTheme, toast: toast, applyDismissed: applyDismissed };
+  // ---- The navbar ----
+  // [data-chth-nav] gets .chth-nav--scrolled once the page scrolls; [data-chth-type] types its
+  // words one after another (JSON array), or swaps them gently with reduced motion.
+
+  function onScroll() {
+    var navs = d.querySelectorAll('[data-chth-nav]');
+    for (var i = 0; i < navs.length; i++) navs[i].classList.toggle('chth-nav--scrolled', w.scrollY > 40);
+  }
+  w.addEventListener('scroll', onScroll, { passive: true });
+
+  function typeWords(el) {
+    if (el.chthTyping) return;
+    var words;
+    try { words = JSON.parse(el.getAttribute('data-chth-type') || '[]'); } catch (e) { return; }
+    var out = el.querySelector('.chth-nav__type');
+    if (!out || !words || words.length < 2) return;
+    el.chthTyping = true;
+    el.setAttribute('aria-label', words[0]);
+    var i = 0, n = words[0].length, deleting = false;
+    var source = el.getAttribute('data-chth-type');
+    var tick = function () {
+      if (!el.isConnected) { el.chthTyping = false; return; }
+      // The page changed the words (a new language): start again with them.
+      if (el.getAttribute('data-chth-type') !== source) {
+        source = el.getAttribute('data-chth-type');
+        try { words = JSON.parse(source || '[]'); } catch (e) { words = []; }
+        if (words.length < 1) { el.chthTyping = false; return; }
+        i = 0; n = 0; deleting = false;
+      }
+      if (reduced()) {
+        i = (i + 1) % words.length;
+        out.textContent = words[i];
+        return setTimeout(tick, 3500);
+      }
+      var word = words[i];
+      if (!deleting && n < word.length) { out.textContent = word.slice(0, ++n); return setTimeout(tick, 75); }
+      if (!deleting) { deleting = true; return setTimeout(tick, 1600); }
+      if (n > 0) { out.textContent = word.slice(0, --n); return setTimeout(tick, 40); }
+      deleting = false;
+      i = (i + 1) % words.length;
+      setTimeout(tick, 250);
+    };
+    setTimeout(tick, 1600);
+  }
+  function startNav(scope) {
+    var els = (scope || d).querySelectorAll('[data-chth-type]');
+    for (var i = 0; i < els.length; i++) typeWords(els[i]);
+    onScroll();
+  }
+  if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', function () { startNav(); });
+  else startNav();
+
+  w.chthShell = { theme: currentTheme, setTheme: setTheme, toggleTheme: toggleTheme, toast: toast, applyDismissed: applyDismissed, startNav: startNav };
   w.chthToast = toast;
 })();

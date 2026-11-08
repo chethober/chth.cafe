@@ -192,9 +192,10 @@ are shown as the café wrote them. The admin and panel apps are English for now.
 ## CHTH kit and hub
 
 `src/chth-kit/` is generated from the shared CHTH kit: don't edit it here. It holds the brand
-tokens, logo, languages and product links, the "Part of CHTH" footer shown under the public menu,
-and the CHTH shell (`shell.js`): the theme toggle (the saved `chth_theme`, used by the menu and the
-dashboards), toasts, and for the chth.cafe landing the app switcher, the banner and the
+tokens, logo, languages and product links, the CHTH footer (under the public menu without CHTH's
+privacy and terms, since the menu is the café's), and the CHTH shell (`shell.js`): the theme toggle
+(the saved `chth_theme`, used by the menu and the dashboards), toasts, and for chth.cafe's own
+pages the CHTH navbar (`cafeNav()` in `control-plane/src/design.ts`), the banner and the
 essential-cookies notice. The landing's only script is the shell, allowed by its hash in the
 CSP; its theme toggle still works without it (it posts to `/theme`). The control
 plane can report landing visits from other CHTH products, sign-ins and deploys to a CHTH hub and
