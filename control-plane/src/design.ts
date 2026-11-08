@@ -22,10 +22,10 @@ export const OLD_THEME_COOKIE = 'cp_theme';
 export const FONTS_URL = 'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300..800&family=Fraunces:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400..600&family=Vazirmatn:wght@300..800&display=swap';
 /** Set for one page load after the theme changes, so that page reveals itself in a circle. */
 export const THEME_SWITCH_COOKIE = 'cp_theme_switch';
-export const THEME_COLORS = { dark: '#100b08', light: '#f7f1e8' } as const;
+export const THEME_COLORS = { dark: '#0c0a09', light: '#fafaf9' } as const;
 
-const DARK = '--bg:#100b08;--bg2:#17110c;--panel:#1d1610;--panel2:#241b14;--line:#3a2d22;--line2:#5a4635;--ink:#f6efe6;--muted:#b3a495;--dim:#8a7a6b;--accent:#e7a96b;--accent2:#f3c993;--em1:#f3c993;--em2:#e7a96b;--em3:#c9773a;--mint:#5fd3a0;--red:#ff7a6b;--warn:#ffd28a;--field:#100b08;--shadow:rgba(0,0,0,.8);--glass:rgba(16,11,8,.72);--soft:rgba(255,255,255,.035);--soft2:rgba(255,255,255,.07);--chat:#20303f;--chat-line:#2d4357;--chat-meta:#8fb3d1;color-scheme:dark';
-const LIGHT = '--bg:#f7f1e8;--bg2:#efe6d8;--panel:#fffaf3;--panel2:#fbf3e8;--line:#e3d5c2;--line2:#cdb9a0;--ink:#23180f;--muted:#6b5848;--dim:#86715e;--accent:#b4612a;--accent2:#9a4f1d;--em1:#c87a3c;--em2:#a2531f;--em3:#7a3a14;--mint:#1d8a5a;--red:#c2412f;--warn:#8a5a00;--field:#fffdf9;--shadow:rgba(80,50,20,.28);--glass:rgba(247,241,232,.78);--soft:rgba(60,35,15,.035);--soft2:rgba(60,35,15,.07);--chat:#e6f1fb;--chat-line:#c3dcf0;--chat-meta:#4f7799;color-scheme:light';
+const DARK = '--bg:#0c0a09;--bg2:#141210;--panel:#1c1917;--panel2:#232120;--line:#2e2a27;--line2:#44403c;--ink:#fafaf9;--muted:#a8a29e;--dim:#78716c;--accent:var(--chth-cafe-accent);--accent2:var(--chth-cafe-accent-hover);--em1:#e7e5e4;--em2:#d6d3d1;--em3:#a8a29e;--mint:#5fd3a0;--red:#ff7a6b;--warn:#ffd28a;--field:#0c0a09;--shadow:rgba(0,0,0,.8);--glass:rgba(12,10,9,.72);--soft:rgba(255,255,255,.035);--soft2:rgba(255,255,255,.07);--chat:#20303f;--chat-line:#2d4357;--chat-meta:#8fb3d1;color-scheme:dark';
+const LIGHT = '--bg:#fafaf9;--bg2:#f5f5f4;--panel:#ffffff;--panel2:#fafaf9;--line:#e7e5e4;--line2:#d6d3d1;--ink:#1c1917;--muted:#57534e;--dim:#78716c;--accent:var(--chth-cafe-accent);--accent2:var(--chth-cafe-accent-hover);--em1:#57534e;--em2:#44403c;--em3:#292524;--mint:#1d8a5a;--red:#c2412f;--warn:#8a5a00;--field:#ffffff;--shadow:rgba(28,25,23,.2);--glass:rgba(250,250,249,.8);--soft:rgba(28,25,23,.035);--soft2:rgba(28,25,23,.07);--chat:#e6f1fb;--chat-line:#c3dcf0;--chat-meta:#4f7799;color-scheme:light';
 
 const BASE = `
 :root{${DARK};--serif:"Fraunces","Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;--mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
@@ -46,7 +46,7 @@ form.inline{display:inline-flex;align-items:center;gap:10px;margin:0}
 
 .btn{font:inherit;font-weight:650;display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:12px 20px;border-radius:999px;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap;color:var(--ink);background:var(--soft);transition:transform 160ms var(--ease-out),box-shadow 200ms ease,background-color 150ms ease,border-color 150ms ease,color 150ms ease}
 .btn:active:not(:disabled){transform:scale(.97)}
-.btn.cf{background:linear-gradient(180deg,#f6a24c,#f38020);color:#1a0f05;box-shadow:0 10px 30px -12px rgba(243,128,32,.7),inset 0 1px 0 rgba(255,255,255,.35)}
+.btn.cf{background:var(--accent);color:var(--chth-cafe-on-accent);box-shadow:0 10px 30px -14px color-mix(in srgb,var(--accent) 70%,transparent),inset 0 1px 0 rgba(255,255,255,.25)}
 .btn.ghost{border-color:var(--line);background:transparent}
 .btn.danger{background:#c8372a;color:#fff}
 .btn.small{padding:8px 14px;font-size:14px}
@@ -87,7 +87,7 @@ details[open]::details-content{height:auto}
 
 @media (hover:hover) and (pointer:fine){
   a:hover{color:var(--accent2)}
-  .btn.cf:hover{box-shadow:0 14px 40px -10px rgba(243,128,32,.9),inset 0 1px 0 rgba(255,255,255,.35)}
+  .btn.cf:hover{background:var(--accent2);box-shadow:0 14px 40px -12px color-mix(in srgb,var(--accent) 80%,transparent),inset 0 1px 0 rgba(255,255,255,.25)}
   .btn.ghost:hover{border-color:var(--line2);background:var(--soft)}
   .btn.danger:hover{background:#ad2c21}
   .chth-theme:hover{background:var(--soft2);border-color:var(--line2)}
@@ -109,7 +109,7 @@ details[open]::details-content{height:auto}
 }
 `;
 
-const CUP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="9" fill="#e7a96b"/><path d="M8 13h13v5a6 6 0 0 1-6 6h-1a6 6 0 0 1-6-6v-5Z" fill="#100b08"/><path d="M21 15h1.5a2.5 2.5 0 0 1 0 5H21" stroke="#100b08" stroke-width="2"/><path d="M12 6c0 1.5 1.5 1.5 1.5 3M16 6c0 1.5 1.5 1.5 1.5 3" stroke="#100b08" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+const CUP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none"><rect width="32" height="32" rx="9" fill="#d6d3d1"/><path d="M8 13h13v5a6 6 0 0 1-6 6h-1a6 6 0 0 1-6-6v-5Z" fill="#0c0a09"/><path d="M21 15h1.5a2.5 2.5 0 0 1 0 5H21" stroke="#0c0a09" stroke-width="2"/><path d="M12 6c0 1.5 1.5 1.5 1.5 3M16 6c0 1.5 1.5 1.5 1.5 3" stroke="#0c0a09" stroke-width="1.6" stroke-linecap="round"/></svg>`;
 /** Served at /favicon.svg and /favicon.ico. */
 export const FAVICON = CUP_SVG;
 export const CUP = raw(CUP_SVG.replace('<svg ', '<svg aria-hidden="true" '));

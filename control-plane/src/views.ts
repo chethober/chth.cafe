@@ -13,7 +13,7 @@ main.narrow{max-width:720px}
 .card h2{margin:0 0 6px;font-size:19px;letter-spacing:-.01em}
 .card p{margin:0 0 12px}.card p:last-child{margin-bottom:0}
 .account-card{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.account-card .cf-mark{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;flex:none;color:#f38020;background:color-mix(in srgb,#f38020 14%,transparent)}
+.account-card .cf-mark{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;flex:none;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
 .account-card .cf-mark svg{width:24px;height:24px}
 .account-card .who{flex:1;min-width:min(100%,220px)}.account-card .who b{display:block;font-size:17px}
 .account-card .who span{color:var(--muted);font-size:14px}

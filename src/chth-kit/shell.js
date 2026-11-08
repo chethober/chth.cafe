@@ -68,8 +68,8 @@ export function themeToggleHtml(locale, opts = {}) {
 }
 
 // ---- The navbar: the shop's floating pill, on every CHTH site ----
-// Text that types itself on the left (a link), the CHTH mark in the middle, and on the right
-// the site's own icons, then profile, theme and language. It shrinks a little once the page
+// On the left the language menu and theme toggle, then text that types itself (a link); the CHTH
+// mark in the middle; on the right the site's own icons, then the profile. It shrinks a little once the page
 // scrolls. The left text is per product, in every language.
 
 /** What each product's navbar types on the left: the product first, then what it invites to. */
@@ -127,8 +127,8 @@ export function navbarModel(locale, self, opts = {}) {
 }
 
 /**
- * The navbar as HTML. `extra` is the site's own icon links (HTML), before profile, theme and
- * language. `language: false` / `theme: false` leave those out; `account: null` leaves out the
+ * The navbar as HTML: language and theme on the left, then the words; `extra` (the site's own
+ * icon links, HTML) and the profile on the right. `language: false` / `theme: false` leave those out; `account: null` leaves out the
  * profile. `overlay` floats it over the page (the page leaves room at the top); otherwise it
  * takes its own space and sticks to the top as the page scrolls.
  */
@@ -137,15 +137,14 @@ export function navbarHtml(locale, self, opts = {}) {
   const first = m.words[0] ?? '';
   const account = m.account
     ? `<a class="chth-nav__icon" href="${esc(m.account.href)}" aria-label="${esc(m.account.label)}" title="${esc(m.account.label)}">${m.userSvg}</a>` : '';
+  const prefs = (opts.language === false ? '' : languageMenuHtml(locale, { langHref: opts.langHref, className: 'chth-nav__lang' }))
+    + (opts.theme === false ? '' : themeToggleHtml(locale, { className: 'chth-nav__icon', formAction: opts.themeFormAction }));
   return `<header class="chth-nav${opts.overlay ? ' chth-nav--overlay' : ''}${opts.className ? ` ${esc(opts.className)}` : ''}" data-chth-nav>`
     + `<div class="chth-nav__pill">`
-    + `<div class="chth-nav__start"><a class="chth-nav__lead" href="${esc(m.leadHref)}" data-chth-type="${esc(JSON.stringify(m.words))}">`
+    + `<div class="chth-nav__start">${prefs}<a class="chth-nav__lead" href="${esc(m.leadHref)}" data-chth-type="${esc(JSON.stringify(m.words))}">`
     + `<span class="chth-nav__type">${esc(first)}</span><span class="chth-nav__caret" aria-hidden="true"></span></a></div>`
     + `<a class="chth-nav__logo" href="${esc(m.home)}" aria-label="${esc(m.homeLabel)}">${m.logoSvg}</a>`
-    + `<div class="chth-nav__end">${opts.extra ?? ''}${account}`
-    + (opts.theme === false ? '' : themeToggleHtml(locale, { className: 'chth-nav__icon', formAction: opts.themeFormAction }))
-    + (opts.language === false ? '' : languageMenuHtml(locale, { langHref: opts.langHref, className: 'chth-nav__lang' }))
-    + `</div></div></header>`;
+    + `<div class="chth-nav__end">${opts.extra ?? ''}${account}</div></div></header>`;
 }
 
 // ---- The banner, set from the hub's 📢 Banners ----

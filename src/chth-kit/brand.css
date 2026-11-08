@@ -2,13 +2,13 @@
 :root {
   --chth-ink: #09090b;
   --chth-ink-soft: #18181b;
-  --chth-paper: #fafaf9;
+  --chth-paper: #fafafa;
   --chth-paper-soft: #f4f4f5;
   --chth-muted: #71717a;
-  --chth-line: rgba(127, 127, 127, 0.22);
-  --chth-accent: #ff6a2b;
-  --chth-accent-hover: #ff7d45;
-  --chth-on-accent: #1a0a02;
+  --chth-line: rgba(161, 161, 170, 0.24);
+  --chth-accent: #d4d4d8;
+  --chth-accent-hover: #e4e4e7;
+  --chth-on-accent: #09090b;
   --chth-success: #10b981;
   --chth-warning: #f59e0b;
   --chth-danger: #f43f5e;
@@ -22,18 +22,21 @@
   --chth-radius-lg: 14px;
   --chth-radius-xl: 20px;
   --chth-radius-full: 9999px;
-  --chth-cafe-accent: #f59e0b;
-  --chth-cafe-accent-hover: #d97706;
-  --chth-cafe-on-accent: #451a03;
-  --chth-gym-accent: #ff6a2b;
-  --chth-gym-accent-hover: #ff7d45;
-  --chth-gym-on-accent: #1a0a02;
-  --chth-shop-accent: #f97316;
-  --chth-shop-accent-hover: #ea580c;
-  --chth-shop-on-accent: #1a0a02;
-  --chth-hub-accent: #ff6a2b;
-  --chth-hub-accent-hover: #ff7d45;
-  --chth-hub-on-accent: #1a0a02;
+  --chth-cafe-accent: #d6d3d1;
+  --chth-cafe-accent-hover: #e7e5e4;
+  --chth-cafe-on-accent: #0c0a09;
+  --chth-gym-accent: #d4d4d8;
+  --chth-gym-accent-hover: #e4e4e7;
+  --chth-gym-on-accent: #09090b;
+  --chth-shop-accent: #d4d4d4;
+  --chth-shop-accent-hover: #e5e5e5;
+  --chth-shop-on-accent: #0a0a0a;
+  --chth-wtf-accent: #d1d5db;
+  --chth-wtf-accent-hover: #e5e7eb;
+  --chth-wtf-on-accent: #030712;
+  --chth-hub-accent: #d4d4d8;
+  --chth-hub-accent-hover: #e4e4e7;
+  --chth-hub-on-accent: #09090b;
   --chth-product-accent: var(--chth-accent);
   --chth-product-accent-hover: var(--chth-accent-hover);
   --chth-product-on-accent: var(--chth-on-accent);
@@ -57,10 +60,61 @@
   --chth-product-on-accent: var(--chth-shop-on-accent);
 }
 
+[data-chth-product="wtf"] {
+  --chth-product-accent: var(--chth-wtf-accent);
+  --chth-product-accent-hover: var(--chth-wtf-accent-hover);
+  --chth-product-on-accent: var(--chth-wtf-on-accent);
+}
+
 [data-chth-product="hub"] {
   --chth-product-accent: var(--chth-hub-accent);
   --chth-product-accent-hover: var(--chth-hub-accent-hover);
   --chth-product-on-accent: var(--chth-hub-on-accent);
+}
+
+:root[data-theme="light"] {
+  --chth-accent: #27272a;
+  --chth-accent-hover: #3f3f46;
+  --chth-on-accent: #fafafa;
+  --chth-line: rgba(82, 82, 91, 0.2);
+  --chth-cafe-accent: #292524;
+  --chth-cafe-accent-hover: #44403c;
+  --chth-cafe-on-accent: #fafaf9;
+  --chth-gym-accent: #27272a;
+  --chth-gym-accent-hover: #3f3f46;
+  --chth-gym-on-accent: #fafafa;
+  --chth-shop-accent: #262626;
+  --chth-shop-accent-hover: #404040;
+  --chth-shop-on-accent: #fafafa;
+  --chth-wtf-accent: #1f2937;
+  --chth-wtf-accent-hover: #374151;
+  --chth-wtf-on-accent: #f9fafb;
+  --chth-hub-accent: #27272a;
+  --chth-hub-accent-hover: #3f3f46;
+  --chth-hub-on-accent: #fafafa;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --chth-accent: #27272a;
+    --chth-accent-hover: #3f3f46;
+    --chth-on-accent: #fafafa;
+    --chth-line: rgba(82, 82, 91, 0.2);
+    --chth-cafe-accent: #292524;
+    --chth-cafe-accent-hover: #44403c;
+    --chth-cafe-on-accent: #fafaf9;
+    --chth-gym-accent: #27272a;
+    --chth-gym-accent-hover: #3f3f46;
+    --chth-gym-on-accent: #fafafa;
+    --chth-shop-accent: #262626;
+    --chth-shop-accent-hover: #404040;
+    --chth-shop-on-accent: #fafafa;
+    --chth-wtf-accent: #1f2937;
+    --chth-wtf-accent-hover: #374151;
+    --chth-wtf-on-accent: #f9fafb;
+    --chth-hub-accent: #27272a;
+    --chth-hub-accent-hover: #3f3f46;
+    --chth-hub-on-accent: #fafafa;
+  }
 }
 
 /* Persian and Arabic pages use the RTL font wherever the brand sans font is used. */
@@ -331,8 +385,8 @@
 :root { --chth-nav-space: 5rem; }
 @media (max-width: 640px) { :root { --chth-nav-space: 4.75rem; } }
 
-/* Navbar: the shop's floating pill on every site. Typing text on the left, the CHTH mark in the
-   middle, the site's icons then profile, theme and language on the right. It narrows a little
+/* Navbar: the shop's floating pill on every site. Language, theme and typing text on the left,
+   the CHTH mark in the middle, the site's icons and the profile on the right. It narrows a little
    once the page scrolls. Sticky by default (it takes its own room); --overlay floats it over
    the page, which then leaves room at the top itself. */
 .chth-nav {
@@ -366,25 +420,24 @@
   justify-content: space-between;
   margin: 0 auto;
   max-width: 64rem;
-  padding: 0 0.75rem 0 1.25rem;
+  padding: 0 0.75rem;
   pointer-events: auto;
   position: relative;
   transition: max-width 420ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 300ms ease, transform 420ms cubic-bezier(0.23, 1, 0.32, 1);
 }
-[dir="rtl"] .chth-nav__pill { padding: 0 1.25rem 0 0.75rem; }
 .chth-nav--scrolled .chth-nav__pill {
   box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--chth-nav-ring), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   max-width: max(45rem, 64%);
   transform: translateY(4px);
 }
-.chth-nav__start, .chth-nav__end { align-items: center; display: flex; flex: 1 1 0; min-width: 0; position: relative; z-index: 1; }
-.chth-nav__end { gap: 0.25rem; justify-content: flex-end; }
+.chth-nav__start, .chth-nav__end { align-items: center; display: flex; flex: 1 1 0; gap: 0.25rem; min-width: 0; position: relative; z-index: 1; }
+.chth-nav__end { justify-content: flex-end; }
 .chth-nav__lead {
   border-radius: var(--chth-radius-full);
   color: var(--chth-nav-muted);
   font-size: 0.8125rem;
   letter-spacing: 0.04em;
-  margin-inline-start: -0.5rem;
+  margin-inline-start: 0.25rem;
   overflow: hidden;
   padding: 0.3rem 0.6rem;
   text-decoration: none;
@@ -432,7 +485,7 @@
 .chth-nav__icon:focus-visible, .chth-nav__lead:focus-visible, .chth-nav__logo:focus-visible { outline: 2px solid var(--chth-product-accent); outline-offset: 2px; }
 .chth-nav__icon[aria-current], .chth-nav .chth-lang-menu[open] > summary { background: color-mix(in srgb, currentColor 10%, transparent); color: var(--chth-nav-ink); }
 .chth-nav .chth-lang-menu { --chth-menu-bg: var(--chth-nav-bg); --chth-menu-ink: var(--chth-nav-ink); --chth-line: var(--chth-nav-ring); }
-.chth-nav .chth-lang-menu__list { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.chth-nav .chth-lang-menu__list { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); inset-inline-end: auto; inset-inline-start: 0; }
 .chth-nav__badge {
   background: var(--chth-product-accent);
   border-radius: var(--chth-radius-full);
@@ -453,19 +506,19 @@
   .chth-nav__logo:hover svg { transform: rotate(-3deg); }
   .chth-nav__icon:hover, .chth-nav .chth-lang-menu > summary:hover { background: color-mix(in srgb, currentColor 10%, transparent); color: var(--chth-nav-ink); transform: scale(1.08); }
 }
-/* Phones: a tighter pill; the typing text gives way to the logo. */
+/* Phones: a tighter pill. */
 @media (max-width: 640px) {
   .chth-nav { padding: 0 0.75rem; }
-  .chth-nav__pill { height: 3.25rem; padding: 0 0.4rem 0 1rem; }
-  [dir="rtl"] .chth-nav__pill { padding: 0 1rem 0 0.4rem; }
+  .chth-nav__pill { height: 3.25rem; padding: 0 0.4rem; }
   .chth-nav--scrolled .chth-nav__pill { max-width: 94%; }
   .chth-nav { --chth-control-size: 1.875rem; }
   .chth-nav__logo { padding: 0 0.25rem; }
-  .chth-nav__end { gap: 0; }
+  .chth-nav__start, .chth-nav__end { gap: 0; }
   .chth-nav__lead { font-size: 0.75rem; letter-spacing: 0.01em; max-width: 8rem; }
   .chth-nav__logo svg { height: 1.35rem; width: 2.9rem; }
 }
-@media (max-width: 400px) { .chth-nav__lead { max-width: 5.5rem; } }
+/* Small phones: the icons and the logo; the words would crowd them. */
+@media (max-width: 520px) { .chth-nav__lead { display: none; } }
 @media (prefers-reduced-motion: reduce) {
   .chth-nav__pill, .chth-nav__logo, .chth-nav__logo svg { transition: none; }
   .chth-nav__caret { animation: none; }
