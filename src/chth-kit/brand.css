@@ -419,16 +419,18 @@
   height: 3.5rem;
   justify-content: space-between;
   margin: 0 auto;
-  max-width: 64rem;
   padding: 0 0.75rem;
   pointer-events: auto;
   position: relative;
-  transition: max-width 420ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 300ms ease, transform 420ms cubic-bezier(0.23, 1, 0.32, 1);
+  /* The width itself animates (not a max-width), with one curve and duration, so the pill narrows
+     and widens exactly the same way whatever the window's width. */
+  transition: width 480ms cubic-bezier(0.65, 0, 0.35, 1), box-shadow 480ms cubic-bezier(0.65, 0, 0.35, 1), transform 480ms cubic-bezier(0.65, 0, 0.35, 1);
+  width: min(64rem, 100%);
 }
 .chth-nav--scrolled .chth-nav__pill {
   box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--chth-nav-ring), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  max-width: max(45rem, 64%);
   transform: translateY(4px);
+  width: min(max(45rem, 64%), 100%);
 }
 .chth-nav__start, .chth-nav__end { align-items: center; display: flex; flex: 1 1 0; gap: 0.25rem; min-width: 0; position: relative; z-index: 1; }
 .chth-nav__end { justify-content: flex-end; }
@@ -510,7 +512,7 @@
 @media (max-width: 640px) {
   .chth-nav { padding: 0 0.75rem; }
   .chth-nav__pill { height: 3.25rem; padding: 0 0.4rem; }
-  .chth-nav--scrolled .chth-nav__pill { max-width: 94%; }
+  .chth-nav--scrolled .chth-nav__pill { width: 94%; }
   .chth-nav { --chth-control-size: 1.875rem; }
   .chth-nav__logo { padding: 0 0.25rem; }
   .chth-nav__start, .chth-nav__end { gap: 0; }
