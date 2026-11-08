@@ -191,10 +191,15 @@ are shown as the café wrote them. The admin and panel apps are English for now.
 
 ## CHTH kit and hub
 
-`src/chth-kit/` is generated from the shared CHTH kit (brand tokens, logo, languages, product
-links and the "Part of CHTH" footer shown under the public menu): don't edit it here. The control
+`src/chth-kit/` is generated from the shared CHTH kit: don't edit it here. It holds the brand
+tokens, logo, languages and product links, the "Part of CHTH" footer shown under the public menu,
+and the CHTH shell (`shell.js`): the theme toggle (the saved `chth_theme`, used by the menu and the
+dashboards), toasts, and for the chth.cafe landing the app switcher, the banner and the
+essential-cookies notice. The landing's only script is the shell, allowed by its hash in the
+CSP; its theme toggle still works without it (it posts to `/theme`). The control
 plane can report landing visits from other CHTH products, sign-ins and deploys to a CHTH hub and
-answer signed `GET /internal/stats`; set `HUB_URL` and `HUB_SECRET` to switch that on. Without
+answer signed `GET /internal/stats` and `POST /internal/announcement` (the banner across the
+landing and dashboard pages, from the hub's 📢 Banners); set `HUB_URL` and `HUB_SECRET` to switch that on. Without
 them nothing is sent and `/internal/stats` refuses every call. Self-hosted cafés send nothing.
 
 ## Project structure
