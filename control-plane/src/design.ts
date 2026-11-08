@@ -2,7 +2,7 @@ import { html, raw } from 'hono/html';
 import type { HtmlEscapedString } from 'hono/utils/html';
 import { BRAND_CSS } from '../../src/chth-kit/brand.js';
 import { footerHtml } from '../../src/chth-kit/footer.js';
-import { appSwitcherHtml, themeToggleModel } from '../../src/chth-kit/shell.js';
+import { appSwitcherHtml, cookieNoticeHtml, themeToggleModel } from '../../src/chth-kit/shell.js';
 import { SHELL_JS } from '../../src/chth-kit/shell-script.js';
 
 /**
@@ -196,6 +196,7 @@ ${options.description ? html`<meta name="description" content="${options.descrip
   </div>
 </nav>
 ${body}
+${raw(cookieNoticeHtml('en'))}
 <script>${raw(PAGE_SCRIPT)}</script>
 ${raw(footerHtml('en', 'cafe'))}
 </body>

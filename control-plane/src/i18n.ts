@@ -6,7 +6,7 @@
 import { dirOf, isLocale, localeCookie, localeFromCookie, pickLocale, type Locale } from '../../src/chth-kit/locales.js';
 import { footerHtml } from '../../src/chth-kit/footer.js';
 import { languageMenuHtml } from '../../src/chth-kit/language-menu.js';
-import { appSwitcherHtml, themeToggleModel } from '../../src/chth-kit/shell.js';
+import { appSwitcherHtml, cookieNoticeHtml, themeToggleModel } from '../../src/chth-kit/shell.js';
 
 type Row = [fa: string, ar: string, ru: string, es: string];
 const COL: Record<Exclude<Locale, 'en'>, number> = { fa: 0, ar: 1, ru: 2, es: 3 };
@@ -141,6 +141,7 @@ export function localizeLanding(page: string, locale: Locale): string {
   // The footer is swapped before translating, so the translator never sees its English text.
   let out = page.replace(footerHtml('en', 'cafe'), footerHtml(locale, 'cafe'))
     .replace(appSwitcherHtml('en', 'cafe'), appSwitcherHtml(locale, 'cafe'))
+    .replace(cookieNoticeHtml('en'), cookieNoticeHtml(locale))
     .replaceAll(`"${themeToggleModel('en').label}"`, `"${themeToggleModel(locale).label}"`);
   if (locale !== 'en') {
     const col = COL[locale];

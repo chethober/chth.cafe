@@ -37,6 +37,17 @@ export const SHELL_STRINGS = {
   bots: { en: 'Telegram bots', fa: 'ربات‌های تلگرام', ar: 'بوتات تيليجرام', ru: 'Боты в Telegram', es: 'Bots de Telegram' },
   here: { en: 'You’re here', fa: 'همین‌جایی', ar: 'أنت هنا', ru: 'Вы здесь', es: 'Estás aquí' },
   about: { en: 'About CHTH', fa: 'دربارهٔ CHTH', ar: 'عن CHTH', ru: 'О CHTH', es: 'Sobre CHTH' },
+  close: { en: 'Close', fa: 'بستن', ar: 'إغلاق', ru: 'Закрыть', es: 'Cerrar' },
+  announcement: { en: 'Announcement', fa: 'اطلاعیه', ar: 'إعلان', ru: 'Объявление', es: 'Aviso' },
+  cookies: {
+    en: 'This site only uses essential cookies: your sign-in, language and theme. No tracking, nothing to accept.',
+    fa: 'این سایت فقط کوکی‌های ضروری دارد: ورود، زبان و پوسته. بدون ردیابی، چیزی برای پذیرفتن نیست.',
+    ar: 'يستخدم هذا الموقع ملفات تعريف الارتباط الضرورية فقط: تسجيل الدخول واللغة والمظهر. بلا تتبّع، ولا شيء لتقبله.',
+    ru: 'Сайт использует только необходимые cookie: вход, язык и тема. Без слежки, соглашаться не на что.',
+    es: 'Este sitio solo usa cookies esenciales: tu sesión, idioma y tema. Sin rastreo, nada que aceptar.',
+  },
+  gotIt: { en: 'Got it', fa: 'فهمیدم', ar: 'حسنًا', ru: 'Понятно', es: 'Entendido' },
+  privacy: { en: 'Privacy', fa: 'حریم خصوصی', ar: 'الخصوصية', ru: 'Конфиденциальность', es: 'Privacidad' },
   tagline: {
     en: 'Small, free and open-source tools',
     fa: 'ابزارهای کوچک، رایگان و متن‌باز',
@@ -124,6 +135,55 @@ export function shellToolsHtml(locale, self, opts = {}) {
     + (opts.theme === false ? '' : themeToggleHtml(locale))
     + appSwitcherHtml(locale, self, { prefs: opts.compact, langHref: opts.langHref })
     + `</div>`;
+}
+
+// ---- The banner, set from the hub's 📢 Banners ----
+
+/**
+ * Checks a POST /internal/announcement body: { text, url? }, text up to 200 characters, an
+ * https:// link. Empty text clears the banner (announcement: null).
+ */
+export function parseAnnouncement(body) {
+  const text = String(body?.text ?? '').trim();
+  const url = String(body?.url ?? '').trim();
+  if (!text) return { ok: true, announcement: null };
+  if (text.length > 200) return { ok: false, error: 'The banner can be up to 200 characters.' };
+  if (url && !/^https:\/\/[^\s"'<>]+$/.test(url)) return { ok: false, error: 'The link must start with https://' };
+  return { ok: true, announcement: { text, url: url || null } };
+}
+
+/** A short id for a banner's text and link: a visitor's close lasts until it changes. */
+export const bannerId = (a) => Array.from(a.text + (a.url ?? '')).reduce((h, ch) => (h * 31 + ch.codePointAt(0)) >>> 0, 7).toString(36);
+
+/** The banner strip as HTML, for the top of <body>; '' without one. */
+export function bannerHtml(a, locale = 'en') {
+  if (!a || !a.text) return '';
+  const t = translator(SHELL_STRINGS, locale);
+  const body = a.url ? `<a href="${esc(a.url)}">${esc(a.text)} <span aria-hidden="true">→</span></a>` : `<span>${esc(a.text)}</span>`;
+  return `<div class="chth-banner" role="region" aria-label="${esc(t('announcement'))}" data-chth-dismiss="banner" data-chth-dismiss-id="${bannerId(a)}">`
+    + `<p class="chth-banner__text">${body}</p>`
+    + `<button type="button" class="chth-banner__close" data-chth-dismiss-close aria-label="${esc(t('close'))}">`
+    + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>';
+}
+
+// ---- The cookie notice ----
+
+/** The cookie notice's text. Every CHTH site uses essential cookies only, so there's nothing to accept. */
+export function cookieNoticeModel(locale) {
+  const t = translator(SHELL_STRINGS, locale);
+  return { text: t('cookies'), gotIt: t('gotIt'), privacy: t('privacy') };
+}
+
+/**
+ * The cookie notice as HTML: a small card in the corner, shown until "Got it" (remembered per
+ * site; bump `version` when the cookies change).
+ */
+export function cookieNoticeHtml(locale, opts = {}) {
+  const m = cookieNoticeModel(locale);
+  const privacy = opts.privacyHref ? ` <a href="${esc(opts.privacyHref)}">${esc(m.privacy)}</a>` : '';
+  return `<aside class="chth-cookies" role="note" data-chth-dismiss="cookies" data-chth-dismiss-id="${esc(opts.version ?? '1')}">`
+    + `<span class="chth-cookies__ico" aria-hidden="true">🍪</span><p>${esc(m.text)}${privacy}</p>`
+    + `<button type="button" class="chth-cookies__ok" data-chth-dismiss-close>${esc(m.gotIt)}</button></aside>`;
 }
 
 const shell = () => (typeof window === 'undefined' ? null : window.chthShell);

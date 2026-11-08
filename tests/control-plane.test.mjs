@@ -245,6 +245,17 @@ try {
   check(await owner('/api/notice?cafe=' + cafe.id).then(r => r.json()), { notice: null });
   check((await hub('GET', '/internal/cafes')).json.accounts[0].cafes[0].notice, 'none');
   check(await owner('/api/notice?cafe=other').then(r => r.json()), { notice: { text: 'Try CHTH Pro', url: 'https://chth.example/pro' } });
+  // The CHTH banner on chth.cafe's own pages (the hub's 📢 Banners), apart from the cafés' notice.
+  check((await hub('POST', '/internal/announcement', { text: 'Hi', url: 'javascript:alert(1)' })).status, 400);
+  check((await hub('POST', '/internal/announcement', { text: 'New <release>', url: 'https://chth.cafe/#how' })).json.ok, true);
+  const bannered = await (await owner('/dashboard')).text();
+  check(/<body[^>]*><div class="chth-banner"[^>]*data-chth-dismiss="banner"/.test(bannered), true);
+  check(bannered.includes('New &lt;release&gt;') && !bannered.includes('New <release>'), true);
+  check(bannered.includes('class="chth-cookies"'), true);
+  check(await owner('/api/notice?cafe=other').then(r => r.json()), { notice: { text: 'Try CHTH Pro', url: 'https://chth.example/pro' } });
+  check((await hub('GET', '/internal/cafes')).json.accounts[0].cafes[0].notice, 'none');
+  await hub('POST', '/internal/announcement', { text: '' });
+  check((await (await owner('/dashboard')).text()).includes('class="chth-banner"'), false);
   await hub('POST', `/internal/cafes/${cafe.id}/notice`, { mode: 'global' });
   check(await owner('/api/notice?cafe=' + cafe.id).then(r => r.json()), { notice: { text: 'Try CHTH Pro', url: 'https://chth.example/pro' } });
   // Renaming and updating a café with the owner's saved access; the café still asks the owner site.

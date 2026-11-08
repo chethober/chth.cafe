@@ -17,7 +17,7 @@ export const THEME_KEY: 'chth_theme';
 export const THEME_INIT_JS: string;
 export const SUN_SVG: string;
 export const MOON_SVG: string;
-export const SHELL_STRINGS: Record<'theme' | 'apps' | 'sites' | 'bots' | 'here' | 'about' | 'tagline', Text>;
+export const SHELL_STRINGS: Record<'theme' | 'apps' | 'sites' | 'bots' | 'here' | 'about' | 'tagline' | 'close' | 'announcement' | 'cookies' | 'gotIt' | 'privacy', Text>;
 export const APPS_SVG: string;
 export interface AppItem { id: string; ico: string; name: string; tagline: string; href: string; current: boolean }
 export interface AppSwitcherModel {
@@ -29,6 +29,12 @@ export function appSwitcherHtml(locale: Locale, self: string, opts?: { className
 export function shellToolsHtml(locale: Locale, self: string, opts?: { className?: string; language?: boolean; theme?: boolean; compact?: boolean; langHref?: (code: Locale) => string }): string;
 export function themeToggleModel(locale: Locale): { label: string; iconsSvg: string };
 export function themeToggleHtml(locale: Locale, opts?: { className?: string }): string;
+export interface Announcement { text: string; url: string | null }
+export function parseAnnouncement(body: unknown): { ok: true; announcement: Announcement | null } | { ok: false; error: string };
+export function bannerId(a: Announcement): string;
+export function bannerHtml(a: Announcement | null | undefined, locale?: Locale): string;
+export function cookieNoticeModel(locale: Locale): { text: string; gotIt: string; privacy: string };
+export function cookieNoticeHtml(locale: Locale, opts?: { privacyHref?: string; version?: string }): string;
 export const toast: ToastFn;
 export function setTheme(theme: Theme, origin?: Element | null): void;
 export function toggleTheme(origin?: Element | null): void;
