@@ -293,3 +293,141 @@
   .chth-toast { animation: none; transition: none; }
   .chth-theme svg { transition: none; }
 }
+
+/* The tools at the end of every CHTH header: language, theme, apps. */
+.chth-tools { align-items: center; display: inline-flex; flex: none; gap: 0.5rem; }
+
+/* App switcher: a grid of dots that opens a small start menu of every CHTH site and bot. */
+.chth-apps { display: inline-block; flex: none; position: relative; }
+.chth-apps > summary {
+  align-items: center;
+  border: 1px solid var(--chth-line);
+  border-radius: var(--chth-radius-full);
+  color: inherit;
+  cursor: pointer;
+  display: inline-grid;
+  height: var(--chth-control-size, 2.5rem);
+  justify-items: center;
+  list-style: none;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+  user-select: none;
+  -webkit-user-select: none;
+  width: var(--chth-control-size, 2.5rem);
+}
+.chth-apps > summary::-webkit-details-marker { display: none; }
+.chth-apps > summary svg { height: 1rem; transition: transform 300ms cubic-bezier(0.23, 1, 0.32, 1); width: 1rem; }
+.chth-apps > summary:active { transform: scale(0.92); }
+.chth-apps > summary:focus-visible { outline: 2px solid var(--chth-product-accent); outline-offset: 2px; }
+.chth-apps[open] > summary { border-color: var(--chth-product-accent); color: var(--chth-product-accent); }
+.chth-apps[open] > summary svg { transform: rotate(45deg); }
+.chth-apps__panel {
+  --chth-apps-bg: var(--chth-ink-soft);
+  --chth-apps-ink: var(--chth-paper);
+  --chth-apps-soft: rgba(255, 255, 255, 0.06);
+  --chth-apps-line: rgba(255, 255, 255, 0.09);
+  background: var(--chth-apps-bg);
+  border: 1px solid var(--chth-apps-line);
+  border-radius: var(--chth-radius-xl);
+  box-shadow: 0 30px 70px -24px rgba(0, 0, 0, 0.65);
+  color: var(--chth-apps-ink);
+  font-family: var(--chth-font-sans);
+  inset-inline-end: 0;
+  padding: 0.875rem;
+  position: absolute;
+  text-align: start;
+  top: calc(100% + 0.6rem);
+  transform-origin: top right;
+  width: min(23rem, calc(100vw - 1.5rem));
+  z-index: 60;
+}
+[dir="rtl"] .chth-apps__panel { transform-origin: top left; }
+:root[data-theme="light"] .chth-apps__panel { --chth-apps-bg: #fff; --chth-apps-ink: var(--chth-ink); --chth-apps-soft: rgba(0, 0, 0, 0.04); --chth-apps-line: rgba(0, 0, 0, 0.08); box-shadow: 0 30px 70px -28px rgba(0, 0, 0, 0.35); }
+.chth-apps[open] .chth-apps__panel { animation: chth-apps-in 220ms cubic-bezier(0.23, 1, 0.32, 1); }
+@keyframes chth-apps-in { from { opacity: 0; transform: translateY(-6px) scale(0.96); } }
+.chth-apps__head { align-items: center; display: flex; gap: 0.75rem; padding: 0.25rem 0.25rem 0.75rem; }
+.chth-apps__head strong { display: block; font-family: var(--chth-font-display); font-size: 1rem; letter-spacing: 0.04em; }
+.chth-apps__head small { display: block; font-size: 0.75rem; opacity: 0.6; }
+.chth-apps__mark { color: var(--chth-accent); display: inline-flex; flex: none; height: 1.6rem; width: 3.5rem; }
+.chth-apps__mark svg { height: 100%; width: 100%; }
+.chth-apps__label { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.08em; margin: 0.5rem 0.25rem 0.4rem; opacity: 0.5; text-transform: uppercase; }
+.chth-apps__sites { display: grid; gap: 0.375rem; grid-template-columns: repeat(3, 1fr); }
+.chth-apps__site {
+  background: var(--chth-apps-soft);
+  border: 1px solid transparent;
+  border-radius: var(--chth-radius-lg);
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.625rem;
+  text-decoration: none;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.chth-apps__site[aria-current] { border-color: var(--chth-product-accent); }
+.chth-apps__ico {
+  background: var(--chth-product-accent);
+  border-radius: 0.7rem;
+  display: inline-grid;
+  font-size: 1.1rem;
+  height: 2.25rem;
+  margin-bottom: 0.3rem;
+  place-items: center;
+  width: 2.25rem;
+}
+.chth-apps__name { font-size: 0.8125rem; font-weight: 700; line-height: 1.2; }
+.chth-apps__tag { display: -webkit-box; font-size: 0.6875rem; line-height: 1.35; opacity: 0.6; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.chth-apps__here { color: var(--chth-product-accent); font-size: 0.6875rem; font-weight: 700; }
+.chth-apps__bots { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.chth-apps__bot {
+  align-items: center;
+  border: 1px solid var(--chth-apps-line);
+  border-radius: var(--chth-radius-full);
+  color: inherit;
+  display: inline-flex;
+  font-size: 0.75rem;
+  gap: 0.3rem;
+  padding: 0.3rem 0.6rem;
+  text-decoration: none;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.chth-apps__about {
+  border-top: 1px solid var(--chth-apps-line);
+  color: inherit;
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  opacity: 0.75;
+  padding: 0.75rem 0.25rem 0.125rem;
+  text-decoration: none;
+}
+.chth-apps__site:focus-visible, .chth-apps__bot:focus-visible, .chth-apps__about:focus-visible { outline: 2px solid var(--chth-product-accent); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .chth-apps > summary:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+  a.chth-apps__site:hover { background: color-mix(in srgb, var(--chth-product-accent) 14%, transparent); border-color: color-mix(in srgb, var(--chth-product-accent) 40%, transparent); transform: translateY(-2px); }
+  .chth-apps__bot:hover { background: var(--chth-apps-soft); border-color: var(--chth-accent); }
+  .chth-apps__about:hover { color: var(--chth-accent); opacity: 1; }
+}
+/* Phones: the menu spans the screen under the header instead of hanging off the button. */
+@media (max-width: 480px) {
+  .chth-apps__panel { inset-inline: 0.75rem; position: fixed; top: 4.25rem; width: auto; }
+  .chth-apps__tag { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chth-apps[open] .chth-apps__panel { animation: none; }
+  .chth-apps > summary svg { transition: none; }
+}
+/* Compact headers: on phones the language and theme live inside the app switcher. */
+.chth-apps__prefs { align-items: center; border-top: 1px solid var(--chth-apps-line); display: none; gap: 0.5rem; justify-content: space-between; margin-top: 0.625rem; padding-top: 0.625rem; }
+.chth-apps__langs { align-items: center; display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.chth-apps__langs > svg { height: 1rem; margin-inline-end: 0.25rem; opacity: 0.5; width: 1rem; }
+.chth-apps__langs a { border-radius: var(--chth-radius-full); color: inherit; font-size: 0.75rem; padding: 0.25rem 0.5rem; text-decoration: none; }
+.chth-apps__langs a[aria-current] { background: var(--chth-apps-soft); color: var(--chth-product-accent); font-weight: 700; }
+.chth-apps__langs a:is(:lang(fa), :lang(ar)) { font-family: var(--chth-font-rtl); }
+.chth-apps__prefs .chth-theme { --chth-control-size: 2.25rem; border-color: var(--chth-apps-line); }
+.chth-apps__prefs .chth-theme svg { height: 1rem; width: 1rem; }
+@media (max-width: 640px) {
+  .chth-tools--compact > :is(.chth-lang-menu, .chth-theme) { display: none; }
+  .chth-tools--compact .chth-apps__prefs { display: flex; }
+}

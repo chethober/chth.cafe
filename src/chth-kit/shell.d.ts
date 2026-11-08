@@ -17,7 +17,16 @@ export const THEME_KEY: 'chth_theme';
 export const THEME_INIT_JS: string;
 export const SUN_SVG: string;
 export const MOON_SVG: string;
-export const SHELL_STRINGS: Record<'theme', Text>;
+export const SHELL_STRINGS: Record<'theme' | 'apps' | 'sites' | 'bots' | 'here' | 'about' | 'tagline', Text>;
+export const APPS_SVG: string;
+export interface AppItem { id: string; ico: string; name: string; tagline: string; href: string; current: boolean }
+export interface AppSwitcherModel {
+  label: string; sitesLabel: string; botsLabel: string; hereLabel: string; title: string; tagline: string;
+  iconSvg: string; logoSvg: string; sites: AppItem[]; bots: AppItem[]; about: { label: string; href: string; current: boolean };
+}
+export function appSwitcherModel(locale: Locale, self: string): AppSwitcherModel;
+export function appSwitcherHtml(locale: Locale, self: string, opts?: { className?: string; prefs?: boolean; langHref?: (code: Locale) => string }): string;
+export function shellToolsHtml(locale: Locale, self: string, opts?: { className?: string; language?: boolean; theme?: boolean; compact?: boolean; langHref?: (code: Locale) => string }): string;
 export function themeToggleModel(locale: Locale): { label: string; iconsSvg: string };
 export function themeToggleHtml(locale: Locale, opts?: { className?: string }): string;
 export const toast: ToastFn;

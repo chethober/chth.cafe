@@ -2,7 +2,7 @@ import { html, raw } from 'hono/html';
 import type { HtmlEscapedString } from 'hono/utils/html';
 import { BRAND_CSS } from '../../src/chth-kit/brand.js';
 import { footerHtml } from '../../src/chth-kit/footer.js';
-import { themeToggleModel } from '../../src/chth-kit/shell.js';
+import { appSwitcherHtml, themeToggleModel } from '../../src/chth-kit/shell.js';
 import { SHELL_JS } from '../../src/chth-kit/shell-script.js';
 
 /**
@@ -51,6 +51,7 @@ form.inline{display:inline-flex;align-items:center;gap:10px;margin:0}
 
 /* Theme toggle: shows the sun in dark and the moon in light, like the café's. */
 .theme{display:inline-flex;margin:0}
+.chth-apps>summary{background:var(--soft);color:var(--ink);border-color:var(--line)}
 .chth-theme{background:var(--soft);color:var(--ink);border-color:var(--line)}.chth-theme .chth-theme__sun{color:var(--accent)}
 
 .btn{font:inherit;font-weight:650;display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:12px 20px;border-radius:999px;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap;color:var(--ink);background:var(--soft);transition:transform 160ms var(--ease-out),box-shadow 200ms ease,background-color 150ms ease,border-color 150ms ease,color 150ms ease}
@@ -190,6 +191,7 @@ ${options.description ? html`<meta name="description" content="${options.descrip
       ${options.themeToggle === false ? '' : html`<form class="theme" method="post" action="/theme">
         <button class="chth-theme" data-chth-theme-toggle type="submit" name="theme" value="toggle" aria-label="${TOGGLE.label}" title="${TOGGLE.label}">${raw(TOGGLE.iconsSvg)}</button>
       </form>`}
+      ${raw(appSwitcherHtml('en', 'cafe'))}
     </div>
   </div>
 </nav>

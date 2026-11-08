@@ -6,6 +6,7 @@
 import { dirOf, isLocale, localeCookie, localeFromCookie, pickLocale, type Locale } from '../../src/chth-kit/locales.js';
 import { footerHtml } from '../../src/chth-kit/footer.js';
 import { languageMenuHtml } from '../../src/chth-kit/language-menu.js';
+import { appSwitcherHtml, themeToggleModel } from '../../src/chth-kit/shell.js';
 
 type Row = [fa: string, ar: string, ru: string, es: string];
 const COL: Record<Exclude<Locale, 'en'>, number> = { fa: 0, ar: 1, ru: 2, es: 3 };
@@ -135,10 +136,12 @@ const LANDING_CSS = `
 html[dir="rtl"] body{font-family:var(--chth-font-rtl)}html[dir="rtl"] .window,html[dir="rtl"] .phone,html[dir="rtl"] .board{direction:ltr}html[dir="rtl"] .display{font-family:var(--chth-font-rtl);letter-spacing:0}
 `;
 
-/** Translates the rendered landing page, adds the navbar language menu and localizes the CHTH footer. */
+/** Translates the rendered landing page, adds the navbar language menu and localizes the CHTH footer, theme toggle and app switcher. */
 export function localizeLanding(page: string, locale: Locale): string {
   // The footer is swapped before translating, so the translator never sees its English text.
-  let out = page.replace(footerHtml('en', 'cafe'), footerHtml(locale, 'cafe'));
+  let out = page.replace(footerHtml('en', 'cafe'), footerHtml(locale, 'cafe'))
+    .replace(appSwitcherHtml('en', 'cafe'), appSwitcherHtml(locale, 'cafe'))
+    .replaceAll(`"${themeToggleModel('en').label}"`, `"${themeToggleModel(locale).label}"`);
   if (locale !== 'en') {
     const col = COL[locale];
     // Fragments with markup first, then plain text nodes and text attributes.

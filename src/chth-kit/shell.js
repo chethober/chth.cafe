@@ -7,6 +7,9 @@
 
 import './shell-runtime.js';
 import { translator } from './locales.js';
+import { PRODUCTS, productLink, productName, productTagline } from './products.js';
+import { languageMenuHtml, languageMenuModel } from './language-menu.js';
+import { FOOTER_LOGO_SVG, CHTH_INFO_URL } from './footer.js';
 
 /** The localStorage key and cookie a visitor's theme is kept under, the same on every site. */
 export const THEME_KEY = 'chth_theme';
@@ -29,7 +32,23 @@ export const MOON_SVG = '<svg class="chth-theme__moon" xmlns="http://www.w3.org/
 
 export const SHELL_STRINGS = {
   theme: { en: 'Dark appearance', fa: 'حالت تیره', ar: 'المظهر الداكن', ru: 'Тёмная тема', es: 'Apariencia oscura' },
+  apps: { en: 'CHTH apps', fa: 'برنامه‌های CHTH', ar: 'تطبيقات CHTH', ru: 'Приложения CHTH', es: 'Apps de CHTH' },
+  sites: { en: 'Sites', fa: 'سایت‌ها', ar: 'المواقع', ru: 'Сайты', es: 'Sitios' },
+  bots: { en: 'Telegram bots', fa: 'ربات‌های تلگرام', ar: 'بوتات تيليجرام', ru: 'Боты в Telegram', es: 'Bots de Telegram' },
+  here: { en: 'You’re here', fa: 'همین‌جایی', ar: 'أنت هنا', ru: 'Вы здесь', es: 'Estás aquí' },
+  about: { en: 'About CHTH', fa: 'دربارهٔ CHTH', ar: 'عن CHTH', ru: 'О CHTH', es: 'Sobre CHTH' },
+  tagline: {
+    en: 'Small, free and open-source tools',
+    fa: 'ابزارهای کوچک، رایگان و متن‌باز',
+    ar: 'أدوات صغيرة ومجانية ومفتوحة المصدر',
+    ru: 'Небольшие бесплатные инструменты с открытым кодом',
+    es: 'Herramientas pequeñas, gratuitas y de código abierto',
+  },
 };
+
+/** A 3×3 grid of dots: the app switcher's button. */
+export const APPS_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">'
+  + [5, 12, 19].flatMap((y) => [5, 12, 19].map((x) => `<circle cx="${x}" cy="${y}" r="2.1"/>`)).join('') + '</svg>';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -43,6 +62,68 @@ export function themeToggleModel(locale) {
 export function themeToggleHtml(locale, opts = {}) {
   const m = themeToggleModel(locale);
   return `<button type="button" class="chth-theme${opts.className ? ` ${esc(opts.className)}` : ''}" data-chth-theme-toggle aria-pressed="false" aria-label="${esc(m.label)}" title="${esc(m.label)}">${m.iconsSvg}</button>`;
+}
+
+/**
+ * The app switcher's contents: the CHTH sites as tiles (the current one marked, not linked), the
+ * bots as chips, and chth.wtf. Links carry where the visitor came from (?ref= / ?start=src_).
+ * @param {string} self  this product's id ('cafe', 'gym', 'shop', 'wtf', …)
+ */
+export function appSwitcherModel(locale, self) {
+  const t = translator(SHELL_STRINGS, locale);
+  const item = (p) => ({
+    id: p.id, ico: p.ico, name: productName(p, locale), tagline: productTagline(p, locale),
+    href: productLink(p, self), current: p.id === self,
+  });
+  return {
+    label: t('apps'), sitesLabel: t('sites'), botsLabel: t('bots'), hereLabel: t('here'),
+    title: 'CHTH', tagline: t('tagline'), iconSvg: APPS_SVG, logoSvg: FOOTER_LOGO_SVG,
+    sites: PRODUCTS.filter((p) => p.kind === 'site').map(item),
+    bots: PRODUCTS.filter((p) => p.kind === 'bot').map(item),
+    about: { label: t('about'), href: `${CHTH_INFO_URL}/?ref=${encodeURIComponent(self)}`, current: self === 'wtf' },
+  };
+}
+
+/** The app switcher as HTML: a <details> (it opens without JavaScript), like the language menu. */
+export function appSwitcherHtml(locale, self, opts = {}) {
+  const m = appSwitcherModel(locale, self);
+  const site = (p) => p.current
+    ? `<span class="chth-apps__site" data-chth-product="${esc(p.id)}" aria-current="page"><span class="chth-apps__ico" aria-hidden="true">${esc(p.ico)}</span><span class="chth-apps__name">${esc(p.name)}</span><span class="chth-apps__here">${esc(m.hereLabel)}</span></span>`
+    : `<a class="chth-apps__site" data-chth-product="${esc(p.id)}" href="${esc(p.href)}"><span class="chth-apps__ico" aria-hidden="true">${esc(p.ico)}</span><span class="chth-apps__name">${esc(p.name)}</span><span class="chth-apps__tag">${esc(p.tagline)}</span></a>`;
+  const bot = (p) => `<a class="chth-apps__bot" href="${esc(p.href)}" title="${esc(p.tagline)}"><span aria-hidden="true">${esc(p.ico)}</span>${esc(p.name)}</a>`;
+  return `<details class="chth-apps${opts.className ? ` ${esc(opts.className)}` : ''}">`
+    + `<summary aria-label="${esc(m.label)}" title="${esc(m.label)}">${m.iconSvg}</summary>`
+    + `<div class="chth-apps__panel" role="group" aria-label="${esc(m.label)}">`
+    + `<div class="chth-apps__head"><span class="chth-apps__mark" aria-hidden="true">${m.logoSvg}</span><span><strong>${esc(m.title)}</strong><small>${esc(m.tagline)}</small></span></div>`
+    + `<p class="chth-apps__label">${esc(m.sitesLabel)}</p><div class="chth-apps__sites">${m.sites.map(site).join('')}</div>`
+    + `<p class="chth-apps__label">${esc(m.botsLabel)}</p><div class="chth-apps__bots">${m.bots.map(bot).join('')}</div>`
+    + `<a class="chth-apps__about" href="${esc(m.about.href)}"${m.about.current ? ' aria-current="page"' : ''}>${esc(m.about.label)} · chth.wtf <span aria-hidden="true">↗</span></a>`
+    + (opts.prefs ? prefsHtml(locale, opts) : '')
+    + `</div></details>`;
+}
+
+/**
+ * The language and theme again, inside the switcher: shown only on narrow screens in a
+ * .chth-tools--compact header, which hides its own language menu and theme toggle there.
+ */
+function prefsHtml(locale, opts) {
+  const lang = languageMenuModel(locale);
+  const langHref = opts.langHref ?? ((code) => `?lang=${code}`);
+  const links = lang.locales.map((l) =>
+    `<a href="${esc(langHref(l.code))}" hreflang="${l.code}" lang="${l.code}"${l.current ? ' aria-current="true"' : ''}>${esc(l.label)}</a>`).join('');
+  return `<div class="chth-apps__prefs"><nav class="chth-apps__langs" aria-label="${esc(lang.label)}">${lang.globeSvg}${links}</nav>${themeToggleHtml(locale)}</div>`;
+}
+
+/**
+ * The tools every CHTH header ends with, always in this order: the language menu, the theme
+ * toggle and the app switcher. Each site keeps its own bar, logo and links before them.
+ */
+export function shellToolsHtml(locale, self, opts = {}) {
+  return `<div class="chth-tools${opts.compact ? ' chth-tools--compact' : ''}${opts.className ? ` ${esc(opts.className)}` : ''}">`
+    + (opts.language === false ? '' : languageMenuHtml(locale, { langHref: opts.langHref }))
+    + (opts.theme === false ? '' : themeToggleHtml(locale))
+    + appSwitcherHtml(locale, self, { prefs: opts.compact, langHref: opts.langHref })
+    + `</div>`;
 }
 
 const shell = () => (typeof window === 'undefined' ? null : window.chthShell);
