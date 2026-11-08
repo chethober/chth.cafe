@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { setTheme as setShellTheme } from './chth-kit/shell.js';
 import { flushSync } from 'react-dom';
 import {
   Settings,
@@ -95,27 +96,20 @@ export const App: React.FC = () => {
     // Browser chrome and the status bar follow the page paper, not the OS scheme, because the theme is chosen in-app.
     const paper = getComputedStyle(root).getPropertyValue('--menu-paper').trim();
     if (paper) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', paper);
+    root.setAttribute('data-theme', theme);
     try { localStorage.setItem('chth_theme', theme); } catch { /* storage unavailable */ }
   }, [theme]);
 
-  // The new theme spreads out from the button in a circle. Without View Transitions,
-  // or with reduced motion, it switches at once.
-  const toggleTheme = (button: HTMLElement) => {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    if (!document.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setTheme(next); return; }
-    const { left, top, width, height } = button.getBoundingClientRect();
-    const x = left + width / 2, y = top + height / 2;
-    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-    const transition = document.startViewTransition(() => {
+  // The shared CHTH shell switches the theme (spreading out from the button) and tells us.
+  useEffect(() => {
+    const onTheme = (e: Event) => {
+      const next = (e as CustomEvent<{ theme: 'dark' | 'light' }>).detail.theme;
       flushSync(() => setTheme(next));
-      document.documentElement.classList.toggle('light', next === 'light');
-      document.documentElement.classList.toggle('dark', next === 'dark');
-    });
-    void transition.ready.then(() => document.documentElement.animate(
-      { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] },
-      { duration: 400, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', pseudoElement: '::view-transition-new(root)' }
-    )).catch(() => {});
-  };
+    };
+    window.addEventListener('chth:theme', onTheme);
+    return () => window.removeEventListener('chth:theme', onTheme);
+  }, []);
+  const toggleTheme = (button: HTMLElement) => setShellTheme(theme === 'dark' ? 'light' : 'dark', button);
 
   const [, setStateVersion] = useState(0);
   const refresh = () => setStateVersion((v) => v + 1);
@@ -346,7 +340,7 @@ export const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 w-full">
         {store.pendingSaves > 0 && <p role="status" className="mb-4 rounded-xl border border-amber-500/30 p-3 text-amber-400">Saving {store.pendingSaves} change(s)…</p>}
         {store.saveError && <div role="alert" className="mb-4 rounded-xl border border-rose-500/40 p-4 text-rose-300">{store.saveError}<button type="button" onClick={() => store.dismissSaveError()} className="ml-4 underline">Dismiss</button></div>}
-        <PublicMenu settings={settings} categories={categories} menuItems={menuItems} menuVariants={menuVariants} onOrderCreated={refresh} theme={theme} onToggleTheme={toggleTheme} />
+        <PublicMenu settings={settings} categories={categories} menuItems={menuItems} menuVariants={menuVariants} onOrderCreated={refresh} theme={theme} />
       </main>
 
       <footer className="bg-zinc-950 border-t border-zinc-900 py-5 text-center text-xs text-zinc-500 mt-8">

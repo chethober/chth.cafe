@@ -4,7 +4,10 @@ import schema from '../schema.sql';
 import { CloudflareClient, deployCafe, type CafeResources, type Release } from './cloudflare';
 import { decrypt, encrypt } from './crypto';
 import { lacksScriptsScope, refresh, type Credentials, type OAuthEnv } from './oauth';
-import { applyTheme, THEME_COOKIE, THEME_SWITCH_COOKIE, themeScriptSource } from './design';
+import { bannerHtml } from '../../src/chth-kit/shell.js';
+import { isLocale } from '../../src/chth-kit/locales.js';
+import { footerHtml } from '../../src/chth-kit/footer.js';
+import { applyTheme, fillNav, OLD_THEME_COOKIE, THEME_COOKIE, THEME_SWITCH_COOKIE, themeScriptSource } from './design';
 import * as views from './views';
 
 /** What the owner site (chth.cafe) and the hub's internal API share. */
@@ -105,7 +108,10 @@ export async function deployRow(env: Bindings, requestUrl: string, cafe: CafeRow
   }
 }
 
-/** Pages render without a theme; the saved one is applied here so no view has to know about it. */
+/** The notices row holding chth.cafe's own banner (the hub's 📢 Banners), apart from the cafés' notices. */
+export const BANNER_SCOPE = 'chth:banner';
+
+/** Pages render without a theme or banner; both are applied here so no view has to know about them. */
 export const themed: MiddlewareHandler = async (c, next) => {
   await next();
   if (!c.res.headers.get('Content-Type')?.startsWith('text/html')) return;
@@ -113,7 +119,15 @@ export const themed: MiddlewareHandler = async (c, next) => {
   const res = c.res;
   const headers = new Headers(res.headers);
   headers.delete('Content-Length');
-  c.res = new Response(applyTheme(await res.text(), getCookie(c, THEME_COOKIE), switched), { status: res.status, headers });
+  let page = applyTheme(await res.text(), getCookie(c, THEME_COOKIE) ?? getCookie(c, OLD_THEME_COOKIE), switched);
+  const banner = await (c.env as Bindings).DB.prepare('SELECT text, url FROM notices WHERE scope = ?').bind(BANNER_SCOPE)
+    .first<{ text: string; url: string | null }>().catch(() => null);
+  const lang = /<html lang="([a-z]{2})"/.exec(page)?.[1];
+  const locale = isLocale(lang) ? lang : 'en';
+  // The CHTH navbar and footer, in the page's language.
+  page = fillNav(page, locale).replace('<!--chth-footer-->', () => footerHtml(locale, 'cafe'));
+  if (banner?.text) page = page.replace(/<body[^>]*>/, tag => tag + bannerHtml(banner, locale));
+  c.res = new Response(page, { status: res.status, headers });
   if (switched) deleteCookie(c, THEME_SWITCH_COOKIE, { path: '/' });
 };
 
@@ -121,7 +135,7 @@ export const themed: MiddlewareHandler = async (c, next) => {
 export const guarded: MiddlewareHandler = async (c, next) => {
   await ensureSchema((c.env as Bindings).DB);
   c.header('X-Frame-Options', 'DENY');
-  // The only script is the theme toggle, allowed by its hash.
+  // The only script is the CHTH shell, allowed by its hash.
   c.header('Content-Security-Policy', `default-src 'none'; script-src ${await themeScriptSource()}; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; form-action 'self' https://dash.cloudflare.com; frame-ancestors 'none'; base-uri 'none'`);
   // same-origin, not no-referrer: with no-referrer, browsers send "Origin: null" on form posts, which the origin check refuses.
   c.header('Referrer-Policy', 'same-origin');

@@ -11,9 +11,10 @@ const STYLES = `
 .banner{display:grid;gap:8px;padding-top:20px}.banner a{font-size:14px}
 .glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(600px 420px at 78% 8%,color-mix(in srgb,var(--accent) 24%,transparent),transparent 70%),radial-gradient(520px 380px at 8% 40%,rgba(124,196,255,.07),transparent 70%)}
 .grain{position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(var(--soft2) 1px,transparent 1px);background-size:3px 3px}
-header.hero{position:relative;padding:72px 0 48px;overflow:hidden}
+/* The hero's glow and grain run up behind the CHTH navbar, so the page reads as one surface. */
+header.hero{position:relative;margin-top:calc(-1 * var(--chth-nav-space));padding:calc(72px + var(--chth-nav-space)) 0 48px;overflow:hidden}
 .hero .wrap{position:relative;display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}
-@media (max-width:940px){.hero .wrap{grid-template-columns:minmax(0,1fr)}header.hero{padding-top:44px}}
+@media (max-width:940px){.hero .wrap{grid-template-columns:minmax(0,1fr)}header.hero{padding-top:calc(44px + var(--chth-nav-space))}}
 .eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;font-size:13px;color:var(--muted);background:var(--soft)}
 .eyebrow b{color:var(--mint);font-weight:600}.eyebrow .dot{color:var(--mint)}
 .hero-title{font-size:clamp(42px,6.4vw,76px);line-height:1.02;margin:22px 0 20px}
@@ -58,25 +59,25 @@ section.band{padding:96px 0;position:relative;scroll-margin-top:-8px}
 .phone::before,.phone::after{content:"";position:absolute;width:3px;border-radius:2px;background:linear-gradient(90deg,#3a3836,#6b6763)}
 .phone::before{left:-3px;top:112px;height:56px;box-shadow:0 -40px 0 -0.5px #4a4744,0 70px 0 #4a4744}
 .phone::after{right:-3px;top:150px;height:80px}
-.screen{border-radius:41px;background:#fbf5ec;color:#2a1d12;overflow:hidden;position:relative;height:500px}
+.screen{border-radius:41px;background:#fafaf9;color:#1c1917;overflow:hidden;position:relative;height:500px}
 .island{position:absolute;z-index:2;top:10px;left:50%;width:84px;height:24px;margin-left:-42px;border-radius:999px;background:#000}
 .status{display:flex;justify-content:space-between;align-items:center;height:44px;padding:0 12px 0 22px;font:600 13px/1 system-ui,-apple-system,sans-serif;letter-spacing:-.01em}
 .status .sys{display:flex;gap:5px;align-items:center}.status svg{height:11px;width:auto;fill:currentColor}
-.menu-hero{padding:0 0 12px;background:linear-gradient(160deg,#3b2414,#7a4a26);color:#fff4e6}
+.menu-hero{padding:0 0 12px;background:linear-gradient(160deg,#1c1917,#44403c);color:#fafaf9}
 .menu-hero b{font-family:var(--serif);font-size:22px;display:block;padding:6px 16px 0}.menu-hero small{display:block;padding:0 16px;opacity:.75;font-size:12px}
-.home{position:absolute;z-index:2;bottom:7px;left:50%;width:110px;height:4px;margin-left:-55px;border-radius:999px;background:#2a1d12}
+.home{position:absolute;z-index:2;bottom:7px;left:50%;width:110px;height:4px;margin-left:-55px;border-radius:999px;background:#1c1917}
 .chips{display:flex;gap:6px;padding:12px 14px 6px;overflow:hidden}
-.chip{font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;background:#efe4d5;color:#6b4e35;white-space:nowrap}.chip.on{background:#2a1d12;color:#fbf5ec}
-.item{display:flex;align-items:center;gap:9px;padding:10px 14px;border-bottom:1px solid #eee2d2}
-.thumb{width:40px;height:40px;border-radius:12px;flex:none;display:grid;place-items:center;color:#6b4e35}.thumb svg{width:22px;height:22px}
-.item div{flex:1;min-width:0}.item b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.item small{display:block;color:#8a7560;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;background:#e7e5e4;color:#57534e;white-space:nowrap}.chip.on{background:#1c1917;color:#fafaf9}
+.item{display:flex;align-items:center;gap:9px;padding:10px 14px;border-bottom:1px solid #e7e5e4}
+.thumb{width:40px;height:40px;border-radius:12px;flex:none;display:grid;place-items:center;color:#57534e}.thumb svg{width:22px;height:22px}
+.item div{flex:1;min-width:0}.item b{display:block;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.item small{display:block;color:#78716c;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .price{font-weight:700;font-size:13.5px}
-.add{width:26px;height:26px;border-radius:50%;background:#2a1d12;color:#fff;display:grid;place-items:center;font-weight:700;font-size:16px;flex:none}
+.add{width:26px;height:26px;border-radius:50%;background:#1c1917;color:#fff;display:grid;place-items:center;font-weight:700;font-size:16px;flex:none}
 .item.tap .add{animation:tap 3200ms var(--ease-in-out) infinite}
-@keyframes tap{0%,60%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(231,169,107,0)}66%{transform:scale(.82)}74%{transform:scale(1.06);box-shadow:0 0 0 8px rgba(231,169,107,.35)}84%{box-shadow:0 0 0 14px rgba(231,169,107,0)}}
-.cart{position:absolute;left:12px;right:12px;bottom:20px;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:16px;background:#2a1d12;color:#fbf5ec;font-size:14px;font-weight:600;box-shadow:0 10px 24px -8px rgba(42,29,18,.6);animation:bump 3200ms var(--ease-in-out) infinite}
+@keyframes tap{0%,60%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(214,211,209,0)}66%{transform:scale(.82)}74%{transform:scale(1.06);box-shadow:0 0 0 8px rgba(214,211,209,.35)}84%{box-shadow:0 0 0 14px rgba(214,211,209,0)}}
+.cart{position:absolute;left:12px;right:12px;bottom:20px;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-radius:16px;background:#1c1917;color:#fafaf9;font-size:14px;font-weight:600;box-shadow:0 10px 24px -8px rgba(42,29,18,.6);animation:bump 3200ms var(--ease-in-out) infinite}
 @keyframes bump{0%,72%,100%{transform:none}78%{transform:translateY(-4px) scale(1.02)}}
-.cart .n{display:inline-grid;place-items:center;min-width:22px;height:22px;border-radius:999px;background:#e7a96b;color:#2a1d12;font-size:12px;margin-right:8px}
+.cart .n{display:inline-grid;place-items:center;min-width:22px;height:22px;border-radius:999px;background:var(--accent);color:var(--chth-cafe-on-accent);font-size:12px;margin-right:8px}
 
 .board{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;min-height:180px}
 .col{border-radius:14px;background:var(--soft);border:1px solid var(--line);padding:10px;min-width:0}
@@ -143,7 +144,7 @@ section.band{padding:96px 0;position:relative;scroll-margin-top:-8px}
 .node{border:1px solid var(--line);border-radius:18px;background:var(--panel);padding:18px}
 .node small{font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
 .node b{display:block;font-size:17px;margin:4px 0}.node p{margin:0;color:var(--muted);font-size:13.5px}
-.node.yours{border-color:rgba(243,128,32,.55);background:linear-gradient(180deg,rgba(243,128,32,.10),var(--panel));box-shadow:0 0 60px -20px rgba(243,128,32,.45)}
+.node.yours{border-color:rgba(168,162,158,.55);background:linear-gradient(180deg,rgba(168,162,158,.10),var(--panel));box-shadow:0 0 60px -20px rgba(168,162,158,.45)}
 .res{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}.res span{text-align:center;font:12px var(--mono);padding:8px 4px;border-radius:10px;background:var(--soft);border:1px solid var(--line)}
 .wire{width:80px;height:2px;background:repeating-linear-gradient(90deg,var(--accent) 0 8px,transparent 8px 16px);background-size:32px 2px;animation:wire 1s linear infinite;opacity:.8}
 @keyframes wire{to{background-position:32px 0}}
@@ -153,7 +154,7 @@ section.band{padding:96px 0;position:relative;scroll-margin-top:-8px}
 .promise b{display:block;margin-bottom:4px}.promise p{margin:0;color:var(--muted);font-size:14.5px}
 .promise svg{width:22px;height:22px;color:var(--accent);margin-bottom:10px}
 
-.signin{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:40px;align-items:start;padding:40px;border-radius:28px;border:1px solid var(--line);background:radial-gradient(500px 300px at 100% 0%,rgba(243,128,32,.12),transparent 70%),var(--bg2)}
+.signin{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:40px;align-items:start;padding:40px;border-radius:28px;border:1px solid var(--line);background:radial-gradient(500px 300px at 100% 0%,rgba(168,162,158,.12),transparent 70%),var(--bg2)}
 @media (max-width:860px){.signin{grid-template-columns:minmax(0,1fr);padding:24px;gap:24px}}
 .signin .title{font-size:clamp(30px,3.6vw,42px)}
 .auth{display:grid;gap:14px}
@@ -237,10 +238,10 @@ ${params.error || params.message ? html`<div class="wrap banner">${notice(params
           <div class="screen">
             <i class="island"></i><div class="menu-hero"><div class="status"><span>9:41</span><span class="sys"><svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg viewBox="0 0 16 12"><path d="M8 2.6c2.3 0 4.4.9 6 2.4l1.3-1.4A10.6 10.6 0 0 0 8 .7 10.6 10.6 0 0 0 .7 3.6L2 5c1.6-1.5 3.7-2.4 6-2.4Zm0 3.7c1.3 0 2.5.5 3.4 1.3l1.3-1.4A6.8 6.8 0 0 0 8 4.4c-1.8 0-3.4.7-4.7 1.8l1.3 1.4c.9-.8 2.1-1.3 3.4-1.3Zm0 3.6c-.5 0-1 .2-1.4.5L8 11.9l1.4-1.5c-.4-.3-.9-.5-1.4-.5Z"/></svg><svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="22" height="11" rx="3.2" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="8" rx="2"/><path d="M24.5 4v4c.8-.3 1.5-1 1.5-2s-.7-1.7-1.5-2Z" opacity=".45"/></svg></span></div><b>Corner Beans</b><small>Table 4 · open until 19:00</small></div>
             <div class="chips"><span class="chip on">Coffee</span><span class="chip">Tea</span><span class="chip">Bakery</span><span class="chip">Cold</span></div>
-            <div class="item"><span class="thumb" style="background:#f1dcc4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h12v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Z"/><path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3v2M12 3v2"/></svg></span><div><b>Flat white</b><small>Double ristretto</small></div><span class="price">€3.80</span><span class="add">+</span></div>
-            <div class="item tap"><span class="thumb" style="background:#e9e2cf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10l-1.5 15a2 2 0 0 1-2 1.8h-3a2 2 0 0 1-2-1.8L7 4Z"/><path d="M7.6 10h8.8"/></svg></span><div><b>Cortado</b><small>With oat milk</small></div><span class="price">€3.60</span><span class="add">+</span></div>
-            <div class="item"><span class="thumb" style="background:#f6e0c8"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15a8 6.5 0 0 1 16 0v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V15Z"/><path d="M9 11l.8 1.6M12.5 10.5l.3 1.8M16 11.5l-.6 1.6"/></svg></span><div><b>Cardamom bun</b><small>Baked today</small></div><span class="price">€3.20</span><span class="add">+</span></div>
-            <div class="item"><span class="thumb" style="background:#dcebd9"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-8 5-14 14-14 0 9-6 14-14 14Z"/><path d="M5 19l8-8"/></svg></span><div><b>Matcha</b><small>Whisked to order</small></div><span class="price">€4.40</span><span class="add">+</span></div>
+            <div class="item"><span class="thumb" style="background:#e7e5e4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h12v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Z"/><path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3v2M12 3v2"/></svg></span><div><b>Flat white</b><small>Double ristretto</small></div><span class="price">€3.80</span><span class="add">+</span></div>
+            <div class="item tap"><span class="thumb" style="background:#d6d3d1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10l-1.5 15a2 2 0 0 1-2 1.8h-3a2 2 0 0 1-2-1.8L7 4Z"/><path d="M7.6 10h8.8"/></svg></span><div><b>Cortado</b><small>With oat milk</small></div><span class="price">€3.60</span><span class="add">+</span></div>
+            <div class="item"><span class="thumb" style="background:#e7e5e4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15a8 6.5 0 0 1 16 0v.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V15Z"/><path d="M9 11l.8 1.6M12.5 10.5l.3 1.8M16 11.5l-.6 1.6"/></svg></span><div><b>Cardamom bun</b><small>Baked today</small></div><span class="price">€3.20</span><span class="add">+</span></div>
+            <div class="item"><span class="thumb" style="background:#d6d3d1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-8 5-14 14-14 0 9-6 14-14 14Z"/><path d="M5 19l8-8"/></svg></span><div><b>Matcha</b><small>Whisked to order</small></div><span class="price">€4.40</span><span class="add">+</span></div>
             <div class="cart"><span><span class="n">3</span>View order</span><span>€10.60</span></div><i class="home"></i>
           </div>
         </div>
@@ -296,7 +297,7 @@ ${params.error || params.message ? html`<div class="wrap banner">${notice(params
         <p class="d">Plan who works when, run tastings and classes, and let guests book a seat.</p>
         <div class="plan" aria-hidden="true">
           <div class="shifts">
-            <span class="who">Ana</span><div class="lane"><b style="--s:0%;--w:55%;--c:#e7a96b;--i:0"></b><i class="now"></i></div>
+            <span class="who">Ana</span><div class="lane"><b style="--s:0%;--w:55%;--c:#d6d3d1;--i:0"></b><i class="now"></i></div>
             <span class="who">Sam</span><div class="lane"><b style="--s:30%;--w:50%;--c:#7cc4ff;--i:1"></b></div>
             <span class="who">Rui</span><div class="lane"><b style="--s:50%;--w:50%;--c:#5fd3a0;--i:2"></b></div>
             <span class="who">Lea</span><div class="lane"><b style="--s:8%;--w:34%;--c:#c99bff;--i:3"></b></div>
@@ -392,6 +393,6 @@ ${params.error || params.message ? html`<div class="wrap banner">${notice(params
     description: 'Menu, orders, stock, staff and finances for your café, deployed in one click to your own Cloudflare account.',
     styles: STYLES,
     signInHref,
-    links: html`<a href="#demo">Product</a><a href="#how">How it works</a><a href="#ownership">Ownership</a><a href="#faq">FAQ</a>`
+    languageMenu: true,
   });
 }

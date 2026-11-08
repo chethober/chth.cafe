@@ -143,8 +143,10 @@ try {
   // One footer (the CHTH mark, linking to chth.wtf), the language menu in the navbar, and the brand fonts.
   check(persianPage.match(/<footer\b/g).length, 1);
   check(persianPage.includes('href="https://chth.wtf/?ref=cafe"') && persianPage.includes('بخشی از CHTH'), true);
-  const menuAt = persianPage.indexOf('<details class="chth-lang-menu">');
-  check(menuAt > persianPage.indexOf('<nav class="top"') && menuAt < persianPage.indexOf('<header class="hero"'), true);
+  // The shared CHTH navbar, in Persian: the café words, the language menu, the theme form.
+  const menuAt = persianPage.indexOf('<details class="chth-lang-menu chth-nav__lang">');
+  check(menuAt > persianPage.indexOf('<header class="chth-nav"') && menuAt < persianPage.indexOf('<header class="hero"'), true);
+  check(persianPage.includes('کافه CHTH') && persianPage.includes('action="/theme"'), true);
   check(persianPage.includes('hreflang="fa" lang="fa" aria-current="true"'), true);
   check(landing.includes('fonts.googleapis.com/css2?family=Plus+Jakarta+Sans'), true);
   check(/font-src https:\/\/fonts\.gstatic\.com/.test(persian.headers.get('content-security-policy') || ''), true);
@@ -245,6 +247,17 @@ try {
   check(await owner('/api/notice?cafe=' + cafe.id).then(r => r.json()), { notice: null });
   check((await hub('GET', '/internal/cafes')).json.accounts[0].cafes[0].notice, 'none');
   check(await owner('/api/notice?cafe=other').then(r => r.json()), { notice: { text: 'Try CHTH Pro', url: 'https://chth.example/pro' } });
+  // The CHTH banner on chth.cafe's own pages (the hub's 📢 Banners), apart from the cafés' notice.
+  check((await hub('POST', '/internal/announcement', { text: 'Hi', url: 'javascript:alert(1)' })).status, 400);
+  check((await hub('POST', '/internal/announcement', { text: 'New <release>', url: 'https://chth.cafe/#how' })).json.ok, true);
+  const bannered = await (await owner('/dashboard')).text();
+  check(/<body[^>]*><div class="chth-banner"[^>]*data-chth-dismiss="banner"/.test(bannered), true);
+  check(bannered.includes('New &lt;release&gt;') && !bannered.includes('New <release>'), true);
+  check(bannered.includes('class="chth-cookies"'), true);
+  check(await owner('/api/notice?cafe=other').then(r => r.json()), { notice: { text: 'Try CHTH Pro', url: 'https://chth.example/pro' } });
+  check((await hub('GET', '/internal/cafes')).json.accounts[0].cafes[0].notice, 'none');
+  await hub('POST', '/internal/announcement', { text: '' });
+  check((await (await owner('/dashboard')).text()).includes('class="chth-banner"'), false);
   await hub('POST', `/internal/cafes/${cafe.id}/notice`, { mode: 'global' });
   check(await owner('/api/notice?cafe=' + cafe.id).then(r => r.json()), { notice: { text: 'Try CHTH Pro', url: 'https://chth.example/pro' } });
   // Renaming and updating a café with the owner's saved access; the café still asks the owner site.

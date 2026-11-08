@@ -1,9 +1,10 @@
 import { Hono, type Context } from 'hono';
 import { verifySigned } from '../../src/chth-kit/hub.js';
+import { parseAnnouncement } from '../../src/chth-kit/shell.js';
 import { deleteCafe } from './cloudflare';
 import { decrypt } from './crypto';
 import { revoke, type Credentials } from './oauth';
-import { audit, clientFor, currentRelease, deployRow, ensureSchema, message, now, resourcesOf, type Bindings, type CafeRow, type ConnectionRow } from './shared';
+import { BANNER_SCOPE, audit, clientFor, currentRelease, deployRow, ensureSchema, message, now, resourcesOf, type Bindings, type CafeRow, type ConnectionRow } from './shared';
 
 /**
  * The platform admin, for the CHTH hub's admin bot only: every request must be signed with
@@ -19,6 +20,7 @@ import { audit, clientFor, currentRelease, deployRow, ensureSchema, message, now
  *   POST /internal/cafes/:id/forget         remove from the platform; it keeps running
  *   POST /internal/cafes/:id/delete         { confirm: <worker name> } delete from Cloudflare
  *   POST /internal/notice                   { text, url? } the global notice; empty text clears it
+ *   POST /internal/announcement             { text, url? } the banner on this site (chth.cafe); empty text clears it
  *   POST /internal/accounts/:id/remove      revoke access, sign out, forget its cafés
  */
 type Env = { Bindings: Bindings; Variables: { body: Record<string, unknown> } };
@@ -91,7 +93,7 @@ internal.get('/internal/cafes', async c => {
     c.env.DB.prepare('SELECT * FROM connections ORDER BY created_at').all<ConnectionRow>(),
     c.env.DB.prepare('SELECT * FROM cafes ORDER BY created_at').all<CafeRow>(),
     noticeOf(c, 'global'),
-    c.env.DB.prepare("SELECT scope, text FROM notices WHERE scope != 'global'").all<{ scope: string; text: string }>(),
+    c.env.DB.prepare("SELECT scope, text FROM notices WHERE scope NOT IN ('global', ?)").bind(BANNER_SCOPE).all<{ scope: string; text: string }>(),
   ]);
   const scopes = new Map(overrides.results.map(row => [row.scope, row.text]));
   const byOwner = new Map(connections.results.map(row => [row.owner_id, row]));
@@ -194,6 +196,15 @@ internal.post('/internal/notice', async c => {
   if (notice.text) await upsertNotice(c, 'global', notice.text, notice.url);
   else await c.env.DB.prepare("DELETE FROM notices WHERE scope = 'global'").run();
   return c.json({ ok: true });
+});
+
+/** The CHTH banner across chth.cafe's own pages (not the cafés'), set from the hub's 📢 Banners. */
+internal.post('/internal/announcement', async c => {
+  const parsed = parseAnnouncement(c.get('body'));
+  if (!parsed.ok) return fail(c, parsed.error);
+  if (parsed.announcement) await upsertNotice(c, BANNER_SCOPE, parsed.announcement.text, parsed.announcement.url);
+  else await c.env.DB.prepare('DELETE FROM notices WHERE scope = ?').bind(BANNER_SCOPE).run();
+  return c.json({ ok: true, announcement: parsed.announcement });
 });
 
 /** Revokes the account's access, signs it out everywhere and forgets its cafés. The cafés keep running in its account. */
