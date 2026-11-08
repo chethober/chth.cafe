@@ -11,9 +11,10 @@ const STYLES = `
 .banner{display:grid;gap:8px;padding-top:20px}.banner a{font-size:14px}
 .glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(600px 420px at 78% 8%,color-mix(in srgb,var(--accent) 24%,transparent),transparent 70%),radial-gradient(520px 380px at 8% 40%,rgba(124,196,255,.07),transparent 70%)}
 .grain{position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(var(--soft2) 1px,transparent 1px);background-size:3px 3px}
-header.hero{position:relative;padding:72px 0 48px;overflow:hidden}
+/* The hero's glow and grain run up behind the CHTH navbar, so the page reads as one surface. */
+header.hero{position:relative;margin-top:calc(-1 * var(--chth-nav-space));padding:calc(72px + var(--chth-nav-space)) 0 48px;overflow:hidden}
 .hero .wrap{position:relative;display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}
-@media (max-width:940px){.hero .wrap{grid-template-columns:minmax(0,1fr)}header.hero{padding-top:44px}}
+@media (max-width:940px){.hero .wrap{grid-template-columns:minmax(0,1fr)}header.hero{padding-top:calc(44px + var(--chth-nav-space))}}
 .eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;font-size:13px;color:var(--muted);background:var(--soft)}
 .eyebrow b{color:var(--mint);font-weight:600}.eyebrow .dot{color:var(--mint)}
 .hero-title{font-size:clamp(42px,6.4vw,76px);line-height:1.02;margin:22px 0 20px}

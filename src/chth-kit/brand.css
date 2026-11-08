@@ -325,6 +325,12 @@
   .chth-theme svg { transition: none; }
 }
 
+/* The room the sticky navbar takes (pill and margins). A page whose first section has its own
+   background pulls it up behind the navbar: margin-top: calc(-1 * var(--chth-nav-space)), and the
+   same added to its padding-top. */
+:root { --chth-nav-space: 5rem; }
+@media (max-width: 640px) { :root { --chth-nav-space: 4.75rem; } }
+
 /* Navbar: the shop's floating pill on every site. Typing text on the left, the CHTH mark in the
    middle, the site's icons then profile, theme and language on the right. It narrows a little
    once the page scrolls. Sticky by default (it takes its own room); --overlay floats it over
@@ -456,7 +462,7 @@
   .chth-nav { --chth-control-size: 1.875rem; }
   .chth-nav__logo { padding: 0 0.25rem; }
   .chth-nav__end { gap: 0; }
-  .chth-nav__lead { font-size: 0.75rem; max-width: 7.5rem; }
+  .chth-nav__lead { font-size: 0.75rem; letter-spacing: 0.01em; max-width: 8rem; }
   .chth-nav__logo svg { height: 1.35rem; width: 2.9rem; }
 }
 @media (max-width: 400px) { .chth-nav__lead { max-width: 5.5rem; } }
