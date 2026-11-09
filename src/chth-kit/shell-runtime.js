@@ -237,20 +237,117 @@
         var n = list[i].addedNodes[j];
         if (n.nodeType !== 1) continue;
         if (n.hasAttribute('data-chth-dismiss') || n.querySelector('[data-chth-dismiss]')) applyDismissed(n.parentNode || d);
-        if (n.hasAttribute('data-chth-type') || n.querySelector('[data-chth-type]')) startNav(n.parentNode || d);
+        if (n.hasAttribute('data-chth-type') || n.querySelector('[data-chth-type]') || n.hasAttribute('data-chth-tabs') || n.querySelector('[data-chth-tabs]')) startNav(n.parentNode || d);
       }
     }).observe(root, { childList: true, subtree: true });
   }
 
-  // ---- The navbar ----
-  // [data-chth-nav] gets .chth-nav--scrolled once the page scrolls; [data-chth-type] types its
-  // words one after another (JSON array), or swaps them gently with reduced motion.
+  // ---- The navbar and tab bars: minimize on scroll ----
+  // Scrolling down past the top minimizes [data-chth-nav] (.chth-nav--scrolled) and [data-chth-tabs]
+  // (.chth-tabs--min); scrolling up brings them back, as on iOS. Small moves and the rubber band
+  // past either end are ignored.
 
-  function onScroll() {
+  var lastY = Math.max(0, w.scrollY || 0), minimized = false;
+  function paintMinimized() {
     var navs = d.querySelectorAll('[data-chth-nav]');
-    for (var i = 0; i < navs.length; i++) navs[i].classList.toggle('chth-nav--scrolled', w.scrollY > 40);
+    for (var i = 0; i < navs.length; i++) navs[i].classList.toggle('chth-nav--scrolled', minimized);
+    var bars = d.querySelectorAll('[data-chth-tabs]');
+    for (var j = 0; j < bars.length; j++) bars[j].classList.toggle('chth-tabs--min', minimized);
+  }
+  function onScroll() {
+    var max = Math.max(0, (d.documentElement.scrollHeight || 0) - w.innerHeight);
+    var y = Math.min(Math.max(0, w.scrollY || 0), max);
+    var dy = y - lastY;
+    var next = minimized;
+    if (y <= 40) next = false;
+    else if (dy > 8) next = true;
+    else if (dy < -8) next = false;
+    if (y <= 40 || Math.abs(dy) > 8) lastY = y;
+    if (next !== minimized) { minimized = next; paintMinimized(); }
   }
   w.addEventListener('scroll', onScroll, { passive: true });
+
+  // ---- Tab bars: the sliding highlight and finger scrubbing ----
+
+  function setupTabs(bar) {
+    if (bar.chthTabs) return;
+    bar.chthTabs = true;
+    var glider = bar.querySelector('.chth-tabs__glider');
+    if (!glider) {
+      glider = d.createElement('span');
+      glider.className = 'chth-tabs__glider';
+      glider.setAttribute('aria-hidden', 'true');
+      bar.insertBefore(glider, bar.firstChild);
+    }
+    var items = function () { return [].slice.call(bar.querySelectorAll('[data-chth-tab]')); };
+    var active = function () { return bar.querySelector('[data-chth-tab][aria-current="page"], [data-chth-tab].is-active'); };
+    var scrubbing = false, startX = 0, pointer = null, hovered = null, suppressClick = false;
+    function place(item) {
+      if (!item) { glider.style.opacity = '0'; return; }
+      var r = item.getBoundingClientRect(), p = bar.getBoundingClientRect();
+      glider.style.opacity = '1';
+      glider.style.width = r.width + 'px';
+      glider.style.transform = 'translateX(' + (r.left - p.left) + 'px)';
+    }
+    function settle() { if (!scrubbing) place(active()); }
+    function itemAt(x) {
+      var list = items();
+      for (var i = 0; i < list.length; i++) { var r = list[i].getBoundingClientRect(); if (x >= r.left && x <= r.right) return list[i]; }
+      var first = list[0], last = list[list.length - 1];
+      if (!first) return null;
+      return x < first.getBoundingClientRect().left ? first : last;
+    }
+    function follow(x) {
+      var p = bar.getBoundingClientRect(), item = itemAt(x);
+      if (!item) return;
+      var w0 = item.getBoundingClientRect().width * 1.08;
+      var left = Math.min(Math.max(x - w0 / 2, p.left + 4), p.right - w0 - 4);
+      glider.style.width = w0 + 'px';
+      glider.style.transform = 'translateX(' + (left - p.left) + 'px)';
+      if (item !== hovered) {
+        if (hovered) hovered.classList.remove('is-scrub');
+        hovered = item;
+        item.classList.add('is-scrub');
+        if (w.navigator.vibrate) try { w.navigator.vibrate(6); } catch (e) { /* not allowed */ }
+      }
+    }
+    function end(go) {
+      if (hovered) hovered.classList.remove('is-scrub');
+      var target = hovered;
+      if (scrubbing) {
+        bar.classList.remove('chth-tabs--scrub');
+        scrubbing = false;
+        suppressClick = true;
+        setTimeout(function () { suppressClick = false; }, 60);
+        if (go && target) target.click();
+      }
+      hovered = null; pointer = null;
+      settle();
+    }
+    bar.addEventListener('pointerdown', function (e) {
+      if (e.button > 0) return;
+      pointer = e.pointerId; startX = e.clientX;
+    });
+    bar.addEventListener('pointermove', function (e) {
+      if (pointer !== e.pointerId) return;
+      if (!scrubbing && Math.abs(e.clientX - startX) > 8) {
+        scrubbing = true;
+        bar.classList.add('chth-tabs--scrub');
+        try { bar.setPointerCapture(e.pointerId); } catch (err) { /* already released */ }
+      }
+      if (scrubbing) follow(e.clientX);
+    });
+    bar.addEventListener('pointerup', function (e) { if (pointer === e.pointerId) end(true); });
+    bar.addEventListener('pointercancel', function () { end(false); });
+    // The release of a scrub isn't also a tap on whatever was under it.
+    bar.addEventListener('click', function (e) { if (suppressClick && e.isTrusted) { e.stopPropagation(); e.preventDefault(); } }, true);
+    // Follow the page's own idea of the active tab, and changes of size (minimizing, rotating).
+    new MutationObserver(settle).observe(bar, { subtree: true, attributes: true, attributeFilter: ['class', 'aria-current'] });
+    if (w.ResizeObserver) new ResizeObserver(settle).observe(bar);
+    w.addEventListener('resize', settle);
+    bar.addEventListener('transitionend', settle);
+    settle();
+  }
 
   function typeWords(el) {
     if (el.chthTyping) return;
@@ -289,7 +386,10 @@
   function startNav(scope) {
     var els = (scope || d).querySelectorAll('[data-chth-type]');
     for (var i = 0; i < els.length; i++) typeWords(els[i]);
+    var bars = (scope || d).querySelectorAll('[data-chth-tabs]');
+    for (var j = 0; j < bars.length; j++) setupTabs(bars[j]);
     onScroll();
+    paintMinimized();
   }
   if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', function () { startNav(); });
   else startNav();
