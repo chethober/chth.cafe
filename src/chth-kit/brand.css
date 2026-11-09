@@ -275,8 +275,12 @@
   .chth-theme:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
   .chth-theme:hover .chth-theme__sun { transform: rotate(45deg); }
 }
-/* While the new theme spreads out, nothing else animates. */
+/* While the new theme spreads out, nothing else animates: the new page appears already in its
+   final colours (no element fading from the old ones behind the circle, as the navbar did), and
+   only the toggle's own icon turns. */
 :root.chth-theme-switching::view-transition-old(root), :root.chth-theme-switching::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+:root.chth-theme-switching *, :root.chth-theme-switching *::before, :root.chth-theme-switching *::after { transition: none !important; }
+:root.chth-theme-switching .chth-theme svg { transition: opacity 200ms ease, transform 300ms cubic-bezier(0.23, 1, 0.32, 1) !important; }
 
 /* Toasts: bottom centre, stacked, one accent stripe on the leading edge and a line for the time left. */
 .chth-toasts {
@@ -475,6 +479,8 @@
 .chth-nav__lead { transition: opacity 220ms ease, visibility 0s, background-color 200ms ease, color 200ms ease; }
 .chth-nav--scrolled .chth-nav__lead { opacity: 0; pointer-events: none; transition: opacity 160ms ease, visibility 0s 160ms; visibility: hidden; }
 .chth-nav--scrolled .chth-nav__logo svg { transform: scale(0.88); }
+/* No grey or blue box flashing on a tap (phones); the controls show their own press. */
+.chth-nav a, .chth-nav button, .chth-nav summary, .chth-tabs [data-chth-tab], .chth-theme { -webkit-tap-highlight-color: transparent; }
 .chth-nav__start, .chth-nav__end { align-items: center; display: flex; flex: 1 1 0; gap: 0.25rem; min-width: 0; position: relative; z-index: 1; }
 .chth-nav__end { justify-content: flex-end; }
 .chth-nav__lead {
