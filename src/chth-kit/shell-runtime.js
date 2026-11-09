@@ -281,6 +281,8 @@
   }
   function onScroll() {
     scrollQueued = false;
+    // The navbar holds still while a new theme spreads out from its toggle.
+    if (root.classList.contains('chth-theme-switching')) { lastY = Math.max(0, w.scrollY || 0); return; }
     var max = Math.max(0, (d.documentElement.scrollHeight || 0) - w.innerHeight);
     var y = Math.min(Math.max(0, w.scrollY || 0), max);
     var dy = y - lastY;
