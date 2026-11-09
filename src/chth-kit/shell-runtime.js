@@ -265,7 +265,6 @@
     var rtl = w.getComputedStyle(pill).direction === 'rtl';
     nav.style.setProperty('--chth-nav-dx', dx.toFixed(1) + 'px');
     nav.style.setProperty('--chth-nav-shift', (rtl ? -dx : dx).toFixed(1) + 'px');
-    nav.style.setProperty('--chth-nav-k', (narrow / full).toFixed(4));
   }
   function setupNav(nav) {
     if (nav.chthNav) return;
@@ -332,9 +331,7 @@
       var label = bar.querySelector('[data-chth-tab] > .chth-tabs__label'), prev = label && label.previousElementSibling;
       if (!label || !prev || !label.offsetHeight) return;
       var trim = label.offsetTop + label.offsetHeight - (prev.offsetTop + prev.offsetHeight);
-      if (trim <= 0 || trim >= bar.offsetHeight) return;
-      bar.style.setProperty('--chth-tabs-trim', trim + 'px');
-      bar.style.setProperty('--chth-tabs-ky', ((bar.offsetHeight - trim) / bar.offsetHeight).toFixed(4));
+      if (trim > 0 && trim < bar.offsetHeight) bar.style.setProperty('--chth-tabs-trim', trim + 'px');
     }
     function settle() { if (!scrubbing) place(active()); }
     function itemAt(x) {

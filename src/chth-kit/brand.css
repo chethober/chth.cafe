@@ -380,9 +380,10 @@
 }
 
 /* Liquid glass, after iOS: a blurred, saturated surface with a bright rim and a soft highlight,
-   on the shared navbar and tab bar. The glass is a ::before layer, so minimizing on scroll only
-   clips it (clip-path) and moves things (transform, opacity): nothing is laid out again, and the
-   page under a sticky navbar never moves. */
+   on the shared navbar and tab bar. The glass (::before) and its shadow (::after) are layers of
+   their own: minimizing on scroll resizes only them (their inset) and moves the contents
+   (transform, opacity), so the bar's box never changes and the page under a sticky navbar never
+   moves. Resizing the layer, not clipping it, keeps the ends round and the rim on the edge. */
 :root {
   --chth-glass-dur: 460ms;
   --chth-glass-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -403,12 +404,11 @@
     linear-gradient(180deg, color-mix(in srgb, var(--chth-glass-bg) 80%, var(--chth-glass-shine)) 0%, var(--chth-glass-bg) 55%);
   border-radius: inherit;
   box-shadow: inset 0 1px 0 var(--chth-glass-shine), inset 0 -1px 0 rgba(255, 255, 255, 0.04), inset 0 0 0 1px var(--chth-glass-rim);
-  clip-path: inset(0px 0px 0px 0px round 9999px);
   content: "";
   inset: 0;
   pointer-events: none;
   position: absolute;
-  transition: clip-path var(--chth-glass-dur) var(--chth-glass-ease);
+  transition: inset var(--chth-glass-dur) var(--chth-glass-ease);
   z-index: -1;
 }
 
@@ -453,8 +453,7 @@
   position: relative;
   width: min(64rem, 100%);
 }
-/* The shadow is its own layer that scales with the glass (a shadow is soft, so stretching it
-   doesn't show). */
+/* The shadow, its own layer, resized with the glass. */
 .chth-nav__pill::after {
   border-radius: inherit;
   box-shadow: var(--chth-glass-shadow);
@@ -462,16 +461,15 @@
   inset: 0;
   pointer-events: none;
   position: absolute;
-  transition: transform var(--chth-glass-dur) var(--chth-glass-ease);
+  transition: inset var(--chth-glass-dur) var(--chth-glass-ease);
   z-index: -2;
 }
 /* Minimized (scrolling down): the glass narrows and thins, the icons slide in with it, the words
    fade, the mark shrinks a little; scrolling up plays the same thing backwards, as on iOS. The
    pill's box keeps its size: the script measures how far to narrow (--chth-nav-dx, on each side;
-   --chth-nav-shift, signed for the writing direction; --chth-nav-k, the ratio). */
+   --chth-nav-shift, the same signed for the writing direction). */
 .chth-nav__start, .chth-nav__end, .chth-nav__logo svg { transition: transform var(--chth-glass-dur) var(--chth-glass-ease); }
-.chth-nav--scrolled .chth-nav__pill::before { clip-path: inset(0.25rem var(--chth-nav-dx, 0px) round 9999px); }
-.chth-nav--scrolled .chth-nav__pill::after { transform: scale(var(--chth-nav-k, 1), 0.86); }
+.chth-nav--scrolled .chth-nav__pill::before, .chth-nav--scrolled .chth-nav__pill::after { inset: 0.25rem var(--chth-nav-dx, 0px); }
 .chth-nav--scrolled .chth-nav__start { transform: translateX(var(--chth-nav-shift, 0px)); }
 .chth-nav--scrolled .chth-nav__end { transform: translateX(calc(-1 * var(--chth-nav-shift, 0px))); }
 .chth-nav__lead { transition: opacity 220ms ease, visibility 0s, background-color 200ms ease, color 200ms ease; }
@@ -687,7 +685,7 @@
   -webkit-user-select: none;
   user-select: none;
 }
-/* The shadow, its own layer, which loses the labels' row with the glass (--chth-tabs-ky, measured). */
+/* The shadow, its own layer, resized with the glass. */
 .chth-tabs::after {
   border-radius: inherit;
   box-shadow: var(--chth-glass-shadow);
@@ -695,11 +693,9 @@
   inset: 0;
   pointer-events: none;
   position: absolute;
-  transform-origin: bottom center;
-  transition: transform var(--chth-glass-dur) var(--chth-glass-ease);
+  transition: inset var(--chth-glass-dur) var(--chth-glass-ease);
   z-index: -2;
 }
-.chth-tabs--min::after { transform: scaleY(var(--chth-tabs-ky, 1)); }
 .chth-tabs [data-chth-tab] { background: none; border: 0; border-radius: var(--chth-radius-full); cursor: pointer; flex: 1 1 0; position: relative; z-index: 1; }
 .chth-tabs [data-chth-tab] > * { transition: transform var(--chth-glass-dur) var(--chth-glass-ease), opacity 200ms ease; }
 .chth-tabs__glider {
@@ -707,28 +703,28 @@
   border-radius: var(--chth-radius-full);
   bottom: 0.3rem;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 0 0 1px color-mix(in srgb, currentColor 8%, transparent);
-  clip-path: inset(0px 0px 0px 0px round 9999px);
   left: 0;
   opacity: 0;
   pointer-events: none;
   position: absolute;
   top: 0.3rem;
-  transition: transform var(--chth-glass-dur) var(--chth-glass-ease), width var(--chth-glass-dur) var(--chth-glass-ease), clip-path var(--chth-glass-dur) var(--chth-glass-ease), opacity 200ms ease;
+  transition: transform var(--chth-glass-dur) var(--chth-glass-ease), width var(--chth-glass-dur) var(--chth-glass-ease), top var(--chth-glass-dur) var(--chth-glass-ease), opacity 200ms ease;
   will-change: transform;
   z-index: 0;
 }
 .chth-tabs__label { display: block; }
-/* Minimized (scrolling down): the whole bar scales down a little, its glass loses the labels'
-   row (clipped from the top), the labels fade and the icons settle into the middle. Only
-   transform, opacity and clip-path change, so it runs on the compositor and never re-lays out.
+/* Minimized (scrolling down): the whole bar scales down a little, its glass and the highlight
+   lose the labels' row (their top moves down), the labels fade and the icons settle into the
+   middle. Only those layers and transforms change; the bar's box and the page stay put.
    --chth-tabs-trim, the labels' row (a label and its gap), is measured by the script. */
 .chth-tabs { --chth-tabs-trim: 1.1rem; }
 .chth-tabs--min { transform: scale(0.92); }
-.chth-tabs--min::before, .chth-tabs--min .chth-tabs__glider { clip-path: inset(var(--chth-tabs-trim) 0px 0px 0px round 9999px); }
+.chth-tabs--min::before, .chth-tabs--min::after { top: var(--chth-tabs-trim); }
+.chth-tabs--min .chth-tabs__glider { top: calc(0.3rem + var(--chth-tabs-trim)); }
 .chth-tabs--min [data-chth-tab] > * { transform: translateY(var(--chth-tabs-trim)); }
 .chth-tabs--min [data-chth-tab] > .chth-tabs__label { opacity: 0; transform: translateY(calc(var(--chth-tabs-trim) * 0.6)) scale(0.9); }
 /* Scrubbing: the highlight follows the finger closely and grows a little; tabs under it light up. */
-.chth-tabs--scrub .chth-tabs__glider { transition: transform 90ms linear, width 160ms ease, clip-path var(--chth-glass-dur) var(--chth-glass-ease), opacity 200ms ease; }
+.chth-tabs--scrub .chth-tabs__glider { transition: transform 90ms linear, width 160ms ease, top var(--chth-glass-dur) var(--chth-glass-ease), opacity 200ms ease; }
 .chth-tabs--scrub { scale: 1.02; }
 .chth-tabs [data-chth-tab].is-scrub { color: var(--chth-nav-ink, currentColor); }
 @media (prefers-reduced-motion: reduce) {
