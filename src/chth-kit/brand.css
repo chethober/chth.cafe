@@ -379,6 +379,37 @@
   .chth-theme svg { transition: none; }
 }
 
+/* Liquid glass, after iOS: a strongly blurred, saturated surface with a bright rim and a soft
+   highlight, on the shared navbar and tab bar. */
+:root {
+  --chth-glass-dur: 520ms;
+  --chth-glass-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --chth-glass-bg: rgba(28, 28, 32, 0.6);
+  --chth-glass-rim: rgba(255, 255, 255, 0.14);
+  --chth-glass-shine: rgba(255, 255, 255, 0.22);
+  --chth-glass-shadow: 0 12px 32px -14px rgba(0, 0, 0, 0.6);
+}
+:root[data-theme="light"] { --chth-glass-bg: rgba(255, 255, 255, 0.62); --chth-glass-rim: rgba(255, 255, 255, 0.85); --chth-glass-shine: rgba(255, 255, 255, 0.9); --chth-glass-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.28); }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) { --chth-glass-bg: rgba(255, 255, 255, 0.62); --chth-glass-rim: rgba(255, 255, 255, 0.85); --chth-glass-shine: rgba(255, 255, 255, 0.9); --chth-glass-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.28); } }
+.chth-nav__pill, .chth-tabs {
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  backdrop-filter: blur(24px) saturate(180%);
+  box-sizing: border-box;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--chth-glass-bg) 80%, var(--chth-glass-shine)) 0%, var(--chth-glass-bg) 55%);
+  box-shadow: var(--chth-glass-shadow), inset 0 1px 0 var(--chth-glass-shine), inset 0 -1px 0 rgba(255, 255, 255, 0.04), 0 0 0 1px var(--chth-glass-rim);
+}
+/* A soft highlight across the top, like light on a curved edge. */
+.chth-nav__pill::after, .chth-tabs::after {
+  background: radial-gradient(120% 140% at 30% -40%, var(--chth-glass-shine), transparent 55%);
+  border-radius: inherit;
+  content: "";
+  inset: 0;
+  mix-blend-mode: soft-light;
+  opacity: 0.7;
+  pointer-events: none;
+  position: absolute;
+}
+
 /* The room the sticky navbar takes (pill and margins). A page whose first section has its own
    background pulls it up behind the navbar: margin-top: calc(-1 * var(--chth-nav-space)), and the
    same added to its padding-top. */
@@ -409,11 +440,7 @@
 .chth-nav--overlay { inset-inline: 0; position: fixed; }
 .chth-nav__pill {
   align-items: center;
-  backdrop-filter: blur(10px) saturate(140%);
-  -webkit-backdrop-filter: blur(10px) saturate(140%);
-  background: var(--chth-nav-bg);
   border-radius: var(--chth-radius-full);
-  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--chth-nav-ring);
   color: var(--chth-nav-ink);
   display: flex;
   height: 3.5rem;
@@ -422,15 +449,32 @@
   padding: 0 0.75rem;
   pointer-events: auto;
   position: relative;
-  /* The width itself animates (not a max-width), with one curve and duration, so the pill narrows
-     and widens exactly the same way whatever the window's width. */
-  transition: width 480ms cubic-bezier(0.65, 0, 0.35, 1), box-shadow 480ms cubic-bezier(0.65, 0, 0.35, 1), transform 480ms cubic-bezier(0.65, 0, 0.35, 1);
+  /* Width and height animate themselves (not a max-width), on one curve and duration, so the pill
+     minimizes and grows back exactly the same way whatever the window's width. */
+  transition: width var(--chth-glass-dur) var(--chth-glass-ease), height var(--chth-glass-dur) var(--chth-glass-ease), box-shadow var(--chth-glass-dur) var(--chth-glass-ease), transform var(--chth-glass-dur) var(--chth-glass-ease);
   width: min(64rem, 100%);
 }
+/* Minimized (scrolling down): narrower and shorter, the words fold away, the icons stay. Scrolling
+   up brings it back, as on iOS. */
 .chth-nav--scrolled .chth-nav__pill {
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--chth-nav-ring), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  transform: translateY(4px);
-  width: min(max(45rem, 64%), 100%);
+  height: 3rem;
+  transform: translateY(2px);
+  width: min(max(36rem, 56%), 100%);
+}
+.chth-nav__lead { max-width: 16rem; transition: max-width var(--chth-glass-dur) var(--chth-glass-ease), opacity 200ms ease, padding var(--chth-glass-dur) var(--chth-glass-ease), background-color 200ms ease, color 200ms ease; }
+.chth-nav--scrolled .chth-nav__lead { max-width: 0; opacity: 0; padding-inline: 0; }
+.chth-nav--scrolled .chth-nav__logo svg { transform: scale(0.88); }
+/* Edge blur: the page fades into the blur under the pill, with no hard line. */
+.chth-nav::before {
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  content: "";
+  inset: -0.75rem 0 -1.25rem;
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent);
+  mask-image: linear-gradient(to bottom, #000 40%, transparent);
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
 }
 .chth-nav__start, .chth-nav__end { align-items: center; display: flex; flex: 1 1 0; gap: 0.25rem; min-width: 0; position: relative; z-index: 1; }
 .chth-nav__end { justify-content: flex-end; }
@@ -444,7 +488,6 @@
   padding: 0.3rem 0.6rem;
   text-decoration: none;
   text-overflow: ellipsis;
-  transition: background-color 200ms ease, color 200ms ease, transform 200ms ease;
   white-space: nowrap;
 }
 .chth-nav__caret { animation: chth-caret 1s steps(1) infinite; background: var(--chth-product-accent); display: inline-block; height: 0.95em; margin-inline-start: 2px; vertical-align: -0.12em; width: 1.5px; }
@@ -512,7 +555,7 @@
 @media (max-width: 640px) {
   .chth-nav { padding: 0 0.75rem; }
   .chth-nav__pill { height: 3.25rem; padding: 0 0.4rem; }
-  .chth-nav--scrolled .chth-nav__pill { width: 94%; }
+  .chth-nav--scrolled .chth-nav__pill { height: 2.75rem; width: 88%; }
   .chth-nav { --chth-control-size: 1.875rem; }
   .chth-nav__logo { padding: 0 0.25rem; }
   .chth-nav__start, .chth-nav__end { gap: 0; }
@@ -628,3 +671,44 @@
 .chth-theme-form { display: contents; }
 /* A site's extra icons that give way on phones, so the logo keeps the middle. */
 @media (max-width: 640px) { .chth-nav__icon--wide { display: none; } }
+
+/* Tab bar (data-chth-tabs): the same glass, a highlight that slides to the active tab
+   ([data-chth-tab] with aria-current or .is-active), labels (.chth-tabs__label) that fold away when
+   it minimizes on scroll, and finger scrubbing: drag across it, the highlight follows, release to go.
+   The site positions it (usually fixed at the bottom). */
+.chth-tabs {
+  align-items: stretch;
+  border-radius: var(--chth-radius-full);
+  display: flex;
+  isolation: isolate;
+  padding: 0.3rem;
+  touch-action: none;
+  transition: inset var(--chth-glass-dur) var(--chth-glass-ease), width var(--chth-glass-dur) var(--chth-glass-ease), padding var(--chth-glass-dur) var(--chth-glass-ease);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.chth-tabs [data-chth-tab] { background: none; border: 0; border-radius: var(--chth-radius-full); cursor: pointer; flex: 1 1 0; position: relative; z-index: 1; }
+.chth-tabs__glider {
+  background: color-mix(in srgb, currentColor 13%, transparent);
+  border-radius: var(--chth-radius-full);
+  bottom: 0.3rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 0 0 1px color-mix(in srgb, currentColor 8%, transparent);
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  top: 0.3rem;
+  transition: transform var(--chth-glass-dur) var(--chth-glass-ease), width var(--chth-glass-dur) var(--chth-glass-ease), opacity 200ms ease;
+  will-change: transform, width;
+  z-index: 0;
+}
+.chth-tabs__label { display: block; max-height: 1.2rem; overflow: hidden; transition: max-height var(--chth-glass-dur) var(--chth-glass-ease), opacity 200ms ease; }
+.chth-tabs--min .chth-tabs__label { max-height: 0; opacity: 0; }
+/* Scrubbing: the highlight follows the finger closely and grows a little; tabs under it light up. */
+.chth-tabs--scrub .chth-tabs__glider { transition: transform 90ms linear, width 160ms ease, opacity 200ms ease; }
+.chth-tabs--scrub { scale: 1.02; }
+.chth-tabs { transform-origin: bottom center; transition-property: inset, width, padding, scale; }
+.chth-tabs [data-chth-tab].is-scrub { color: var(--chth-nav-ink, currentColor); }
+@media (prefers-reduced-motion: reduce) {
+  .chth-tabs, .chth-tabs__glider, .chth-tabs__label, .chth-nav__pill, .chth-nav__lead { transition: none; }
+}
