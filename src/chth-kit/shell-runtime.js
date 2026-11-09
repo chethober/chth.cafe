@@ -302,6 +302,23 @@
 
   // ---- Tab bars: the sliding highlight and finger scrubbing ----
 
+  // The room a tab bar docked at the bottom takes (from its top edge, as laid out, to the bottom
+  // of the window, plus a gap), as --chth-bottom-room, so toasts and the cookie notice sit above
+  // it. A hidden bar, or one that isn't fixed near the bottom, takes none.
+  function measureBottomRoom() {
+    var bars = d.querySelectorAll('[data-chth-tabs]'), room = 0, vh = w.innerHeight;
+    for (var i = 0; i < bars.length; i++) {
+      var b = bars[i];
+      if (!b.offsetHeight || w.getComputedStyle(b).position !== 'fixed') continue;
+      var bottom = b.getBoundingClientRect().bottom;
+      if (vh - bottom > 96) continue;
+      room = Math.max(room, vh - (bottom - b.offsetHeight) + 8);
+    }
+    if (room) root.style.setProperty('--chth-bottom-room', Math.round(room) + 'px');
+    else root.style.removeProperty('--chth-bottom-room');
+  }
+  w.addEventListener('resize', function () { measureBottomRoom(); });
+
   function setupTabs(bar) {
     if (bar.chthTabs) return;
     bar.chthTabs = true;
@@ -393,7 +410,7 @@
     bar.addEventListener('click', function (e) { if (suppressClick && e.isTrusted) { e.stopPropagation(); e.preventDefault(); } }, true);
     // Follow the page's own idea of the active tab, and changes of size (rotating, fonts).
     new MutationObserver(settle).observe(bar, { subtree: true, attributes: true, attributeFilter: ['class', 'aria-current'] });
-    var resized = function () { measureTrim(); settle(); };
+    var resized = function () { measureTrim(); settle(); measureBottomRoom(); };
     if (w.ResizeObserver) new ResizeObserver(resized).observe(bar);
     else w.addEventListener('resize', resized);
     resized();

@@ -281,10 +281,12 @@
 :root.chth-theme-switching .chth-theme svg { transition: opacity 200ms ease, transform 300ms cubic-bezier(0.23, 1, 0.32, 1) !important; }
 
 /* Toasts: glass pills, bottom centre, stacked; the kind shows in the icon and in the line for the
-   time left. */
+   time left. Above a tab bar docked at the bottom: the script measures its room
+   (--chth-bottom-room), and toasts and the cookie notice keep clear of it. */
+:root { --chth-bottom-safe: max(calc(1rem + env(safe-area-inset-bottom, 0px)), var(--chth-bottom-room, 0px)); }
 .chth-toasts {
   align-items: center;
-  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  bottom: var(--chth-bottom-safe);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -397,8 +399,8 @@
 @media (prefers-color-scheme: light) { :root:not([data-theme]) { --chth-glass-bg: rgba(255, 255, 255, 0.62); --chth-glass-rim: rgba(255, 255, 255, 0.85); --chth-glass-shine: rgba(255, 255, 255, 0.9); --chth-glass-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.28); } }
 .chth-nav__pill, .chth-tabs { box-sizing: border-box; isolation: isolate; }
 /* The same glass on everything that floats over the page: toasts, the cookie notice, the banner
-   and menus. */
-.chth-toast, .chth-cookies, .chth-banner, .chth-lang-menu__list {
+   and menus. A site's own floating piece (a timer, a sheet) takes it with .chth-glass. */
+.chth-toast, .chth-cookies, .chth-banner, .chth-lang-menu__list, .chth-glass {
   -webkit-backdrop-filter: blur(16px) saturate(180%);
   backdrop-filter: blur(16px) saturate(180%);
   background:
@@ -649,7 +651,7 @@
   align-items: center;
   animation: chth-toast-in 420ms 0.8s cubic-bezier(0.23, 1, 0.32, 1) both;
   border-radius: 1.5rem;
-  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  bottom: var(--chth-bottom-safe);
   display: flex;
   font-family: var(--chth-font-sans);
   font-size: 0.8125rem;
@@ -678,7 +680,7 @@
 .chth-cookies.chth-dismissing { opacity: 0; transform: translateY(8px) scale(0.97); }
 @media (max-width: 480px) { .chth-cookies { inset-inline: 0.75rem; max-width: none; } }
 /* Two layers of glass don't read: while the cookie notice shows, toasts rise above it on phones. */
-@media (max-width: 640px) { :root:has(.chth-cookies:not([hidden]):not(.chth-dismissing)) .chth-toasts { bottom: calc(7rem + env(safe-area-inset-bottom, 0px)); } }
+@media (max-width: 640px) { :root:has(.chth-cookies:not([hidden]):not(.chth-dismissing)) .chth-toasts { bottom: calc(var(--chth-bottom-safe) + 6rem); } }
 @media (prefers-reduced-motion: reduce) {
   .chth-banner::after { animation: none; display: none; }
   .chth-cookies { animation: none; }
