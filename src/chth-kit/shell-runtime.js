@@ -237,7 +237,7 @@
         var n = list[i].addedNodes[j];
         if (n.nodeType !== 1) continue;
         if (n.hasAttribute('data-chth-dismiss') || n.querySelector('[data-chth-dismiss]')) applyDismissed(n.parentNode || d);
-        if (n.hasAttribute('data-chth-type') || n.querySelector('[data-chth-type]') || n.hasAttribute('data-chth-tabs') || n.querySelector('[data-chth-tabs]')) startNav(n.parentNode || d);
+        if (n.hasAttribute('data-chth-type') || n.querySelector('[data-chth-type]') || n.hasAttribute('data-chth-tabs') || n.querySelector('[data-chth-tabs]') || n.hasAttribute('data-chth-nav') || n.querySelector('[data-chth-nav]')) startNav(n.parentNode || d);
       }
     }).observe(root, { childList: true, subtree: true });
   }
@@ -247,7 +247,33 @@
   // (.chth-tabs--min); scrolling up brings them back, as on iOS. Small moves and the rubber band
   // past either end are ignored.
 
-  var lastY = Math.max(0, w.scrollY || 0), minimized = false;
+  var lastY = Math.max(0, w.scrollY || 0), minimized = false, scrollQueued = false;
+  // How far the navbar's glass narrows when minimized, measured here so the CSS only has to clip
+  // and translate (no layout while it animates). The narrow width: 88% of the room on phones,
+  // else 56% (at least 36rem). Mirrors nothing in the CSS; change it here.
+  function measureNav(nav) {
+    var pill = nav.querySelector('.chth-nav__pill');
+    if (!pill) return;
+    var cs = w.getComputedStyle(nav);
+    var room = nav.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+    var full = pill.offsetWidth;
+    if (!full || room <= 0) return;
+    var rem = parseFloat(w.getComputedStyle(d.documentElement).fontSize) || 16;
+    var phone = w.matchMedia && w.matchMedia('(max-width: 640px)').matches;
+    var narrow = Math.min(phone ? room * 0.88 : Math.max(36 * rem, room * 0.56), full);
+    var dx = Math.max(0, (full - narrow) / 2);
+    var rtl = w.getComputedStyle(pill).direction === 'rtl';
+    nav.style.setProperty('--chth-nav-dx', dx.toFixed(1) + 'px');
+    nav.style.setProperty('--chth-nav-shift', (rtl ? -dx : dx).toFixed(1) + 'px');
+    nav.style.setProperty('--chth-nav-k', (narrow / full).toFixed(4));
+  }
+  function setupNav(nav) {
+    if (nav.chthNav) return;
+    nav.chthNav = true;
+    measureNav(nav);
+    if (w.ResizeObserver) new ResizeObserver(function () { measureNav(nav); }).observe(nav);
+    else w.addEventListener('resize', function () { measureNav(nav); });
+  }
   function paintMinimized() {
     var navs = d.querySelectorAll('[data-chth-nav]');
     for (var i = 0; i < navs.length; i++) navs[i].classList.toggle('chth-nav--scrolled', minimized);
@@ -255,6 +281,7 @@
     for (var j = 0; j < bars.length; j++) bars[j].classList.toggle('chth-tabs--min', minimized);
   }
   function onScroll() {
+    scrollQueued = false;
     var max = Math.max(0, (d.documentElement.scrollHeight || 0) - w.innerHeight);
     var y = Math.min(Math.max(0, w.scrollY || 0), max);
     var dy = y - lastY;
@@ -265,7 +292,12 @@
     if (y <= 40 || Math.abs(dy) > 8) lastY = y;
     if (next !== minimized) { minimized = next; paintMinimized(); }
   }
-  w.addEventListener('scroll', onScroll, { passive: true });
+  // At most once a frame, however often the browser reports scrolling.
+  w.addEventListener('scroll', function () {
+    if (scrollQueued) return;
+    scrollQueued = true;
+    (w.requestAnimationFrame || setTimeout)(onScroll);
+  }, { passive: true });
 
   // ---- Tab bars: the sliding highlight and finger scrubbing ----
 
@@ -282,28 +314,47 @@
     var items = function () { return [].slice.call(bar.querySelectorAll('[data-chth-tab]')); };
     var active = function () { return bar.querySelector('[data-chth-tab][aria-current="page"], [data-chth-tab].is-active'); };
     var scrubbing = false, startX = 0, pointer = null, hovered = null, suppressClick = false;
+    // Positions come from layout (offsetLeft/offsetWidth), which minimizing and scrubbing never
+    // change (they only transform), so the highlight isn't re-measured while anything animates.
     function place(item) {
       if (!item) { glider.style.opacity = '0'; return; }
-      var r = item.getBoundingClientRect(), p = bar.getBoundingClientRect();
       glider.style.opacity = '1';
-      glider.style.width = r.width + 'px';
-      glider.style.transform = 'translateX(' + (r.left - p.left) + 'px)';
+      glider.style.width = item.offsetWidth + 'px';
+      glider.style.transform = 'translateX(' + item.offsetLeft + 'px)';
+    }
+    // A pointer's x in the bar's own (untransformed) coordinates.
+    function local(x) {
+      var r = bar.getBoundingClientRect();
+      return r.width ? (x - r.left) * (bar.offsetWidth / r.width) : 0;
+    }
+    // The labels' row (a label and the gap above it), which the glass loses when minimized.
+    function measureTrim() {
+      var label = bar.querySelector('[data-chth-tab] > .chth-tabs__label'), prev = label && label.previousElementSibling;
+      if (!label || !prev || !label.offsetHeight) return;
+      var trim = label.offsetTop + label.offsetHeight - (prev.offsetTop + prev.offsetHeight);
+      if (trim <= 0 || trim >= bar.offsetHeight) return;
+      bar.style.setProperty('--chth-tabs-trim', trim + 'px');
+      bar.style.setProperty('--chth-tabs-ky', ((bar.offsetHeight - trim) / bar.offsetHeight).toFixed(4));
     }
     function settle() { if (!scrubbing) place(active()); }
     function itemAt(x) {
-      var list = items();
-      for (var i = 0; i < list.length; i++) { var r = list[i].getBoundingClientRect(); if (x >= r.left && x <= r.right) return list[i]; }
-      var first = list[0], last = list[list.length - 1];
-      if (!first) return null;
-      return x < first.getBoundingClientRect().left ? first : last;
+      var list = items(), lo = null, hi = null;
+      for (var i = 0; i < list.length; i++) {
+        var l = list[i].offsetLeft, r = l + list[i].offsetWidth;
+        if (x >= l && x <= r) return list[i];
+        if (!lo || l < lo.offsetLeft) lo = list[i];
+        if (!hi || l > hi.offsetLeft) hi = list[i];
+      }
+      if (!lo) return null;
+      return x < lo.offsetLeft ? lo : hi;
     }
-    function follow(x) {
-      var p = bar.getBoundingClientRect(), item = itemAt(x);
+    function follow(clientX) {
+      var x = local(clientX), item = itemAt(x);
       if (!item) return;
-      var w0 = item.getBoundingClientRect().width * 1.08;
-      var left = Math.min(Math.max(x - w0 / 2, p.left + 4), p.right - w0 - 4);
+      var w0 = item.offsetWidth * 1.08;
+      var left = Math.min(Math.max(x - w0 / 2, 4), bar.offsetWidth - w0 - 4);
       glider.style.width = w0 + 'px';
-      glider.style.transform = 'translateX(' + (left - p.left) + 'px)';
+      glider.style.transform = 'translateX(' + left + 'px)';
       if (item !== hovered) {
         if (hovered) hovered.classList.remove('is-scrub');
         hovered = item;
@@ -341,12 +392,12 @@
     bar.addEventListener('pointercancel', function () { end(false); });
     // The release of a scrub isn't also a tap on whatever was under it.
     bar.addEventListener('click', function (e) { if (suppressClick && e.isTrusted) { e.stopPropagation(); e.preventDefault(); } }, true);
-    // Follow the page's own idea of the active tab, and changes of size (minimizing, rotating).
+    // Follow the page's own idea of the active tab, and changes of size (rotating, fonts).
     new MutationObserver(settle).observe(bar, { subtree: true, attributes: true, attributeFilter: ['class', 'aria-current'] });
-    if (w.ResizeObserver) new ResizeObserver(settle).observe(bar);
-    w.addEventListener('resize', settle);
-    bar.addEventListener('transitionend', settle);
-    settle();
+    var resized = function () { measureTrim(); settle(); };
+    if (w.ResizeObserver) new ResizeObserver(resized).observe(bar);
+    else w.addEventListener('resize', resized);
+    resized();
   }
 
   function typeWords(el) {
@@ -388,6 +439,8 @@
     for (var i = 0; i < els.length; i++) typeWords(els[i]);
     var bars = (scope || d).querySelectorAll('[data-chth-tabs]');
     for (var j = 0; j < bars.length; j++) setupTabs(bars[j]);
+    var navs = (scope || d).querySelectorAll('[data-chth-nav]');
+    for (var k = 0; k < navs.length; k++) setupNav(navs[k]);
     onScroll();
     paintMinimized();
   }
