@@ -122,7 +122,8 @@
 
 /* Shared CHTH components. Colors come from the surrounding page (currentColor) plus the brand
    variables, so the same footer and language menu fit a dark café menu, the gym app and the
-   light shop. A site can set --chth-line, --chth-menu-bg and --chth-menu-ink to match itself. */
+   light shop. A site can set --chth-line to match itself. Floating pieces (toasts, the cookie
+   notice, the banner, menus) share the navbar's glass (--chth-glass-*). */
 
 /* Footer: a small call to CHTH (mark, pitch, a button to chth.wtf), then one row of links. */
 .chth-footer {
@@ -205,11 +206,8 @@
 .chth-lang-menu > summary:focus-visible { outline: 2px solid var(--chth-product-accent); outline-offset: 2px; }
 .chth-lang-menu[open] > summary { border-color: var(--chth-product-accent); color: var(--chth-product-accent); }
 .chth-lang-menu__list {
-  background: var(--chth-menu-bg, Canvas);
-  border: 1px solid var(--chth-line);
-  border-radius: var(--chth-radius-lg);
-  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.45);
-  color: var(--chth-menu-ink, CanvasText);
+  border-radius: 1.25rem;
+  box-sizing: border-box;
   display: grid;
   font-family: var(--chth-font-sans);
   font-size: 0.875rem;
@@ -282,7 +280,8 @@
 :root.chth-theme-switching *, :root.chth-theme-switching *::before, :root.chth-theme-switching *::after { transition: none !important; }
 :root.chth-theme-switching .chth-theme svg { transition: opacity 200ms ease, transform 300ms cubic-bezier(0.23, 1, 0.32, 1) !important; }
 
-/* Toasts: bottom centre, stacked, one accent stripe on the leading edge and a line for the time left. */
+/* Toasts: glass pills, bottom centre, stacked; the kind shows in the icon and in the line for the
+   time left. */
 .chth-toasts {
   align-items: center;
   bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
@@ -299,11 +298,7 @@
   --chth-toast-tone: var(--chth-product-accent);
   align-items: center;
   animation: chth-toast-in 320ms cubic-bezier(0.23, 1, 0.32, 1);
-  background: var(--chth-toast-bg, var(--chth-ink-soft));
-  border: 1px solid var(--chth-toast-line, rgba(255, 255, 255, 0.08));
-  border-radius: var(--chth-radius-lg);
-  box-shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.6);
-  color: var(--chth-toast-ink, var(--chth-paper));
+  border-radius: var(--chth-radius-full);
   display: flex;
   font-family: var(--chth-font-sans);
   font-size: 0.875rem;
@@ -312,14 +307,12 @@
   line-height: 1.4;
   max-width: min(26rem, 100%);
   overflow: hidden;
-  padding-block: 0.7rem;
-  padding-inline: 0.9rem 0.6rem;
+  padding: 0.45rem;
+  padding-inline-end: 0.4rem;
   pointer-events: auto;
   position: relative;
   transition: opacity 200ms ease, transform 200ms ease;
 }
-.chth-toast::before { background: var(--chth-toast-tone); content: ""; inset-block: 0; inset-inline-start: 0; position: absolute; width: 3px; }
-:root[data-theme="light"] .chth-toast { --chth-toast-bg: #fff; --chth-toast-ink: var(--chth-ink); --chth-toast-line: rgba(0, 0, 0, 0.08); box-shadow: 0 18px 44px -20px rgba(0, 0, 0, 0.35); }
 .chth-toast--success { --chth-toast-tone: var(--chth-success); }
 .chth-toast--danger { --chth-toast-tone: var(--chth-danger); }
 .chth-toast--warning { --chth-toast-tone: var(--chth-warning); }
@@ -366,9 +359,10 @@
 .chth-toast__time {
   animation: chth-toast-time linear forwards;
   background: var(--chth-toast-tone);
-  bottom: 0;
+  border-radius: 2px;
+  bottom: 1px;
   height: 2px;
-  inset-inline: 0;
+  inset-inline: 1.25rem;
   opacity: 0.55;
   position: absolute;
   transform-origin: left;
@@ -396,9 +390,24 @@
   --chth-glass-shine: rgba(255, 255, 255, 0.22);
   --chth-glass-shadow: 0 12px 32px -14px rgba(0, 0, 0, 0.6);
 }
+:root { --chth-glass-ink: var(--chth-paper); }
+:root[data-theme="light"] { --chth-glass-ink: var(--chth-ink); }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) { --chth-glass-ink: var(--chth-ink); } }
 :root[data-theme="light"] { --chth-glass-bg: rgba(255, 255, 255, 0.62); --chth-glass-rim: rgba(255, 255, 255, 0.85); --chth-glass-shine: rgba(255, 255, 255, 0.9); --chth-glass-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.28); }
 @media (prefers-color-scheme: light) { :root:not([data-theme]) { --chth-glass-bg: rgba(255, 255, 255, 0.62); --chth-glass-rim: rgba(255, 255, 255, 0.85); --chth-glass-shine: rgba(255, 255, 255, 0.9); --chth-glass-shadow: 0 12px 32px -16px rgba(0, 0, 0, 0.28); } }
 .chth-nav__pill, .chth-tabs { box-sizing: border-box; isolation: isolate; }
+/* The same glass on everything that floats over the page: toasts, the cookie notice, the banner
+   and menus. */
+.chth-toast, .chth-cookies, .chth-banner, .chth-lang-menu__list {
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  backdrop-filter: blur(16px) saturate(180%);
+  background:
+    radial-gradient(120% 140% at 30% -40%, color-mix(in srgb, var(--chth-glass-shine) 55%, transparent), transparent 55%),
+    linear-gradient(180deg, color-mix(in srgb, var(--chth-glass-bg) 80%, var(--chth-glass-shine)) 0%, var(--chth-glass-bg) 55%);
+  border: 0;
+  box-shadow: var(--chth-glass-shadow), inset 0 1px 0 var(--chth-glass-shine), inset 0 -1px 0 rgba(255, 255, 255, 0.04), inset 0 0 0 1px var(--chth-glass-rim);
+  color: var(--chth-glass-ink);
+}
 .chth-nav__pill::before, .chth-tabs::before {
   -webkit-backdrop-filter: blur(16px) saturate(180%);
   backdrop-filter: blur(16px) saturate(180%);
@@ -534,8 +543,7 @@
 .chth-nav__icon:active, .chth-nav .chth-lang-menu > summary:active { transform: scale(0.92); }
 .chth-nav__icon:focus-visible, .chth-nav__lead:focus-visible, .chth-nav__logo:focus-visible { outline: 2px solid var(--chth-product-accent); outline-offset: 2px; }
 .chth-nav__icon[aria-current], .chth-nav .chth-lang-menu[open] > summary { background: color-mix(in srgb, currentColor 10%, transparent); color: var(--chth-nav-ink); }
-.chth-nav .chth-lang-menu { --chth-menu-bg: var(--chth-nav-bg); --chth-menu-ink: var(--chth-nav-ink); --chth-line: var(--chth-nav-ring); }
-.chth-nav .chth-lang-menu__list { backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); inset-inline-end: auto; inset-inline-start: 0; }
+.chth-nav .chth-lang-menu__list { inset-inline-end: auto; inset-inline-start: 0; }
 .chth-nav__badge {
   background: var(--chth-product-accent);
   border-radius: var(--chth-radius-full);
@@ -573,11 +581,11 @@
   .chth-nav__caret { animation: none; }
 }
 
-/* Banner: one strip across the top, in the product's accent, closable per visitor. */
+/* Banner: a glass pill across the top with the product's accent as a dot, closable per visitor. */
 .chth-banner {
   align-items: center;
-  background: var(--chth-product-accent);
-  color: var(--chth-product-on-accent);
+  border-radius: var(--chth-radius-full);
+  box-sizing: border-box;
   display: flex;
   font-family: var(--chth-font-sans);
   font-size: 0.875rem;
@@ -585,17 +593,28 @@
   gap: 0.5rem;
   justify-content: center;
   line-height: 1.4;
+  margin: 0.6rem auto 0;
   overflow: hidden;
-  padding: 0.5rem 0.75rem 0.5rem 1rem;
+  padding: 0.4rem 0.4rem 0.4rem 0.9rem;
   position: relative;
   text-align: center;
   transition: margin-top 220ms cubic-bezier(0.23, 1, 0.32, 1), opacity 220ms ease;
+  width: min(40rem, calc(100% - 2rem));
   z-index: 70;
+}
+.chth-banner::before {
+  background: var(--chth-product-accent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--chth-product-accent) 25%, transparent);
+  content: "";
+  flex: none;
+  height: 0.5rem;
+  width: 0.5rem;
 }
 /* One sheen across the strip when it first shows. */
 .chth-banner::after {
   animation: chth-banner-sheen 1.4s 0.4s cubic-bezier(0.23, 1, 0.32, 1) both;
-  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
+  background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--chth-glass-shine) 60%, transparent) 50%, transparent 70%);
   content: "";
   inset: 0;
   pointer-events: none;
@@ -621,20 +640,16 @@
   width: 1.75rem;
 }
 .chth-banner__close svg { height: 0.95rem; width: 0.95rem; }
-.chth-banner__close:hover, .chth-banner__close:focus-visible { background: rgba(0, 0, 0, 0.12); opacity: 1; outline: none; }
-.chth-banner.chth-dismissing { margin-top: -3rem; opacity: 0; }
+.chth-banner__close:hover, .chth-banner__close:focus-visible { background: color-mix(in srgb, currentColor 10%, transparent); opacity: 1; outline: none; }
+.chth-banner.chth-dismissing { margin-top: -3.6rem; opacity: 0; }
 @media (hover: hover) and (pointer: fine) { .chth-banner__text a:hover span { transform: translateX(3px); } }
 
-/* Cookie notice: a small card in the corner, not a wall. */
+/* Cookie notice: a small glass card in the corner, not a wall. */
 .chth-cookies {
   align-items: center;
   animation: chth-toast-in 420ms 0.8s cubic-bezier(0.23, 1, 0.32, 1) both;
-  background: var(--chth-toast-bg, var(--chth-ink-soft));
-  border: 1px solid var(--chth-toast-line, rgba(255, 255, 255, 0.08));
-  border-radius: var(--chth-radius-lg);
+  border-radius: 1.5rem;
   bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
-  box-shadow: 0 18px 44px -18px rgba(0, 0, 0, 0.6);
-  color: var(--chth-toast-ink, var(--chth-paper));
   display: flex;
   font-family: var(--chth-font-sans);
   font-size: 0.8125rem;
@@ -647,7 +662,6 @@
   transition: opacity 200ms ease, transform 200ms ease;
   z-index: 2147482000;
 }
-:root[data-theme="light"] .chth-cookies { --chth-toast-bg: #fff; --chth-toast-ink: var(--chth-ink); --chth-toast-line: rgba(0, 0, 0, 0.08); box-shadow: 0 18px 44px -20px rgba(0, 0, 0, 0.35); }
 .chth-cookies p { flex: 1; margin: 0; }
 .chth-cookies p a { color: inherit; font-weight: 600; }
 .chth-cookies__ico { font-size: 1.35rem; line-height: 1; }
@@ -663,15 +677,13 @@
 .chth-cookies__ok:focus-visible { outline: 2px solid var(--chth-product-accent); outline-offset: 2px; }
 .chth-cookies.chth-dismissing { opacity: 0; transform: translateY(8px) scale(0.97); }
 @media (max-width: 480px) { .chth-cookies { inset-inline: 0.75rem; max-width: none; } }
+/* Two layers of glass don't read: while the cookie notice shows, toasts rise above it on phones. */
+@media (max-width: 640px) { :root:has(.chth-cookies:not([hidden]):not(.chth-dismissing)) .chth-toasts { bottom: calc(7rem + env(safe-area-inset-bottom, 0px)); } }
 @media (prefers-reduced-motion: reduce) {
   .chth-banner::after { animation: none; display: none; }
   .chth-cookies { animation: none; }
 }
 
-/* No saved theme and no script to set one: cards follow a light system theme too. */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme]) :is(.chth-toast, .chth-cookies) { --chth-toast-bg: #fff; --chth-toast-ink: var(--chth-ink); --chth-toast-line: rgba(0, 0, 0, 0.08); box-shadow: 0 18px 44px -20px rgba(0, 0, 0, 0.35); }
-}
 .chth-theme-form { display: contents; }
 /* A site's extra icons that give way on phones, so the logo keeps the middle. */
 @media (max-width: 640px) { .chth-nav__icon--wide { display: none; } }
