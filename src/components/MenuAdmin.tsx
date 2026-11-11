@@ -219,7 +219,7 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menu
             </>}
           >
             {items.length === 0 ? (
-              <p className="ws-hint" style={{ padding: '8px var(--ws-pad) 16px', margin: 0 }}>No items in this category yet.</p>
+              <p className="ws-hint" style={{ padding: 'var(--chth-space-8) var(--ws-pad) var(--chth-space-16)', margin: 0 }}>No items in this category yet.</p>
             ) : (
               <List label={`${cat.name} items`}>
                 {items.map(i => {

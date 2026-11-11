@@ -169,7 +169,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
               </div>
               <List>
                 {paymentMix.rows.map(r => (
-                  <li key={r.key} className="ws-list-item" style={{ padding: '10px 0', minHeight: 0 }}>
+                  <li key={r.key} className="ws-list-item" style={{ padding: 'var(--chth-space-10) 0', minHeight: 0 }}>
                     <span className="ws-swatch" style={{ background: r.color }} aria-hidden="true" />
                     <span style={{ flex: 1 }}>{paymentLabel(r.key)}</span>
                     <span className="ws-hint tabular" style={{ width: 44, textAlign: 'right' }}>{Math.round((r.amount / paymentMix.sum) * 100)}%</span>

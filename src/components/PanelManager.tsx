@@ -408,7 +408,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                   {orderPlaced && <Notice tone="positive" action={<Button size="sm" variant="ghost" onClick={() => onNavigate('orders')}>View board</Button>}>{orderPlaced}</Notice>}
                   {orderError && <Notice tone="danger">{orderError}</Notice>}
                   {cart.length === 0 ? (
-                    <div className="ws-lane-empty"><Receipt width={20} height={20} style={{ margin: '0 auto 8px' }} />The order is empty.</div>
+                    <div className="ws-lane-empty"><Receipt width={20} height={20} style={{ margin: '0 auto var(--chth-space-8)' }} />The order is empty.</div>
                   ) : (
                     <OrderLinesEditor lines={cart} onChange={setCart} currency={currency} editablePrice flush />
                   )}
@@ -605,7 +605,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
           const stock = store.getStockItems();
           if (recipe.length === 0) return <EmptyState icon={<ChefHat />} title="No recipe yet" description="Add ingredients from the admin menu editor." />;
           return (
-            <ul className="ws-list" style={{ margin: '0 -24px' }}>
+            <ul className="ws-list" style={{ margin: '0 calc(-1 * var(--chth-space-24))' }}>
               {recipe.map(ing => {
                 const material = stock.find(s => s.id === ing.stockItemId);
                 const enough = material ? material.quantity >= ing.quantityRequired : false;

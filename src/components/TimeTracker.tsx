@@ -196,7 +196,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ settings, staffList, s
         </Card>
 
         <Card flush title="Shifts" description={`${records.length} of ${shifts.length}`}>
-          <div className="ws-toolbar" style={{ padding: '0 var(--ws-pad) 12px' }}>
+          <div className="ws-toolbar" style={{ padding: '0 var(--ws-pad) var(--chth-space-12)' }}>
             <SearchInput className="ws-grow" value={search} onChange={setSearch} placeholder="Search name or notes" label="Search shifts" />
             <Select aria-label="Team member" value={staffFilter} onChange={e => setStaffFilter(e.target.value)} style={{ width: 'auto' }}>
               <option value="">Everyone</option>

@@ -198,7 +198,7 @@ export function CustomerClub({ settings, customers, orders, orderItems, canDelet
 
       <Card flush title="Members" description={search.trim() ? `${visible.length} of ${customers.length}` : plural(customers.length, 'member')}>
         {customers.length > 0 && (
-          <div className="ws-toolbar" style={{ padding: '0 var(--ws-pad) 12px' }}>
+          <div className="ws-toolbar" style={{ padding: '0 var(--ws-pad) var(--chth-space-12)' }}>
             <SearchInput className="ws-grow" value={search} onChange={setSearch} placeholder="Search name or phone" label="Search members" />
             <Segmented label="Sort members" value={sort} onChange={setSort} options={[
               { value: 'name', label: 'A–Z' }, { value: 'visits', label: 'Top' }, { value: 'recent', label: 'Recent' }

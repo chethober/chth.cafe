@@ -226,7 +226,7 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
             <div style={{ marginBottom: 20 }}>
               <Notice tone="danger" role="alert" action={<Button size="sm" variant="ghost" onClick={onDismissRejected}>Dismiss</Button>}>
                 {rejectedChanges.length === 1 ? 'A change made offline was refused when it was sent. Re-enter it if it is still needed:' : 'Changes made offline were refused when they were sent. Re-enter them if they are still needed:'}
-                <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                <ul style={{ margin: 'var(--chth-space-6) 0 0', paddingLeft: 18 }}>
                   {rejectedChanges.map(change => <li key={change.seq}>{change.label}: {change.reason}</li>)}
                 </ul>
               </Notice>

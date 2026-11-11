@@ -343,7 +343,7 @@ export function OrderEditDialog({ order, items, settings, categories, menuItems,
     >
       {error && <Notice tone="danger">{error}</Notice>}
       {lines.length === 0 ? <div className="ws-lane-empty">An order needs at least one item. Add one below, or cancel the order instead.</div>
-        : <div className="ws-panel" style={{ padding: '4px 12px' }}><OrderLinesEditor lines={lines} onChange={setLines} currency={currency} /></div>}
+        : <div className="ws-panel" style={{ padding: 'var(--chth-space-4) var(--chth-space-12)' }}><OrderLinesEditor lines={lines} onChange={setLines} currency={currency} /></div>}
       <div className="ws-field">
         <span className="ws-label">Add items</span>
         <div className="ws-toolbar-stack">

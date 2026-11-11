@@ -1,9 +1,29 @@
 @import "tailwindcss";
 
-/* Stronger ease-out than Tailwind's default so transitions respond instantly. */
+/* Tailwind's scales come from the CHTH kit's tokens (chth-kit/brand.css), so p-3, text-sm, rounded-xl
+   and the default transition are the same sizes as everywhere else in CHTH. Sizes Tailwind has
+   and the kit doesn't (text-3xl, rounded-4xl…) keep Tailwind's values. The kit's ease-out is
+   stronger than Tailwind's default, so transitions respond instantly. */
 @theme {
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --default-transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  --spacing: var(--chth-space-4);
+  --text-xs: var(--chth-text-12);
+  --text-sm: var(--chth-text-14);
+  --text-base: var(--chth-text-16);
+  --text-lg: var(--chth-text-18);
+  --text-xl: var(--chth-text-20);
+  --text-2xl: var(--chth-text-24);
+  --text-4xl: var(--chth-text-36);
+  --radius-xs: var(--chth-radius-2);
+  --radius-sm: var(--chth-radius-4);
+  --radius-md: var(--chth-radius-6);
+  --radius-lg: var(--chth-radius-sm);
+  --radius-xl: var(--chth-radius-12);
+  --radius-2xl: var(--chth-radius-16);
+  --radius-3xl: var(--chth-radius-24);
+  --radius-4xl: var(--chth-radius-32);
+  --ease-out: var(--chth-ease-out);
+  --default-transition-timing-function: var(--chth-ease-out);
+  --default-transition-duration: var(--chth-dur-150);
 }
 
 /* Theme switch: App clips the new page in as a growing circle, so the default crossfade is off. */
@@ -19,14 +39,14 @@
     --brand-dark: #451a03;
     --brand-glow: rgba(245, 158, 11, 0.2);
 
-    --accent-emerald: #10b981;
+    --accent-emerald: var(--chth-success);
     --accent-indigo: #6366f1;
-    --accent-rose: #f43f5e;
-    --accent-amber: #f59e0b;
+    --accent-rose: var(--chth-danger);
+    --accent-amber: var(--chth-warning);
 
-    --font-heading: 'Outfit', sans-serif;
-    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    --font-mono: 'JetBrains Mono', monospace;
+    --font-heading: var(--chth-font-display);
+    --font-sans: var(--chth-font-sans);
+    --font-mono: var(--chth-font-mono);
   }
 
   body {
@@ -60,7 +80,7 @@
   /* iOS zooms into inputs under 16px and never zooms back out. */
   @media (pointer: coarse) {
     input, textarea, select {
-      font-size: 16px !important;
+      font-size: var(--chth-text-16) !important;
     }
   }
 
@@ -94,7 +114,7 @@
 .glass-card {
   background: rgba(39, 39, 42, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.07);
-  transition: transform 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  transition: transform var(--chth-dur-150) ease, border-color var(--chth-dur-150) ease, background-color var(--chth-dur-150) ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -110,7 +130,7 @@
   background: var(--brand-primary, #f59e0b);
   color: #09090b;
   font-weight: 700;
-  transition: transform 160ms var(--ease-out), filter 150ms ease;
+  transition: transform var(--chth-dur-150) var(--ease-out), filter var(--chth-dur-150) ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -163,11 +183,11 @@
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.2s ease-out forwards;
+  animation: fadeIn var(--chth-dur-200) ease-out forwards;
 }
 
 .animate-scale-up {
-  animation: scaleUp 0.18s ease-out forwards;
+  animation: scaleUp var(--chth-dur-200) ease-out forwards;
 }
 
 /* Custom scrollbars */
@@ -180,7 +200,7 @@
 }
 ::-webkit-scrollbar-thumb {
   background: #27272a;
-  border-radius: 9999px;
+  border-radius: var(--chth-radius-full);
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #3f3f46;

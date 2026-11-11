@@ -2,44 +2,44 @@ import { html } from 'hono/html';
 import { CLOUD, notice, page, type View } from './design';
 
 const STYLES = `
-main.app{width:100%;max-width:960px;margin:0 auto;padding:48px 20px 72px;display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-content:start}
-@media (max-width:560px){main.app{padding-top:32px}}
+main.app{width:100%;max-width:960px;margin:0 auto;padding:var(--chth-space-48) var(--chth-space-20) var(--chth-space-72);display:grid;grid-template-columns:minmax(0,1fr);gap:var(--chth-space-18);align-content:start}
+@media (max-width:560px){main.app{padding-top:var(--chth-space-32)}}
 main.narrow{max-width:720px}
-.head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:6px}
-.head h1{font-size:clamp(34px,5vw,52px);line-height:1.05;margin:8px 0 6px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--chth-space-16);flex-wrap:wrap;margin-bottom:var(--chth-space-6)}
+.head h1{font-size:clamp(34px,5vw,52px);line-height:1.05;margin:var(--chth-space-8) 0 var(--chth-space-6)}
 .head p{margin:0}
-.rise{animation:rise 300ms var(--ease-out) backwards;animation-delay:calc(var(--i,0) * 50ms)}
+.rise{animation:rise var(--chth-dur-300) var(--ease-out) backwards;animation-delay:calc(var(--i,0) * 50ms)}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}}
-.card h2{margin:0 0 6px;font-size:19px;letter-spacing:-.01em}
-.card p{margin:0 0 12px}.card p:last-child{margin-bottom:0}
-.account-card{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.account-card .cf-mark{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;flex:none;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.card h2{margin:0 0 var(--chth-space-6);font-size:var(--chth-text-18);letter-spacing:-.01em}
+.card p{margin:0 0 var(--chth-space-12)}.card p:last-child{margin-bottom:0}
+.account-card{display:flex;align-items:center;gap:var(--chth-space-16);flex-wrap:wrap}
+.account-card .cf-mark{width:46px;height:46px;border-radius:var(--chth-radius-lg);display:grid;place-items:center;flex:none;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
 .account-card .cf-mark svg{width:24px;height:24px}
-.account-card .who{flex:1;min-width:min(100%,220px)}.account-card .who b{display:block;font-size:17px}
-.account-card .who span{color:var(--muted);font-size:14px}
-.account-card .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.account-card select{font:inherit;font-size:14px;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:var(--field);color:var(--ink)}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:16px;align-items:start}
-.cafe{min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:14px;transition:border-color 200ms ease,transform 200ms var(--ease-out)}
-.cafe .top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.cafe .top>div{min-width:0}
-.cafe h2{font-family:var(--serif);font-size:26px;line-height:1.2;font-weight:600;letter-spacing:-.02em;margin:0;overflow-wrap:anywhere}
-.cafe .meta{color:var(--dim);font-size:13.5px;overflow-wrap:anywhere}
-.links{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}
-.links a{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-radius:12px;background:var(--soft);border:1px solid var(--line);text-decoration:none;color:var(--ink);font-size:14px;transition:border-color 150ms ease,background-color 150ms ease}
-.links a span{width:52px;color:var(--dim);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;flex:none}
+.account-card .who{flex:1;min-width:min(100%,220px)}.account-card .who b{display:block;font-size:var(--chth-text-17)}
+.account-card .who span{color:var(--muted);font-size:var(--chth-text-14)}
+.account-card .actions{display:flex;gap:var(--chth-space-8);flex-wrap:wrap;align-items:center}
+.account-card select{font:inherit;font-size:var(--chth-text-14);padding:var(--chth-space-8) var(--chth-space-12);border-radius:var(--chth-radius-full);border:1px solid var(--line);background:var(--field);color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:var(--chth-space-16);align-items:start}
+.cafe{min-width:0;display:grid;grid-template-columns:minmax(0,1fr);gap:var(--chth-space-14);transition:border-color var(--chth-dur-200) ease,transform var(--chth-dur-200) var(--ease-out)}
+.cafe .top{display:flex;justify-content:space-between;gap:var(--chth-space-12);align-items:flex-start}.cafe .top>div{min-width:0}
+.cafe h2{font-family:var(--serif);font-size:var(--chth-text-26);line-height:1.2;font-weight:600;letter-spacing:-.02em;margin:0;overflow-wrap:anywhere}
+.cafe .meta{color:var(--dim);font-size:var(--chth-text-13);overflow-wrap:anywhere}
+.links{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--chth-space-6)}
+.links a{display:flex;align-items:center;justify-content:space-between;gap:var(--chth-space-12);padding:var(--chth-space-10) var(--chth-space-14);border-radius:var(--chth-radius-12);background:var(--soft);border:1px solid var(--line);text-decoration:none;color:var(--ink);font-size:var(--chth-text-14);transition:border-color var(--chth-dur-150) ease,background-color var(--chth-dur-150) ease}
+.links a span{width:52px;color:var(--dim);font-size:var(--chth-text-12);font-weight:600;text-transform:uppercase;letter-spacing:.06em;flex:none}
 .links a code{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.links a i{font-style:normal;color:var(--accent);transition:transform 160ms var(--ease-out)}
-.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.uptodate{display:inline-flex;align-items:center;gap:6px;color:var(--mint);font-size:14px;font-weight:600;padding:0 6px}
-.empty{text-align:center;padding:48px 24px;border-style:dashed}
-.empty .cup{width:56px;height:56px;margin:0 auto 14px;display:block}
-.empty h2{font-family:var(--serif);font-size:26px}
-form.stack{display:grid;gap:18px}
-.setup-link{display:block;padding:12px 14px;border-radius:12px;background:var(--field);border:1px solid var(--line);font:13px/1.6 var(--mono);overflow-wrap:anywhere;color:var(--muted)}
-.big-ok{width:56px;height:56px;border-radius:18px;display:grid;place-items:center;color:var(--mint);background:color-mix(in srgb,var(--mint) 14%,transparent);font-size:28px;animation:pop 400ms var(--spring) backwards}
+.links a i{font-style:normal;color:var(--accent);transition:transform var(--chth-dur-150) var(--ease-out)}
+.actions{display:flex;gap:var(--chth-space-8);flex-wrap:wrap;align-items:center}
+.uptodate{display:inline-flex;align-items:center;gap:var(--chth-space-6);color:var(--mint);font-size:var(--chth-text-14);font-weight:600;padding:0 var(--chth-space-6)}
+.empty{text-align:center;padding:var(--chth-space-48) var(--chth-space-24);border-style:dashed}
+.empty .cup{width:56px;height:56px;margin:0 auto var(--chth-space-14);display:block}
+.empty h2{font-family:var(--serif);font-size:var(--chth-text-26)}
+form.stack{display:grid;gap:var(--chth-space-18)}
+.setup-link{display:block;padding:var(--chth-space-12) var(--chth-space-14);border-radius:var(--chth-radius-12);background:var(--field);border:1px solid var(--line);font:var(--chth-text-13)/1.6 var(--mono);overflow-wrap:anywhere;color:var(--muted)}
+.big-ok{width:56px;height:56px;border-radius:var(--chth-radius-18);display:grid;place-items:center;color:var(--mint);background:color-mix(in srgb,var(--mint) 14%,transparent);font-size:var(--chth-text-28);animation:pop var(--chth-dur-400) var(--spring) backwards}
 @keyframes pop{from{opacity:0;transform:scale(.6)}}
 .danger-zone{border-color:color-mix(in srgb,var(--red) 40%,var(--line))}
-.back{font-size:15px}
+.back{font-size:var(--chth-text-15)}
 @media (hover:hover) and (pointer:fine){
   .cafe:hover{border-color:var(--line2);transform:translateY(-2px)}
   .links a:hover{border-color:var(--line2);background:var(--soft2)}
@@ -134,7 +134,7 @@ export function newCafe(params: { csrf: string; error?: string; values?: Record<
         <input type="text" name="customDomain" maxlength="200" placeholder="mycafe.com" value="${v.customDomain || ''}"></label>
       <label class="check"><input type="checkbox" name="demo" value="1" ${v.demo ? 'checked' : ''}> <span>Start with the demo menu, staff and stock, to try things out. You can delete them later.</span></label>
       <div class="actions"><button class="btn cf" type="submit">Deploy café</button><a class="btn ghost" href="/dashboard">Cancel</a></div>
-      <p class="muted" style="margin:0;font-size:14px">Deploying takes up to a minute. Keep this page open.</p>
+      <p class="muted" style="margin:0;font-size:var(--chth-text-14)">Deploying takes up to a minute. Keep this page open.</p>
     </form>`, { csrf: params.csrf, narrow: true });
 }
 
@@ -148,7 +148,7 @@ export function deployed(params: { csrf: string; name: string; url: string; setu
         <p class="muted">Open this link to choose your admin and panel passwords. It works only until setup is finished, and any earlier link stops working. We do not keep a copy, so open it now or ask for a new one from your dashboard.</p>
         <p><a class="btn cf" href="${params.setupUrl}" target="_blank" rel="noopener">Open setup ↗</a></p>
         <span class="setup-link">${params.setupUrl}</span>
-        ${params.kind === 'deployed' ? html`<p class="muted" style="margin-top:12px;font-size:14px">A new workers.dev address can take a minute to start answering.</p>` : ''}
+        ${params.kind === 'deployed' ? html`<p class="muted" style="margin-top:var(--chth-space-12);font-size:var(--chth-text-14)">A new workers.dev address can take a minute to start answering.</p>` : ''}
       </section>` : ''}
     <p class="back"><a href="/dashboard">← Back to your cafés</a></p>`, { csrf: params.csrf, narrow: true, themeToggle: false });
 }
