@@ -1,8 +1,8 @@
 // Generated from the CHTH kit (chth.hub/kit) by `npm run sync`. Do not edit here: edit the kit and sync.
 import type { Locale, Text } from './locales.js';
 export type Theme = 'dark' | 'light';
-export type ToastKind = 'success' | 'danger' | 'warning' | 'info' | 'accent';
-export interface ToastOptions { type?: ToastKind | 'error'; duration?: number; action?: { label: string; onClick?: () => void }; onClose?: () => void }
+export type ToastKind = 'success' | 'danger' | 'warning' | 'info' | 'accent' | 'milestone';
+export interface ToastOptions { type?: ToastKind | 'error'; duration?: number; detail?: string; action?: { label: string; onClick?: () => void }; onClose?: () => void }
 export interface ToastFn {
   (message: string, opts?: ToastOptions): string | null;
   success(message: string, opts?: ToastOptions): string | null;
@@ -11,6 +11,8 @@ export interface ToastFn {
   warning(message: string, opts?: ToastOptions): string | null;
   info(message: string, opts?: ToastOptions): string | null;
   accent(message: string, opts?: ToastOptions): string | null;
+  /** A celebration: `message` is the title, `opts.detail` the line under it. */
+  milestone(message: string, opts?: ToastOptions): string | null;
   close(id: string | null | undefined): void;
 }
 export const THEME_KEY: 'chth_theme';
@@ -33,6 +35,9 @@ export function bannerHtml(a: Announcement | null | undefined, locale?: Locale):
 export function cookieNoticeModel(locale: Locale): { text: string; gotIt: string; privacy: string };
 export function cookieNoticeHtml(locale: Locale, opts?: { privacyHref?: string; version?: string }): string;
 export const toast: ToastFn;
+export function openDialog(id: string): void;
+export function closeDialog(id: string, value?: string): void;
+export function completeStep(listId: string, stepId: string): void;
 export function setTheme(theme: Theme, origin?: Element | null): void;
 export function toggleTheme(origin?: Element | null): void;
 export function currentTheme(): Theme;
@@ -41,5 +46,6 @@ declare global {
     chthShell?: { theme(): Theme; setTheme(theme: Theme, origin?: Element | null): void; toggleTheme(origin?: Element | null): void; toast: ToastFn; applyDismissed(scope?: ParentNode): void; startNav(scope?: ParentNode): void };
     chthToast?: ToastFn;
     chthApplyTheme?: (theme: Theme) => void;
+    chthUi?: { openDialog(id: string | HTMLDialogElement): void; closeDialog(id: string | HTMLDialogElement, value?: string): void; completeStep(listId: string | Element, stepId: string): void; scan(scope?: Element | Document): void };
   }
 }

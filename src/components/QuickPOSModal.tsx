@@ -99,7 +99,7 @@ export const QuickPOSModal: React.FC<QuickPOSModalProps> = ({ isOpen, onClose, c
       {cart.length === 0 ? (
         <div className="ws-lane-empty">No items yet.</div>
       ) : (
-        <div className="ws-panel" style={{ padding: '4px 12px' }}>
+        <div className="ws-panel" style={{ padding: 'var(--chth-space-4) var(--chth-space-12)' }}>
           <OrderLinesEditor lines={cart} onChange={setCart} currency={settings.currency} />
         </div>
       )}

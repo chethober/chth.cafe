@@ -34,49 +34,49 @@ const BASE = `
 :root[data-theme="light"]{${LIGHT}}
 .force-dark{${DARK}}
 *{box-sizing:border-box}html{scroll-behavior:smooth}
-body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font:16px/1.6 var(--chth-font-sans,system-ui,sans-serif);-webkit-font-smoothing:antialiased;overflow-x:hidden}
-a{color:var(--accent);text-underline-offset:3px;text-decoration-thickness:1px;transition:color 150ms ease}
-.wrap{max-width:1160px;margin:0 auto;padding:0 20px;width:100%}
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font:var(--chth-text-16)/1.6 var(--chth-font-sans,system-ui,sans-serif);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:var(--accent);text-underline-offset:3px;text-decoration-thickness:1px;transition:color var(--chth-dur-150) ease}
+.wrap{max-width:1160px;margin:0 auto;padding:0 var(--chth-space-20);width:100%}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
-form.inline{display:inline-flex;align-items:center;gap:10px;margin:0}
+form.inline{display:inline-flex;align-items:center;gap:var(--chth-space-10);margin:0}
 
 /* The CHTH navbar and footer in this page's accent */
 .chth-nav .chth-theme__sun{color:var(--accent)}
 
-.btn{font:inherit;font-weight:650;display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:12px 20px;border-radius:999px;border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap;color:var(--ink);background:var(--soft);transition:transform 160ms var(--ease-out),box-shadow 200ms ease,background-color 150ms ease,border-color 150ms ease,color 150ms ease}
+.btn{font:inherit;font-weight:650;display:inline-flex;align-items:center;justify-content:center;gap:var(--chth-space-10);padding:var(--chth-space-12) var(--chth-space-20);border-radius:var(--chth-radius-full);border:1px solid transparent;cursor:pointer;text-decoration:none;white-space:nowrap;color:var(--ink);background:var(--soft);transition:transform var(--chth-dur-150) var(--ease-out),box-shadow var(--chth-dur-200) ease,background-color var(--chth-dur-150) ease,border-color var(--chth-dur-150) ease,color var(--chth-dur-150) ease}
 .btn:active:not(:disabled){transform:scale(.97)}
 .btn.cf{background:var(--accent);color:var(--chth-cafe-on-accent);box-shadow:0 10px 30px -14px color-mix(in srgb,var(--accent) 70%,transparent),inset 0 1px 0 rgba(255,255,255,.25)}
 .btn.ghost{border-color:var(--line);background:transparent}
 .btn.danger{background:#c8372a;color:#fff}
-.btn.small{padding:8px 14px;font-size:14px}
+.btn.small{padding:var(--chth-space-8) var(--chth-space-14);font-size:var(--chth-text-14)}
 .btn svg{width:20px;height:20px;flex:none}
 
-.kicker{font:600 13px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+.kicker{font:600 var(--chth-text-13) var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
 .display{font-family:var(--serif);font-weight:600;letter-spacing:-.025em;text-wrap:balance}
 .display em{font-style:italic;background:linear-gradient(100deg,var(--em1),var(--em2) 45%,var(--em3));-webkit-background-clip:text;background-clip:text;color:transparent}
 .muted{color:var(--muted)}
 code{font-family:var(--mono);font-size:.9em;overflow-wrap:anywhere}
 
-.card{border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,var(--panel2),var(--panel));padding:24px}
-.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font:600 12px system-ui,sans-serif;white-space:nowrap}
+.card{border:1px solid var(--line);border-radius:var(--chth-radius-xl);background:linear-gradient(180deg,var(--panel2),var(--panel));padding:var(--chth-space-24)}
+.pill{display:inline-flex;align-items:center;gap:var(--chth-space-6);padding:var(--chth-space-4) var(--chth-space-10);border-radius:var(--chth-radius-full);font:600 var(--chth-text-12) system-ui,sans-serif;white-space:nowrap}
 .pill.live{color:var(--mint);background:color-mix(in srgb,var(--mint) 14%,transparent)}.pill.warn{color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent)}.pill.red{color:var(--red);background:color-mix(in srgb,var(--red) 13%,transparent)}
 .dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:none}
-.dot.ping{box-shadow:0 0 0 0 color-mix(in srgb,currentColor 60%,transparent);animation:ping 2s infinite}
+.dot.ping{box-shadow:0 0 0 0 color-mix(in srgb,currentColor 60%,transparent);animation:ping var(--chth-dur-2000) infinite}
 @keyframes ping{70%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 0 transparent}}
 
-.notice{border-radius:14px;padding:12px 16px;font-size:15px;border:1px solid var(--line);animation:drop 260ms var(--ease-out) backwards}
+.notice{border-radius:var(--chth-radius-lg);padding:var(--chth-space-12) var(--chth-space-16);font-size:var(--chth-text-15);border:1px solid var(--line);animation:drop var(--chth-dur-250) var(--ease-out) backwards}
 .notice.error{border-color:color-mix(in srgb,var(--red) 50%,transparent);color:var(--red);background:color-mix(in srgb,var(--red) 7%,transparent)}
 .notice.ok{border-color:color-mix(in srgb,var(--mint) 50%,transparent);color:var(--mint);background:color-mix(in srgb,var(--mint) 7%,transparent)}
 @keyframes drop{from{opacity:0;transform:translateY(-6px)}}
 
-.field{display:grid;gap:6px;font-size:14px;font-weight:600}.field .hint{font-weight:400;color:var(--dim)}
-.field input,.field select{font:inherit;font-weight:400;width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--field);color:var(--ink);outline:none;transition:border-color 150ms ease,box-shadow 150ms ease}
+.field{display:grid;gap:var(--chth-space-6);font-size:var(--chth-text-14);font-weight:600}.field .hint{font-weight:400;color:var(--dim)}
+.field input,.field select{font:inherit;font-weight:400;width:100%;padding:var(--chth-space-12) var(--chth-space-14);border-radius:var(--chth-radius-12);border:1px solid var(--line);background:var(--field);color:var(--ink);outline:none;transition:border-color var(--chth-dur-150) ease,box-shadow var(--chth-dur-150) ease}
 .field input:focus,.field select:focus{border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 18%,transparent)}
-.check{display:flex;gap:12px;align-items:flex-start;font-size:15px;cursor:pointer}.check input{margin-top:5px;accent-color:var(--accent);width:16px;height:16px}
+.check{display:flex;gap:var(--chth-space-12);align-items:flex-start;font-size:var(--chth-text-15);cursor:pointer}.check input{margin-top:var(--chth-space-4);accent-color:var(--accent);width:16px;height:16px}
 
 details>summary{cursor:pointer}
-details::details-content{height:0;overflow:clip;transition:height 250ms var(--ease-out),content-visibility 250ms allow-discrete}
+details::details-content{height:0;overflow:clip;transition:height var(--chth-dur-250) var(--ease-out),content-visibility var(--chth-dur-250) allow-discrete}
 details[open]::details-content{height:auto}
 
 /* The shared CHTH footer and navbar language menu, in this page's colors */
@@ -95,17 +95,17 @@ details[open]::details-content{height:auto}
 
 /* Page changes crossfade; a theme change spreads out of the toggle, in the navbar's right end. */
 @view-transition{navigation:auto}
-::view-transition-old(root){animation:vt-out 150ms ease-out both}
-::view-transition-new(root){animation:vt-in 220ms var(--ease-out) both}
+::view-transition-old(root){animation:vt-out var(--chth-dur-150) ease-out both}
+::view-transition-new(root){animation:vt-in var(--chth-dur-200) var(--ease-out) both}
 @keyframes vt-out{to{opacity:0}}@keyframes vt-in{from{opacity:0}}
 :root[data-theme-switch]::view-transition-old(root),.chth-theme-switching::view-transition-old(root),.chth-theme-switching::view-transition-new(root){animation:none}
-:root[data-theme-switch]::view-transition-new(root){animation:vt-reveal 400ms var(--ease-out) both}
+:root[data-theme-switch]::view-transition-new(root){animation:vt-reveal var(--chth-dur-400) var(--ease-out) both}
 @keyframes vt-reveal{from{clip-path:circle(0 at calc(50% + min(50%,32rem) - 60px) 40px)}to{clip-path:circle(150vmax at calc(50% + min(50%,32rem) - 60px) 40px)}}
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:1ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:1ms!important}
   html{scroll-behavior:auto}
-  :root[data-theme-switch]::view-transition-new(root){animation:vt-in 200ms ease both!important}
+  :root[data-theme-switch]::view-transition-new(root){animation:vt-in var(--chth-dur-200) ease both!important}
 }
 `;
 

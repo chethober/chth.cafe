@@ -1,0 +1,219 @@
+/* Generated from the CHTH kit (chth.hub/kit) by `npm run sync`. Do not edit here: edit the kit and sync. */
+:root {
+  --chth-ink: #09090b;
+  --chth-ink-soft: #18181b;
+  --chth-paper: #fafafa;
+  --chth-paper-soft: #f4f4f5;
+  --chth-muted: #71717a;
+  --chth-line: rgba(161, 161, 170, 0.24);
+  --chth-accent: #d4d4d8;
+  --chth-accent-hover: #e4e4e7;
+  --chth-on-accent: #09090b;
+  --chth-success: #10b981;
+  --chth-warning: #f59e0b;
+  --chth-danger: #f43f5e;
+  --chth-telegram: #2ca5e0;
+  --chth-font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --chth-font-display: 'Outfit', 'Plus Jakarta Sans', system-ui, sans-serif;
+  --chth-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --chth-font-rtl: 'Vazirmatn', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
+  --chth-radius-2: 2px;
+  --chth-radius-4: 4px;
+  --chth-radius-6: 6px;
+  --chth-radius-12: 12px;
+  --chth-radius-16: 16px;
+  --chth-radius-18: 18px;
+  --chth-radius-22: 22px;
+  --chth-radius-24: 24px;
+  --chth-radius-26: 26px;
+  --chth-radius-28: 28px;
+  --chth-radius-32: 32px;
+  --chth-radius-sm: 8px;
+  --chth-radius-md: 10px;
+  --chth-radius-lg: 14px;
+  --chth-radius-xl: 20px;
+  --chth-radius-full: 9999px;
+  --chth-space-2: 0.125rem;
+  --chth-space-4: 0.25rem;
+  --chth-space-6: 0.375rem;
+  --chth-space-8: 0.5rem;
+  --chth-space-10: 0.625rem;
+  --chth-space-12: 0.75rem;
+  --chth-space-14: 0.875rem;
+  --chth-space-16: 1rem;
+  --chth-space-18: 1.125rem;
+  --chth-space-20: 1.25rem;
+  --chth-space-22: 1.375rem;
+  --chth-space-24: 1.5rem;
+  --chth-space-26: 1.625rem;
+  --chth-space-28: 1.75rem;
+  --chth-space-30: 1.875rem;
+  --chth-space-32: 2rem;
+  --chth-space-34: 2.125rem;
+  --chth-space-36: 2.25rem;
+  --chth-space-38: 2.375rem;
+  --chth-space-40: 2.5rem;
+  --chth-space-42: 2.625rem;
+  --chth-space-44: 2.75rem;
+  --chth-space-46: 2.875rem;
+  --chth-space-48: 3rem;
+  --chth-space-56: 3.5rem;
+  --chth-space-64: 4rem;
+  --chth-space-72: 4.5rem;
+  --chth-space-80: 5rem;
+  --chth-space-96: 6rem;
+  --chth-text-10: 0.625rem;
+  --chth-text-11: 0.6875rem;
+  --chth-text-12: 0.75rem;
+  --chth-text-13: 0.8125rem;
+  --chth-text-14: 0.875rem;
+  --chth-text-15: 0.9375rem;
+  --chth-text-16: 1rem;
+  --chth-text-17: 1.0625rem;
+  --chth-text-18: 1.125rem;
+  --chth-text-20: 1.25rem;
+  --chth-text-22: 1.375rem;
+  --chth-text-24: 1.5rem;
+  --chth-text-26: 1.625rem;
+  --chth-text-28: 1.75rem;
+  --chth-text-32: 2rem;
+  --chth-text-36: 2.25rem;
+  --chth-text-40: 2.5rem;
+  --chth-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --chth-shadow-md: 0 8px 24px -12px rgba(0, 0, 0, 0.45);
+  --chth-shadow-lg: 0 24px 48px -20px rgba(0, 0, 0, 0.55);
+  --chth-dur-100: 100ms;
+  --chth-dur-150: 150ms;
+  --chth-dur-200: 200ms;
+  --chth-dur-250: 250ms;
+  --chth-dur-300: 300ms;
+  --chth-dur-400: 400ms;
+  --chth-dur-500: 500ms;
+  --chth-dur-600: 600ms;
+  --chth-dur-800: 800ms;
+  --chth-dur-1000: 1000ms;
+  --chth-dur-1200: 1200ms;
+  --chth-dur-1600: 1600ms;
+  --chth-dur-2000: 2000ms;
+  --chth-dur-2400: 2400ms;
+  --chth-dur-3000: 3000ms;
+  --chth-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --chth-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --chth-ease-glass: cubic-bezier(0.22, 1, 0.36, 1);
+  --chth-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --chth-dur-fast: 150ms;
+  --chth-dur-base: 200ms;
+  --chth-dur-slow: 320ms;
+  --chth-dur-glass: 460ms;
+  --chth-z-menu: 50;
+  --chth-z-nav: 60;
+  --chth-z-banner: 70;
+  --chth-z-cookies: 2147482000;
+  --chth-z-toast: 2147483000;
+  --chth-success-soft: color-mix(in srgb, var(--chth-success) 16%, transparent);
+  --chth-warning-soft: color-mix(in srgb, var(--chth-warning) 16%, transparent);
+  --chth-danger-soft: color-mix(in srgb, var(--chth-danger) 16%, transparent);
+  --chth-telegram-soft: color-mix(in srgb, var(--chth-telegram) 16%, transparent);
+  --chth-cafe-accent: #d6d3d1;
+  --chth-cafe-accent-hover: #e7e5e4;
+  --chth-cafe-on-accent: #0c0a09;
+  --chth-gym-accent: #d4d4d8;
+  --chth-gym-accent-hover: #e4e4e7;
+  --chth-gym-on-accent: #09090b;
+  --chth-shop-accent: #d4d4d4;
+  --chth-shop-accent-hover: #e5e5e5;
+  --chth-shop-on-accent: #0a0a0a;
+  --chth-wtf-accent: #d1d5db;
+  --chth-wtf-accent-hover: #e5e7eb;
+  --chth-wtf-on-accent: #030712;
+  --chth-hub-accent: #d4d4d8;
+  --chth-hub-accent-hover: #e4e4e7;
+  --chth-hub-on-accent: #09090b;
+  --chth-product-accent: var(--chth-accent);
+  --chth-product-accent-hover: var(--chth-accent-hover);
+  --chth-product-on-accent: var(--chth-on-accent);
+  --chth-product-accent-soft: color-mix(in srgb, var(--chth-product-accent) 14%, transparent);
+}
+
+[data-chth-product="cafe"] {
+  --chth-product-accent: var(--chth-cafe-accent);
+  --chth-product-accent-hover: var(--chth-cafe-accent-hover);
+  --chth-product-on-accent: var(--chth-cafe-on-accent);
+  --chth-product-accent-soft: color-mix(in srgb, var(--chth-product-accent) 14%, transparent);
+}
+
+[data-chth-product="gym"] {
+  --chth-product-accent: var(--chth-gym-accent);
+  --chth-product-accent-hover: var(--chth-gym-accent-hover);
+  --chth-product-on-accent: var(--chth-gym-on-accent);
+  --chth-product-accent-soft: color-mix(in srgb, var(--chth-product-accent) 14%, transparent);
+}
+
+[data-chth-product="shop"] {
+  --chth-product-accent: var(--chth-shop-accent);
+  --chth-product-accent-hover: var(--chth-shop-accent-hover);
+  --chth-product-on-accent: var(--chth-shop-on-accent);
+  --chth-product-accent-soft: color-mix(in srgb, var(--chth-product-accent) 14%, transparent);
+}
+
+[data-chth-product="wtf"] {
+  --chth-product-accent: var(--chth-wtf-accent);
+  --chth-product-accent-hover: var(--chth-wtf-accent-hover);
+  --chth-product-on-accent: var(--chth-wtf-on-accent);
+  --chth-product-accent-soft: color-mix(in srgb, var(--chth-product-accent) 14%, transparent);
+}
+
+[data-chth-product="hub"] {
+  --chth-product-accent: var(--chth-hub-accent);
+  --chth-product-accent-hover: var(--chth-hub-accent-hover);
+  --chth-product-on-accent: var(--chth-hub-on-accent);
+  --chth-product-accent-soft: color-mix(in srgb, var(--chth-product-accent) 14%, transparent);
+}
+
+:root[data-theme="light"] {
+  --chth-accent: #27272a;
+  --chth-accent-hover: #3f3f46;
+  --chth-on-accent: #fafafa;
+  --chth-line: rgba(82, 82, 91, 0.2);
+  --chth-cafe-accent: #292524;
+  --chth-cafe-accent-hover: #44403c;
+  --chth-cafe-on-accent: #fafaf9;
+  --chth-gym-accent: #27272a;
+  --chth-gym-accent-hover: #3f3f46;
+  --chth-gym-on-accent: #fafafa;
+  --chth-shop-accent: #262626;
+  --chth-shop-accent-hover: #404040;
+  --chth-shop-on-accent: #fafafa;
+  --chth-wtf-accent: #1f2937;
+  --chth-wtf-accent-hover: #374151;
+  --chth-wtf-on-accent: #f9fafb;
+  --chth-hub-accent: #27272a;
+  --chth-hub-accent-hover: #3f3f46;
+  --chth-hub-on-accent: #fafafa;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --chth-accent: #27272a;
+    --chth-accent-hover: #3f3f46;
+    --chth-on-accent: #fafafa;
+    --chth-line: rgba(82, 82, 91, 0.2);
+    --chth-cafe-accent: #292524;
+    --chth-cafe-accent-hover: #44403c;
+    --chth-cafe-on-accent: #fafaf9;
+    --chth-gym-accent: #27272a;
+    --chth-gym-accent-hover: #3f3f46;
+    --chth-gym-on-accent: #fafafa;
+    --chth-shop-accent: #262626;
+    --chth-shop-accent-hover: #404040;
+    --chth-shop-on-accent: #fafafa;
+    --chth-wtf-accent: #1f2937;
+    --chth-wtf-accent-hover: #374151;
+    --chth-wtf-on-accent: #f9fafb;
+    --chth-hub-accent: #27272a;
+    --chth-hub-accent-hover: #3f3f46;
+    --chth-hub-on-accent: #fafafa;
+  }
+}
+
+/* Persian and Arabic pages use the RTL font wherever the brand sans font is used. */
+:root:lang(fa), :root:lang(ar), [dir="rtl"] { --chth-font-sans: var(--chth-font-rtl); --chth-font-display: var(--chth-font-rtl); }

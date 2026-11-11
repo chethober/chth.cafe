@@ -364,7 +364,7 @@ function StockCategoriesDialog({ open, onClose, categories, stockItems, onChange
       footer={<Button variant="primary" onClick={() => { setRenaming(null); setError(''); onClose(); }}>Done</Button>}>
       <div className="ws-form">
         {error && <Notice tone="danger">{error}</Notice>}
-        <ul className="ws-list" style={{ margin: '0 -24px' }} aria-label="Categories">
+        <ul className="ws-list" style={{ margin: '0 calc(-1 * var(--chth-space-24))' }} aria-label="Categories">
           {categories.map(name => {
             const count = countOf(name);
             if (renaming?.from === name) return (

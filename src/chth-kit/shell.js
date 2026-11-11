@@ -6,6 +6,7 @@
 // Styles are in brand.css. Behaviour is in shell-runtime.js, wired by data-chth-* attributes.
 
 import './shell-runtime.js';
+import './ui-runtime.js';
 import { translator } from './locales.js';
 import { languageMenuHtml, languageMenuModel } from './language-menu.js';
 import { FOOTER_LOGO_SVG } from './footer.js';
@@ -200,15 +201,24 @@ const shell = () => (typeof window === 'undefined' ? null : window.chthShell);
 
 /**
  * Shows a toast; returns its id (null on the server). toast.success / danger / warning / info /
- * accent pick the kind; toast.close(id) closes one.
+ * accent pick the kind; toast.close(id) closes one. toast.milestone(title, { detail }) celebrates
+ * (a first workout, a streak, a first order): a taller toast with a medal and a line under it.
  * @param {string} message
- * @param {{ type?: string, duration?: number, action?: { label: string, onClick?: () => void }, onClose?: () => void }} [opts]
+ * @param {{ type?: string, duration?: number, detail?: string, action?: { label: string, onClick?: () => void }, onClose?: () => void }} [opts]
  */
 export function toast(message, opts) { return shell()?.toast(message, opts) ?? null; }
-for (const kind of ['success', 'danger', 'warning', 'info', 'accent', 'error']) {
+for (const kind of ['success', 'danger', 'warning', 'info', 'accent', 'milestone', 'error']) {
   toast[kind] = (message, opts) => shell()?.toast[kind](message, opts) ?? null;
 }
 toast.close = (id) => shell()?.toast.close(id);
+
+const ui = () => (typeof window === 'undefined' ? null : window.chthUi);
+
+/** Opens the kit dialog with this id (dialogHtml in ui.js); closeDialog closes it with a return value. */
+export const openDialog = (id) => ui()?.openDialog(id);
+export const closeDialog = (id, value) => ui()?.closeDialog(id, value);
+/** Ticks a step of an onboarding checklist on the page; the last one gets a milestone toast. */
+export const completeStep = (listId, stepId) => ui()?.completeStep(listId, stepId);
 
 /** Sets the theme ('dark' | 'light'); with `origin`, it spreads out from that element. */
 export const setTheme = (theme, origin) => shell()?.setTheme(theme, origin);

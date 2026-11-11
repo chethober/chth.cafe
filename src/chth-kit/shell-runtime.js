@@ -88,9 +88,13 @@
     warning: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/>',
     info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
     accent: '<path d="M12 3l1.9 5.8H20l-4.9 3.6 1.9 5.8-5-3.6-5 3.6 1.9-5.8L4 8.8h6.1z"/>',
+    // Lucide's award: a medal on a ribbon.
+    milestone: '<circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/>',
   };
-  var KINDS = { success: 1, danger: 1, warning: 1, info: 1, accent: 1, error: 'danger', default: 'info' };
+  var KINDS = { success: 1, danger: 1, warning: 1, info: 1, accent: 1, milestone: 1, error: 'danger', default: 'info' };
   var CLOSE = { en: 'Close', fa: 'بستن', ar: 'إغلاق', ru: 'Закрыть', es: 'Cerrar' };
+  var NOTIFICATIONS = { en: 'Notifications', fa: 'اعلان‌ها', ar: 'الإشعارات', ru: 'Уведомления', es: 'Notificaciones' };
+  var lang = function () { return (root.lang || 'en').slice(0, 2); };
   var seq = 0, live = {};
 
   function region() {
@@ -98,7 +102,7 @@
     if (!r) {
       r = d.createElement('section');
       r.className = 'chth-toasts';
-      r.setAttribute('aria-label', 'Notifications');
+      r.setAttribute('aria-label', NOTIFICATIONS[lang()] || NOTIFICATIONS.en);
       d.body.appendChild(r);
     }
     return r;
@@ -123,8 +127,9 @@
   /**
    * Shows a toast and returns its id.
    * @param {string} message
-   * @param {{ type?: 'success'|'danger'|'warning'|'info'|'accent', duration?: number,
-   *   action?: { label: string, onClick?: Function }, onClose?: Function }} [opts]
+   * @param {{ type?: 'success'|'danger'|'warning'|'info'|'accent'|'milestone', duration?: number,
+   *   detail?: string, action?: { label: string, onClick?: Function }, onClose?: Function }} [opts]
+   * With `detail`, the message is a title and the detail a line under it (milestones use this).
    */
   function toast(message, opts) {
     opts = opts || {};
@@ -140,7 +145,29 @@
     icon.innerHTML = svg(ICONS[kind]);
     var text = d.createElement('span');
     text.className = 'chth-toast__text';
-    text.textContent = String(message == null ? '' : message);
+    if (opts.detail) {
+      var title = d.createElement('strong');
+      title.className = 'chth-toast__title';
+      title.textContent = String(message == null ? '' : message);
+      var detail = d.createElement('span');
+      detail.className = 'chth-toast__detail';
+      detail.textContent = String(opts.detail);
+      text.appendChild(title);
+      text.appendChild(detail);
+    } else text.textContent = String(message == null ? '' : message);
+    if (kind === 'milestone' && !reduced()) {
+      // Eight sparks fly out of the medal as it lands.
+      var sparks = d.createElement('span');
+      sparks.className = 'chth-toast__sparks';
+      sparks.setAttribute('aria-hidden', 'true');
+      for (var s = 0; s < 8; s++) {
+        var i = d.createElement('i');
+        i.style.setProperty('--a', (s * 45 + 22) + 'deg');
+        i.style.animationDelay = (120 + (s % 2) * 60) + 'ms';
+        sparks.appendChild(i);
+      }
+      icon.appendChild(sparks);
+    }
     el.appendChild(icon);
     el.appendChild(text);
     if (opts.action && opts.action.label) {
@@ -157,25 +184,30 @@
     var x = d.createElement('button');
     x.type = 'button';
     x.className = 'chth-toast__close';
-    var lang = (root.lang || 'en').slice(0, 2);
-    x.setAttribute('aria-label', CLOSE[lang] || CLOSE.en);
+    x.setAttribute('aria-label', CLOSE[lang()] || CLOSE.en);
     x.innerHTML = svg('<path d="M18 6 6 18M6 6l12 12"/>');
     x.addEventListener('click', function () { close(id); });
     el.appendChild(x);
 
-    var duration = opts.duration == null ? (kind === 'danger' ? 6000 : 4000) : opts.duration;
+    var duration = opts.duration == null ? (kind === 'danger' || kind === 'milestone' ? 6000 : 4000) : opts.duration;
     var t = live[id] = { el: el, onClose: opts.onClose, timer: 0, left: duration, started: 0 };
     if (duration > 0) {
       var bar = d.createElement('span');
       bar.className = 'chth-toast__time';
       bar.style.animationDuration = duration + 'ms';
       el.appendChild(bar);
-      var run = function () { t.started = Date.now(); t.timer = setTimeout(function () { close(id); }, t.left); el.classList.remove('chth-toast--paused'); };
-      var pause = function () { if (!live[id]) return; clearTimeout(t.timer); t.left -= Date.now() - t.started; el.classList.add('chth-toast--paused'); };
+      // Hover, focus and touch can overlap (a tap also sends mouse events), so each is a no-op twice.
+      var running = false;
+      var run = function () { if (running || !live[id]) return; running = true; t.started = Date.now(); t.timer = setTimeout(function () { close(id); }, t.left); el.classList.remove('chth-toast--paused'); };
+      var pause = function () { if (!running) return; running = false; clearTimeout(t.timer); t.left -= Date.now() - t.started; el.classList.add('chth-toast--paused'); };
       el.addEventListener('mouseenter', pause);
       el.addEventListener('mouseleave', run);
       el.addEventListener('focusin', pause);
       el.addEventListener('focusout', function (e) { if (!el.contains(e.relatedTarget)) run(); });
+      // On phones, holding a toast keeps it, like hovering does.
+      el.addEventListener('touchstart', pause, { passive: true });
+      el.addEventListener('touchend', run);
+      el.addEventListener('touchcancel', run);
       run();
     }
     var r = region();
@@ -184,7 +216,7 @@
     for (var i = 0; i < shown.length - 3; i++) close(shown[i].id);
     return id;
   }
-  ['success', 'danger', 'warning', 'info', 'accent'].forEach(function (k) {
+  ['success', 'danger', 'warning', 'info', 'accent', 'milestone'].forEach(function (k) {
     toast[k] = function (message, opts) { var o = {}; for (var p in opts || {}) o[p] = opts[p]; o.type = k; return toast(message, o); };
   });
   toast.error = toast.danger;
@@ -462,6 +494,220 @@
   }
   if (d.readyState === 'loading') d.addEventListener('DOMContentLoaded', function () { startNav(); });
   else startNav();
+
+  // ---- Steppers (data-chth-stepper): − and + around a number field ----
+  // Buttons step the input with its own stepUp/stepDown (so min, max and step hold), ten steps
+  // with Shift, repeating while held. Each step fires the input's `input` and `change`, and the
+  // buttons turn off at the ends. Delegated, so markup added later (React) works too.
+
+  function stepperInput(box) { return box && box.querySelector('input'); }
+  function syncStepper(box) {
+    var input = stepperInput(box);
+    if (!input) return;
+    var v = input.valueAsNumber, min = parseFloat(input.min), max = parseFloat(input.max);
+    var btns = box.querySelectorAll('[data-chth-step]');
+    for (var i = 0; i < btns.length; i++) {
+      var up = btns[i].getAttribute('data-chth-step') === '1';
+      btns[i].disabled = input.disabled || (!isNaN(v) && (up ? !isNaN(max) && v >= max : !isNaN(min) && v <= min));
+    }
+  }
+  function step(btn, times) {
+    var box = btn.closest('[data-chth-stepper]');
+    var input = stepperInput(box);
+    if (!input || input.disabled || btn.disabled) return false;
+    var before = input.value;
+    try {
+      // An empty field starts from min (or 0) rather than stepping from nothing
+      if (before === '') input.value = input.min !== '' ? input.min : '0';
+      else if (btn.getAttribute('data-chth-step') === '1') input.stepUp(times);
+      else input.stepDown(times);
+    } catch (e) { return false; }
+    if (input.value === before) return false;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    syncStepper(box);
+    return true;
+  }
+  var hold = null;
+  function stopHold() { if (hold) { clearTimeout(hold); hold = null; } }
+  d.addEventListener('pointerdown', function (e) {
+    var btn = e.target.closest && e.target.closest('[data-chth-step]');
+    if (!btn || e.button > 0) return;
+    e.preventDefault(); // keep the focus (and the phone's keyboard) where it was
+    var times = e.shiftKey ? 10 : 1;
+    if (!step(btn, times)) return;
+    var delay = 420;
+    var again = function () {
+      if (!step(btn, times)) return stopHold();
+      delay = Math.max(50, delay * 0.8);
+      hold = setTimeout(again, delay);
+    };
+    hold = setTimeout(again, delay);
+  });
+  ['pointerup', 'pointercancel', 'blur'].forEach(function (t) { (t === 'blur' ? w : d).addEventListener(t, stopHold, true); });
+  // Keyboard presses (Enter, Space) arrive as clicks with no pointer behind them
+  d.addEventListener('click', function (e) {
+    var btn = e.target.closest && e.target.closest('[data-chth-step]');
+    if (btn && e.detail === 0) step(btn, e.shiftKey ? 10 : 1);
+  });
+  d.addEventListener('input', function (e) {
+    var box = e.target.closest && e.target.closest('[data-chth-stepper]');
+    if (box) syncStepper(box);
+  });
+
+  // ---- Upload areas (data-chth-drop): drop or pick files ----
+  // The input keeps exactly the accepted files (type, size, count), adding to earlier ones when
+  // it takes several; the list under the area shows them with a remove button each. Every change
+  // reaches the page as the input's own `change` (checked here first, in the capture phase) and
+  // as `chth:files` on the area.
+
+  function dropStrings(box) { try { return JSON.parse(box.getAttribute('data-chth-i18n') || '{}'); } catch (e) { return {}; } }
+  function fill(text, vars) { return String(text || '').replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; }); }
+  function bytes(n) {
+    var u = ['B', 'KB', 'MB', 'GB'], i = 0;
+    while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+    var fmt;
+    try { fmt = new Intl.NumberFormat(root.lang || 'en', { maximumFractionDigits: n < 10 && i > 0 ? 1 : 0 }).format(n); } catch (e) { fmt = String(Math.round(n)); }
+    return fmt + ' ' + u[i];
+  }
+  function accepts(input, file) {
+    var list = (input.getAttribute('accept') || '').split(',').map(function (a) { return a.trim().toLowerCase(); }).filter(Boolean);
+    if (!list.length) return true;
+    var name = file.name.toLowerCase(), type = (file.type || '').toLowerCase();
+    return list.some(function (a) {
+      if (a.charAt(0) === '.') return name.slice(-a.length) === a;
+      if (a.slice(-2) === '/*') return type.indexOf(a.slice(0, -1)) === 0;
+      return type === a;
+    });
+  }
+  function setFiles(box, files, notify) {
+    var input = box.querySelector('input[type=file]');
+    if (!input) return;
+    box.chthFiles = files;
+    if (w.DataTransfer) {
+      try {
+        var dt = new DataTransfer();
+        files.forEach(function (f) { dt.items.add(f); });
+        box.chthSetting = true;
+        input.files = dt.files;
+      } catch (e) { /* an old browser keeps whatever the picker chose */ }
+    }
+    renderFiles(box);
+    if (notify) input.dispatchEvent(new Event('change', { bubbles: true }));
+    box.chthSetting = false;
+    box.dispatchEvent(new CustomEvent('chth:files', { bubbles: true, detail: { files: files.slice() } }));
+  }
+  function take(box, incoming) {
+    var input = box.querySelector('input[type=file]');
+    var s = dropStrings(box);
+    var maxSize = parseFloat(box.getAttribute('data-chth-max-size'));
+    var maxFiles = parseInt(box.getAttribute('data-chth-max-files'), 10);
+    if (!input.multiple) maxFiles = 1;
+    var keep = input.multiple ? (box.chthFiles || []).slice() : [];
+    var errors = [];
+    for (var i = 0; i < incoming.length; i++) {
+      var f = incoming[i];
+      if (!accepts(input, f)) { errors.push(fill(s.wrongType, { name: f.name })); continue; }
+      if (maxSize && f.size > maxSize) { errors.push(fill(s.tooBig, { name: f.name, size: bytes(maxSize) })); continue; }
+      // The same file twice (name, size, date) is kept once
+      if (keep.some(function (k) { return k.name === f.name && k.size === f.size && k.lastModified === f.lastModified; })) continue;
+      keep.push(f);
+    }
+    if (maxFiles && keep.length > maxFiles) {
+      if (maxFiles > 1) errors.push(fill(s.tooMany, { count: maxFiles }));
+      // Files already chosen stay; the newest ones over the limit are turned away
+      keep = keep.slice(0, maxFiles);
+    }
+    var err = box.querySelector('.chth-drop__error');
+    if (err) { err.textContent = errors.join(' '); err.hidden = !errors.length; }
+    return keep;
+  }
+  function renderFiles(box) {
+    var list = box.querySelector('.chth-drop__files');
+    if (!list) return;
+    (list.chthUrls || []).forEach(function (u) { URL.revokeObjectURL(u); });
+    list.chthUrls = [];
+    list.textContent = '';
+    var files = box.chthFiles || [];
+    var s = dropStrings(box);
+    files.forEach(function (f, i) {
+      var li = d.createElement('li');
+      li.className = 'chth-drop__file';
+      var thumb = d.createElement('span');
+      thumb.className = 'chth-drop__thumb';
+      thumb.setAttribute('aria-hidden', 'true');
+      if (/^image\//.test(f.type) && w.URL && URL.createObjectURL) {
+        var url = URL.createObjectURL(f);
+        list.chthUrls.push(url);
+        var img = d.createElement('img');
+        img.src = url;
+        img.alt = '';
+        // An image the browser can't show gets its extension instead of a broken picture
+        img.onerror = function () { thumb.textContent = (f.name.split('.').pop() || '').slice(0, 4).toUpperCase(); };
+        thumb.appendChild(img);
+      } else thumb.textContent = (f.name.split('.').pop() || '').slice(0, 4).toUpperCase();
+      var name = d.createElement('span');
+      name.className = 'chth-drop__name';
+      name.textContent = f.name;
+      var size = d.createElement('span');
+      size.className = 'chth-drop__size';
+      size.textContent = bytes(f.size);
+      var x = d.createElement('button');
+      x.type = 'button';
+      x.className = 'chth-drop__remove';
+      x.setAttribute('data-chth-drop-remove', String(i));
+      x.setAttribute('aria-label', fill(s.remove || 'Remove {name}', { name: f.name }));
+      x.innerHTML = svg('<path d="M18 6 6 18M6 6l12 12"/>');
+      li.appendChild(thumb); li.appendChild(name); li.appendChild(size); li.appendChild(x);
+      list.appendChild(li);
+    });
+    list.hidden = !files.length;
+    box.classList.toggle('has-files', files.length > 0);
+  }
+  // A pick from the dialog: check it before the page's own change handlers see it
+  d.addEventListener('change', function (e) {
+    var input = e.target;
+    var box = input && input.type === 'file' && input.closest && input.closest('[data-chth-drop]');
+    if (!box || box.chthSetting) return;
+    setFiles(box, take(box, [].slice.call(input.files || [])), false);
+  }, true);
+  function dropBox(e) { return e.target.closest && e.target.closest('[data-chth-drop]'); }
+  ['dragenter', 'dragover'].forEach(function (t) {
+    d.addEventListener(t, function (e) {
+      var box = dropBox(e);
+      if (!box || !e.dataTransfer || [].indexOf.call(e.dataTransfer.types || [], 'Files') < 0) return;
+      var input = box.querySelector('input[type=file]');
+      if (input && input.disabled) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      box.classList.add('is-over');
+    });
+  });
+  d.addEventListener('dragleave', function (e) {
+    var box = dropBox(e);
+    if (box && !box.contains(e.relatedTarget)) box.classList.remove('is-over');
+  });
+  d.addEventListener('drop', function (e) {
+    var box = dropBox(e);
+    if (!box) return;
+    e.preventDefault();
+    box.classList.remove('is-over');
+    var input = box.querySelector('input[type=file]');
+    if (!input || input.disabled || !e.dataTransfer) return;
+    setFiles(box, take(box, [].slice.call(e.dataTransfer.files || [])), true);
+  });
+  d.addEventListener('click', function (e) {
+    var x = e.target.closest && e.target.closest('[data-chth-drop-remove]');
+    if (!x) return;
+    var box = x.closest('[data-chth-drop]');
+    var files = (box.chthFiles || []).slice();
+    files.splice(parseInt(x.getAttribute('data-chth-drop-remove'), 10), 1);
+    var err = box.querySelector('.chth-drop__error');
+    if (err) { err.textContent = ''; err.hidden = true; }
+    setFiles(box, files, true);
+    var zone = box.querySelector('input[type=file]');
+    if (zone) zone.focus();
+  });
 
   w.chthShell = { theme: currentTheme, setTheme: setTheme, toggleTheme: toggleTheme, toast: toast, applyDismissed: applyDismissed, startNav: startNav };
   w.chthToast = toast;

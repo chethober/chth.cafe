@@ -429,7 +429,7 @@ export function EventManager({ settings, mode }: { settings: SettingsSelect; mod
       </StatGrid>
 
       <Card flush>
-        <div className="ws-toolbar" style={{ padding: 'var(--ws-pad) var(--ws-pad) 12px' }}>
+        <div className="ws-toolbar" style={{ padding: 'var(--ws-pad) var(--ws-pad) var(--chth-space-12)' }}>
           <Segmented label="Events view" value={view} onChange={setView} options={[
             { value: 'agenda', label: 'Agenda' }, { value: 'month', label: 'Month' }, ...(mode === 'admin' ? [{ value: 'all' as const, label: 'All events' }] : [])
           ]} />
@@ -461,7 +461,7 @@ export function EventManager({ settings, mode }: { settings: SettingsSelect; mod
             </div>
           ) : (
             <>
-              <div style={{ padding: '0 var(--ws-pad) 12px' }}>
+              <div style={{ padding: '0 var(--ws-pad) var(--chth-space-12)' }}>
                 <Chips label="Filter events" value={filter} onChange={setFilter} options={[
                   { value: 'all', label: 'All', count: events.length },
                   { value: 'public', label: 'Public', count: events.filter(e => e.visibility === 'public' && e.status !== 'cancelled').length },

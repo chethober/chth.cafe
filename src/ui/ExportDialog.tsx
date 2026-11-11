@@ -101,15 +101,15 @@ export function SortFilter<T extends string>({ value, onChange, order, onOrder, 
   return (
     <div className="ws-form-row cols-2">
       <Field label="Sort by">{id => (
-        <select id={id} className="ws-input" value={value} onChange={e => onChange(e.target.value as T)}>
+        <span className="chth-select-wrap"><select id={id} className="chth-select" value={value} onChange={e => onChange(e.target.value as T)}>
           {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        </select></span>
       )}</Field>
       <Field label="Order">{id => (
-        <select id={id} className="ws-input" value={order} onChange={e => onOrder(e.target.value as 'asc' | 'desc')}>
+        <span className="chth-select-wrap"><select id={id} className="chth-select" value={order} onChange={e => onOrder(e.target.value as 'asc' | 'desc')}>
           <option value="desc">Highest / newest first</option>
           <option value="asc">Lowest / oldest first</option>
-        </select>
+        </select></span>
       )}</Field>
     </div>
   );

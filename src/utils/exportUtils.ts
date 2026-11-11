@@ -1,6 +1,8 @@
 /**
  * Export Utilities for CHTH Cafe Admin Panel
  * Provides styled Excel (.xls) generation, CSV formatting, JSON serialization, and clipboard helpers.
+ *
+ * chth-tokens: off. Excel reads the styles below, and it knows no CSS variables, so they stay raw.
  */
 
 export interface ExportColumn {
