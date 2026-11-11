@@ -1,14 +1,26 @@
 // Generated from the CHTH kit (chth.hub/kit) by `npm run sync`. Do not edit here: edit the kit and sync.
 // Content pieces: what goes inside a site's pages, as opposed to the shell around them. Like the
 // shell, each comes as *Html() for server-rendered pages and *Model() for React, with the same
-// classes. Styles are in brand.css. Nothing here needs a script: a site updates a ring by
-// setting --chth-ring (ringStyle()), and milestones are toast.milestone() in shell.js.
+// classes. Styles are in brand.css. Each works without a script (a ring by --chth-ring, a stepper
+// as a number field, an upload area as a file field); the shell's script, already on every CHTH
+// page, adds the rest (stepping, drag and drop, the file list) through data-chth-* attributes, so
+// React markup gets it too. Milestones are toast.milestone() in shell.js.
 
 import { translator } from './locales.js';
 
 export const UI_STRINGS = {
   loading: { en: 'Loading…', fa: 'در حال بارگذاری…', ar: 'جارٍ التحميل…', ru: 'Загрузка…', es: 'Cargando…' },
   progress: { en: 'Progress', fa: 'پیشرفت', ar: 'التقدّم', ru: 'Прогресс', es: 'Progreso' },
+  decrease: { en: 'Decrease', fa: 'کم کردن', ar: 'إنقاص', ru: 'Уменьшить', es: 'Disminuir' },
+  increase: { en: 'Increase', fa: 'زیاد کردن', ar: 'زيادة', ru: 'Увеличить', es: 'Aumentar' },
+  dropMany: { en: 'Drop files here or {browse}', fa: 'فایل‌ها را اینجا رها کنید یا {browse}', ar: 'أفلت الملفات هنا أو {browse}', ru: 'Перетащите файлы сюда или {browse}', es: 'Suelta archivos aquí o {browse}' },
+  dropOne: { en: 'Drop a file here or {browse}', fa: 'فایل را اینجا رها کنید یا {browse}', ar: 'أفلت ملفًا هنا أو {browse}', ru: 'Перетащите файл сюда или {browse}', es: 'Suelta un archivo aquí o {browse}' },
+  browse: { en: 'browse', fa: 'انتخاب کنید', ar: 'تصفّح', ru: 'выберите', es: 'elige uno' },
+  upTo: { en: 'Up to {size}', fa: 'تا {size}', ar: 'حتى {size}', ru: 'До {size}', es: 'Hasta {size}' },
+  remove: { en: 'Remove {name}', fa: 'حذف {name}', ar: 'إزالة {name}', ru: 'Убрать {name}', es: 'Quitar {name}' },
+  tooBig: { en: '{name} is over {size}.', fa: '{name} بیشتر از {size} است.', ar: '{name} أكبر من {size}.', ru: '{name} больше {size}.', es: '{name} supera {size}.' },
+  wrongType: { en: "{name} isn't a file this takes.", fa: '{name} از نوع فایل‌های قابل قبول نیست.', ar: '{name} ليس من نوع الملفات المقبولة.', ru: '{name}: такой тип файла не подходит.', es: '{name} no es un tipo de archivo admitido.' },
+  tooMany: { en: 'Only {count} at a time.', fa: 'هر بار فقط {count} فایل.', ar: '{count} فقط في كل مرة.', ru: 'Не больше {count} за раз.', es: 'Solo {count} a la vez.' },
 };
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -106,4 +118,102 @@ export function ringHtml(locale, opts) {
   const m = ringModel(locale, opts);
   return `<div class="${m.className}" style="${m.style}" role="progressbar" aria-valuemin="0" aria-valuemax="${m.max}" aria-valuenow="${m.value}" aria-label="${esc(m.title)}">`
     + `${m.svg}<span class="chth-ring__label" aria-hidden="true">${esc(m.label)}</span></div>`;
+}
+
+// ---- Stepper ----
+
+const MINUS_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>';
+const PLUS_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+
+/**
+ * A number field with − and + on either side: reps, weight, servings, quantity. It is a real
+ * <input type="number">, so it types, submits and validates like one. The shell's script makes
+ * the buttons step by `step` (Shift: ten steps), repeat while held, stop at `min`/`max`, and fire
+ * the input's own `input` and `change` events, so a React onChange sees every step.
+ * @param {'en'|'fa'|'ar'|'ru'|'es'} locale
+ * @param {{ value?: number|string, min?: number, max?: number, step?: number, name?: string, id?: string, label?: string, unit?: string, size?: 'sm'|'md', disabled?: boolean, className?: string }} opts
+ */
+export function stepperModel(locale, opts = {}) {
+  const t = translator(UI_STRINGS, locale);
+  const value = opts.value ?? '';
+  const n = Number(value);
+  const has = value !== '' && Number.isFinite(n);
+  const what = opts.label ? ` ${opts.label}` : '';
+  return {
+    className: cls(`chth-stepper${opts.size === 'sm' ? ' chth-stepper--sm' : ''}`, opts.className),
+    input: { type: 'number', inputMode: Number.isInteger(opts.step ?? 1) ? 'numeric' : 'decimal', value: has ? String(value) : '', min: opts.min ?? null, max: opts.max ?? null, step: opts.step ?? 1, name: opts.name ?? null, id: opts.id ?? null, disabled: !!opts.disabled, label: opts.label ?? null },
+    label: opts.label ?? null,
+    unit: opts.unit ?? null,
+    decrease: { label: `${t('decrease')}${what}`, disabled: !!opts.disabled || (has && opts.min != null && n <= opts.min), svg: MINUS_SVG },
+    increase: { label: `${t('increase')}${what}`, disabled: !!opts.disabled || (has && opts.max != null && n >= opts.max), svg: PLUS_SVG },
+  };
+}
+
+export function stepperHtml(locale, opts = {}) {
+  const m = stepperModel(locale, opts);
+  const i = m.input;
+  const attr = (k, v) => (v == null || v === false ? '' : v === true ? ` ${k}` : ` ${k}="${esc(v)}"`);
+  const btn = (dir, b) => `<button type="button" class="chth-stepper__btn" data-chth-step="${dir}" aria-label="${esc(b.label)}"${b.disabled ? ' disabled' : ''}>${b.svg}</button>`;
+  return `<div class="${m.className}" data-chth-stepper>`
+    + btn(-1, m.decrease)
+    + `<span class="chth-stepper__field"><input class="chth-stepper__input"${attr('type', i.type)}${attr('inputmode', i.inputMode)}${attr('value', i.value)}${attr('min', i.min)}${attr('max', i.max)}${attr('step', i.step)}${attr('name', i.name)}${attr('id', i.id)}${attr('aria-label', i.label)}${attr('disabled', i.disabled)}>`
+    + (m.unit ? `<span class="chth-stepper__unit" aria-hidden="true">${esc(m.unit)}</span>` : '') + '</span>'
+    + btn(1, m.increase) + '</div>';
+}
+
+// ---- Upload area ----
+
+const UPLOAD_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 13v8"/><path d="m8 17 4-4 4 4"/><path d="M4 14.9A7 7 0 1 1 15.7 8h1.8a4.5 4.5 0 0 1 2.5 8.2"/></svg>';
+
+/** "1.5 MB" for a byte count, in the page's digits. */
+export function formatBytes(bytes, locale = 'en') {
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let n = Math.max(0, Number(bytes) || 0);
+  let u = 0;
+  while (n >= 1024 && u < units.length - 1) { n /= 1024; u++; }
+  const num = new Intl.NumberFormat(locale, { maximumFractionDigits: n < 10 && u > 0 ? 1 : 0 }).format(n);
+  return `${num} ${units[u]}`;
+}
+
+/**
+ * An upload area: drop files on it or click it to pick them. It is a <label> around a real
+ * <input type="file">, so picking works without a script and the files submit with the form.
+ * The shell's script adds dragging, checks `accept`, `maxSize` (bytes) and `maxFiles`, and lists
+ * what was chosen (a thumbnail for images, the size, a remove button). The input keeps exactly
+ * the accepted files and fires `change`; the area also fires `chth:files` with { files }.
+ * @param {'en'|'fa'|'ar'|'ru'|'es'} locale
+ * @param {{ name?: string, id?: string, accept?: string, multiple?: boolean, maxSize?: number, maxFiles?: number, title?: string, hint?: string, icon?: string, disabled?: boolean, className?: string }} opts
+ */
+export function dropzoneModel(locale, opts = {}) {
+  const t = translator(UI_STRINGS, locale);
+  const multiple = !!opts.multiple;
+  const maxFiles = multiple ? opts.maxFiles ?? null : 1;
+  const sizeText = opts.maxSize ? formatBytes(opts.maxSize, locale) : null;
+  const kinds = (opts.accept || '').split(',').map((a) => a.trim()).filter(Boolean)
+    .map((a) => (a.endsWith('/*') ? a.slice(0, -2) : a.replace(/^\./, '').replace(/^[a-z]+\//, '')).toUpperCase());
+  const hint = opts.hint ?? [kinds.join(', '), sizeText && t('upTo', { size: sizeText })].filter(Boolean).join(' · ');
+  const [before, after] = (opts.title ?? t(multiple ? 'dropMany' : 'dropOne')).split('{browse}');
+  return {
+    className: cls('chth-drop', opts.className),
+    input: { type: 'file', name: opts.name ?? null, id: opts.id ?? null, accept: opts.accept ?? null, multiple, disabled: !!opts.disabled },
+    maxSize: opts.maxSize ?? null,
+    maxFiles,
+    title: { before, browse: after === undefined ? '' : t('browse'), after: after ?? '' },
+    hint,
+    icon: opts.icon ?? UPLOAD_SVG,
+    // What the script says about files, in the page's language
+    strings: { remove: t('remove'), tooBig: t('tooBig'), wrongType: t('wrongType'), tooMany: t('tooMany') },
+  };
+}
+
+export function dropzoneHtml(locale, opts = {}) {
+  const m = dropzoneModel(locale, opts);
+  const i = m.input;
+  const attr = (k, v) => (v == null || v === false ? '' : v === true ? ` ${k}` : ` ${k}="${esc(v)}"`);
+  return `<div class="${m.className}" data-chth-drop${attr('data-chth-max-size', m.maxSize)}${attr('data-chth-max-files', m.maxFiles)} data-chth-i18n="${esc(JSON.stringify(m.strings))}">`
+    + `<label class="chth-drop__zone"><input class="chth-drop__input"${attr('type', i.type)}${attr('name', i.name)}${attr('id', i.id)}${attr('accept', i.accept)}${attr('multiple', i.multiple)}${attr('disabled', i.disabled)}>`
+    + `<span class="chth-drop__icon" aria-hidden="true">${m.icon}</span>`
+    + `<span class="chth-drop__title">${esc(m.title.before)}${m.title.browse ? `<u>${esc(m.title.browse)}</u>` : ''}${esc(m.title.after)}</span>`
+    + (m.hint ? `<span class="chth-drop__hint">${esc(m.hint)}</span>` : '')
+    + '</label><ul class="chth-drop__files" hidden></ul><p class="chth-drop__error" role="alert" hidden></p></div>';
 }

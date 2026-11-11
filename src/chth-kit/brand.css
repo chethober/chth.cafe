@@ -1006,3 +1006,152 @@
   .chth-ring__arc, .chth-empty__action { transition: none; }
   .chth-toast--milestone .chth-toast__icon { animation: none; }
 }
+
+/* Stepper (kit/src/ui.js stepperHtml): − and + around a real number field. The field takes the
+   room; the buttons are round, in the page's own colour, and switch off at min and max. */
+.chth-stepper {
+  --chth-stepper-h: var(--chth-space-44);
+  align-items: center;
+  border: 1px solid var(--chth-line);
+  border-radius: var(--chth-radius-full);
+  display: inline-flex;
+  font-family: var(--chth-font-sans);
+  gap: var(--chth-space-2);
+  height: var(--chth-stepper-h);
+  padding: var(--chth-space-4);
+  box-sizing: border-box;
+  transition: border-color var(--chth-dur-150) ease, box-shadow var(--chth-dur-150) ease;
+}
+.chth-stepper:focus-within { border-color: var(--chth-product-accent); box-shadow: 0 0 0 3px var(--chth-product-accent-soft); }
+.chth-stepper--sm { --chth-stepper-h: var(--chth-space-36); }
+.chth-stepper__btn {
+  align-items: center;
+  aspect-ratio: 1;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  border: 0;
+  border-radius: var(--chth-radius-full);
+  color: inherit;
+  cursor: pointer;
+  display: inline-grid;
+  flex: none;
+  height: 100%;
+  padding: 0;
+  place-items: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--chth-dur-150) ease, transform var(--chth-dur-100) var(--chth-ease-out), opacity var(--chth-dur-150) ease;
+}
+.chth-stepper__btn svg { height: 45%; width: 45%; }
+.chth-stepper__btn:active:not(:disabled) { transform: scale(0.88); }
+.chth-stepper__btn:disabled { cursor: default; opacity: 0.35; }
+.chth-stepper__btn:focus-visible { outline: 2px solid var(--chth-product-accent); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .chth-stepper__btn:hover:not(:disabled) { background: var(--chth-product-accent-soft); color: var(--chth-product-accent); }
+}
+.chth-stepper__field { align-items: baseline; display: inline-flex; flex: 1; gap: var(--chth-space-4); justify-content: center; min-width: 3.5ch; padding-inline: var(--chth-space-4); }
+.chth-stepper__input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-size: var(--chth-text-16);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  min-width: 0;
+  outline: none;
+  padding: 0;
+  text-align: center;
+  width: 5ch;
+}
+.chth-stepper__input::-webkit-inner-spin-button, .chth-stepper__input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.chth-stepper__unit { font-size: var(--chth-text-12); opacity: 0.6; white-space: nowrap; }
+.chth-stepper--sm .chth-stepper__input { font-size: var(--chth-text-14); width: 4ch; }
+
+/* Upload area (kit/src/ui.js dropzoneHtml): a dashed zone that lights up in the product accent
+   while files hover over it, then the chosen files as a list with thumbnails. */
+.chth-drop { display: flex; flex-direction: column; font-family: var(--chth-font-sans); gap: var(--chth-space-8); }
+.chth-drop__zone {
+  align-items: center;
+  border: 2px dashed color-mix(in srgb, currentColor 22%, transparent);
+  border-radius: var(--chth-radius-lg);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: var(--chth-space-6);
+  padding: var(--chth-space-24) var(--chth-space-16);
+  position: relative;
+  text-align: center;
+  transition: border-color var(--chth-dur-150) ease, background-color var(--chth-dur-150) ease, transform var(--chth-dur-200) var(--chth-ease-out);
+}
+/* The real input covers nothing and stays focusable; the zone shows its focus. */
+.chth-drop__input { height: 1px; opacity: 0; overflow: hidden; position: absolute; width: 1px; }
+.chth-drop__zone:focus-within { border-color: var(--chth-product-accent); box-shadow: 0 0 0 3px var(--chth-product-accent-soft); }
+.chth-drop.is-over .chth-drop__zone { background: var(--chth-product-accent-soft); border-color: var(--chth-product-accent); border-style: solid; transform: scale(1.01); }
+.chth-drop__zone:has(input:disabled) { cursor: not-allowed; opacity: 0.5; }
+.chth-drop__icon {
+  background: var(--chth-product-accent-soft);
+  border-radius: var(--chth-radius-full);
+  color: var(--chth-product-accent);
+  display: grid;
+  height: var(--chth-space-48);
+  place-items: center;
+  transition: transform var(--chth-dur-200) var(--chth-ease-out);
+  width: var(--chth-space-48);
+}
+.chth-drop__icon svg { height: 1.4rem; width: 1.4rem; }
+.chth-drop.is-over .chth-drop__icon { transform: translateY(-3px); }
+.chth-drop__title { font-size: var(--chth-text-14); font-weight: 600; }
+.chth-drop__title u { color: var(--chth-product-accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.chth-drop__hint { font-size: var(--chth-text-12); opacity: 0.6; }
+@media (hover: hover) and (pointer: fine) {
+  .chth-drop__zone:hover { border-color: color-mix(in srgb, currentColor 40%, transparent); }
+}
+.chth-drop__files { display: flex; flex-direction: column; gap: var(--chth-space-6); list-style: none; margin: 0; padding: 0; }
+.chth-drop__file {
+  align-items: center;
+  animation: chth-menu-in var(--chth-dur-200) var(--chth-ease-out);
+  border: 1px solid var(--chth-line);
+  border-radius: var(--chth-radius-md);
+  display: flex;
+  gap: var(--chth-space-10);
+  padding: var(--chth-space-6);
+  padding-inline-end: var(--chth-space-4);
+}
+.chth-drop__thumb {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  border-radius: var(--chth-radius-6);
+  display: grid;
+  flex: none;
+  font-size: var(--chth-text-10);
+  font-weight: 700;
+  height: var(--chth-space-40);
+  overflow: hidden;
+  place-items: center;
+  width: var(--chth-space-40);
+}
+.chth-drop__thumb img { height: 100%; object-fit: cover; width: 100%; }
+.chth-drop__name { flex: 1; font-size: var(--chth-text-13); font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chth-drop__size { flex: none; font-size: var(--chth-text-12); font-variant-numeric: tabular-nums; opacity: 0.6; }
+.chth-drop__remove {
+  background: none;
+  border: 0;
+  border-radius: var(--chth-radius-full);
+  color: inherit;
+  cursor: pointer;
+  display: inline-grid;
+  flex: none;
+  height: var(--chth-space-32);
+  opacity: 0.6;
+  padding: 0;
+  place-items: center;
+  width: var(--chth-space-32);
+}
+.chth-drop__remove svg { height: 0.95rem; width: 0.95rem; }
+.chth-drop__remove:hover, .chth-drop__remove:focus-visible { background: var(--chth-danger-soft); color: var(--chth-danger); opacity: 1; outline: none; }
+.chth-drop__error { color: var(--chth-danger); font-size: var(--chth-text-13); margin: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .chth-stepper__btn, .chth-drop__zone, .chth-drop__icon, .chth-drop__file { animation: none; transition: none; }
+  .chth-drop.is-over .chth-drop__zone { transform: none; }
+}
