@@ -203,7 +203,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
                   <div className="ws-form">
                     <div className="ws-chips" role="group" aria-label="Preset accents" style={{ flexWrap: 'wrap', mask: 'none', WebkitMask: 'none', paddingRight: 2 }}>
                       {PRESET_ACCENTS.map(c => (
-                        <button key={c.hex} type="button" className="ws-chip" aria-pressed={formData.brandPrimary.toLowerCase() === c.hex.toLowerCase()} onClick={() => edit({ brandPrimary: c.hex })}>
+                        <button key={c.hex} type="button" className="chth-chip" aria-pressed={formData.brandPrimary.toLowerCase() === c.hex.toLowerCase()} onClick={() => edit({ brandPrimary: c.hex })}>
                           <span className="ws-swatch" style={{ background: c.hex, borderRadius: '50%' }} aria-hidden="true" />{c.name}
                         </button>
                       ))}

@@ -233,6 +233,18 @@
     select(tabs[(next + tabs.length) % tabs.length], true);
   });
 
+  // ---- Segmented controls ([data-chth-seg]): the thumb slides to the chosen option ----
+  function placeSeg(seg) {
+    var thumb = seg.querySelector('.chth-seg__thumb');
+    var on = seg.querySelector('input:checked');
+    var face = on && on.nextElementSibling;
+    if (!thumb || !face) { seg.classList.remove('is-ready'); return; }
+    seg.style.setProperty('--chth-seg-x', face.offsetLeft + 'px');
+    seg.style.setProperty('--chth-seg-w', face.offsetWidth + 'px');
+    if (!seg.classList.contains('is-ready')) requestAnimationFrame(function () { seg.classList.add('is-ready'); });
+  }
+  d.addEventListener('change', function (e) { var seg = e.target.closest && e.target.closest('[data-chth-seg]'); if (seg) placeSeg(seg); });
+
   // ---- Chips: the × removes the chip ----
   d.addEventListener('click', function (e) {
     var x = e.target.closest && e.target.closest('[data-chth-chip-remove]');
@@ -467,6 +479,9 @@
     for (var i = 0; i < dates.length; i++) enhance(dates[i]);
     var sets = s.querySelectorAll('[data-chth-tabset]');
     for (var j = 0; j < sets.length; j++) line(sets[j]);
+    if (s.matches && s.matches('[data-chth-seg]')) placeSeg(s);
+    var segs = s.querySelectorAll('[data-chth-seg]');
+    for (var q = 0; q < segs.length; q++) placeSeg(segs[q]);
     var counted = s.querySelectorAll('[data-chth-count]');
     for (var k = 0; k < counted.length; k++) count(counted[k]);
     var imgs = s.querySelectorAll('img.chth-avatar__img');
@@ -482,7 +497,10 @@
         }
       }).observe(d.body, { childList: true, subtree: true });
     }
-    var resize = function () { var sets = d.querySelectorAll('[data-chth-tabset]'); for (var i = 0; i < sets.length; i++) line(sets[i]); };
+    var resize = function () {
+      var sets = d.querySelectorAll('[data-chth-tabset]'); for (var i = 0; i < sets.length; i++) line(sets[i]);
+      var segs = d.querySelectorAll('[data-chth-seg]'); for (var j = 0; j < segs.length; j++) placeSeg(segs[j]);
+    };
     if (w.ResizeObserver) new ResizeObserver(resize).observe(root); else w.addEventListener('resize', resize);
     if (d.fonts && d.fonts.ready) d.fonts.ready.then(resize);
   }

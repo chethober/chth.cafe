@@ -101,7 +101,9 @@ export function fieldHtml(locale, opts) {
 
 /**
  * A row of mutually exclusive choices (week | month | year, list | grid). Radio buttons under
- * the hood, so it submits and works with arrow keys without a script.
+ * the hood, so it submits and works with arrow keys without a script. With the script, a thumb
+ * slides to the chosen option (data-chth-seg; React markup includes the .chth-seg__thumb span and
+ * calls window.chthUi.scan(el) after changing the value from code).
  * @param {{ name: string, label: string, options: { value: string, label: string, icon?: string }[], value?: string, size?: 'sm'|'md', block?: boolean, className?: string }} opts
  */
 export function segmentedModel(opts) {
@@ -115,7 +117,7 @@ export function segmentedModel(opts) {
 
 export function segmentedHtml(opts) {
   const m = segmentedModel(opts);
-  return `<div class="${m.className}" role="radiogroup" aria-label="${esc(m.label)}">`
+  return `<div class="${m.className}" role="radiogroup" aria-label="${esc(m.label)}" data-chth-seg><span class="chth-seg__thumb" aria-hidden="true"></span>`
     + m.options.map((o) => `<label class="chth-seg__item"><input type="radio" name="${esc(m.name)}" value="${esc(o.value)}"${o.checked ? ' checked' : ''}>`
       + `<span>${o.icon ? `<span class="chth-seg__icon" aria-hidden="true">${o.icon}</span>` : ''}${esc(o.label)}</span></label>`).join('')
     + '</div>';

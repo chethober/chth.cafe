@@ -856,7 +856,6 @@
   align-items: center;
   display: flex;
   flex-direction: column;
-  font-family: var(--chth-font-sans);
   gap: var(--chth-space-8);
   margin-inline: auto;
   max-width: 24rem;
@@ -939,7 +938,6 @@
   --chth-ring-tone: var(--chth-product-accent);
   display: inline-grid;
   flex: none;
-  font-family: var(--chth-font-sans);
   height: var(--chth-ring-size);
   place-items: center;
   position: relative;
@@ -1015,7 +1013,6 @@
   border: 1px solid var(--chth-line);
   border-radius: var(--chth-radius-full);
   display: inline-flex;
-  font-family: var(--chth-font-sans);
   gap: var(--chth-space-2);
   height: var(--chth-stepper-h);
   padding: var(--chth-space-4);
@@ -1071,7 +1068,7 @@
 
 /* Upload area (kit/src/ui.js dropzoneHtml): a dashed zone that lights up in the product accent
    while files hover over it, then the chosen files as a list with thumbnails. */
-.chth-drop { display: flex; flex-direction: column; font-family: var(--chth-font-sans); gap: var(--chth-space-8); }
+.chth-drop { display: flex; flex-direction: column; gap: var(--chth-space-8); }
 .chth-drop__zone {
   align-items: center;
   border: 2px dashed color-mix(in srgb, currentColor 22%, transparent);
@@ -1162,20 +1159,33 @@
    rest of the kit, so they sit on a dark café menu or the light shop alike.
    ====================================================================== */
 
-:root { --chth-field-line: color-mix(in srgb, currentColor 20%, transparent); --chth-field-bg: color-mix(in srgb, currentColor 4%, transparent); }
+/* Theme hooks: a site keeps its own shapes by setting these (the café's square corners, say),
+   and the content pieces take the page's own font. */
+:root {
+  --chth-field-line: color-mix(in srgb, currentColor 20%, transparent);
+  --chth-field-bg: color-mix(in srgb, currentColor 4%, transparent);
+  --chth-btn-radius: var(--chth-radius-full);
+  --chth-field-radius: var(--chth-radius-md);
+  --chth-field-focus: var(--chth-product-accent);
+  --chth-field-font: var(--chth-text-16); /* 16px: phones don't zoom into the field */
+  --chth-chip-radius: var(--chth-radius-full);
+  --chth-badge-radius: var(--chth-radius-full);
+  --chth-seg-radius: var(--chth-radius-full);
+  --chth-dialog-radius: var(--chth-radius-xl);
+  --chth-card-radius: var(--chth-radius-xl);
+}
 
 /* ---- Button ---- */
 .chth-btn {
   --chth-btn-h: var(--chth-space-40);
   align-items: center;
   border: 1px solid transparent;
-  border-radius: var(--chth-radius-full);
+  border-radius: var(--chth-btn-radius);
   box-sizing: border-box;
   color: inherit;
   cursor: pointer;
   display: inline-flex;
   font: inherit;
-  font-family: var(--chth-font-sans);
   font-size: var(--chth-text-14);
   font-weight: 600;
   gap: var(--chth-space-8);
@@ -1231,17 +1241,17 @@
 @keyframes chth-pop { 40% { transform: scale(1.3); } }
 
 /* ---- Field ---- */
-.chth-field { display: flex; flex-direction: column; font-family: var(--chth-font-sans); gap: var(--chth-space-6); min-width: 0; }
+.chth-field { display: flex; flex-direction: column; gap: var(--chth-space-6); min-width: 0; }
 .chth-field__label { font-size: var(--chth-text-13); font-weight: 600; }
 .chth-field__optional { font-weight: 400; opacity: 0.55; }
 .chth-input, .chth-select, .chth-textarea {
   background: var(--chth-field-bg);
   border: 1px solid var(--chth-field-line);
-  border-radius: var(--chth-radius-md);
+  border-radius: var(--chth-field-radius);
   box-sizing: border-box;
   color: inherit;
   font: inherit;
-  font-size: var(--chth-text-16); /* 16px: phones don't zoom into the field */
+  font-size: var(--chth-field-font);
   min-height: var(--chth-space-44);
   padding: var(--chth-space-10) var(--chth-space-12);
   transition: border-color var(--chth-dur-150) ease, box-shadow var(--chth-dur-150) ease, background-color var(--chth-dur-150) ease;
@@ -1249,7 +1259,7 @@
 }
 .chth-textarea { line-height: 1.5; resize: vertical; }
 .chth-input::placeholder, .chth-textarea::placeholder { color: currentColor; opacity: 0.45; }
-.chth-input:focus, .chth-select:focus, .chth-textarea:focus { border-color: var(--chth-product-accent); box-shadow: 0 0 0 3px var(--chth-product-accent-soft); outline: none; }
+.chth-input:focus, .chth-select:focus, .chth-textarea:focus { border-color: var(--chth-field-focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--chth-field-focus) 22%, transparent); outline: none; }
 .chth-input:disabled, .chth-select:disabled, .chth-textarea:disabled { cursor: not-allowed; opacity: 0.55; }
 .chth-field.is-invalid :is(.chth-input, .chth-select, .chth-textarea), :is(.chth-input, .chth-select, .chth-textarea)[aria-invalid="true"] { border-color: var(--chth-danger); }
 .chth-field.is-invalid :is(.chth-input, .chth-select, .chth-textarea):focus { box-shadow: 0 0 0 3px var(--chth-danger-soft); }
@@ -1277,18 +1287,36 @@
 /* ---- Segmented control ---- */
 .chth-seg {
   background: color-mix(in srgb, currentColor 7%, transparent);
-  border-radius: var(--chth-radius-full);
+  border-radius: var(--chth-seg-radius);
   display: inline-flex;
-  font-family: var(--chth-font-sans);
   gap: var(--chth-space-2);
   padding: var(--chth-space-4);
 }
 .chth-seg--block { display: flex; }
+.chth-seg { position: relative; }
+/* The thumb slides to the chosen option once the script has measured it (until then, and
+   without a script, the chosen option paints its own background). */
+.chth-seg__thumb {
+  background: var(--chth-product-accent);
+  border-radius: calc(var(--chth-seg-radius) - 2px);
+  bottom: var(--chth-space-4);
+  box-shadow: var(--chth-shadow-sm);
+  left: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  top: var(--chth-space-4);
+  transform: translateX(var(--chth-seg-x, 0));
+  width: var(--chth-seg-w, 0);
+}
+.chth-seg.is-ready .chth-seg__thumb { opacity: 1; transition: transform var(--chth-dur-300) var(--chth-ease-out), width var(--chth-dur-300) var(--chth-ease-out); }
+.chth-seg.is-ready .chth-seg__item input:checked + span { background: transparent; box-shadow: none; }
+.chth-seg__item { z-index: 1; }
 .chth-seg__item { cursor: pointer; display: flex; flex: 1; position: relative; }
 .chth-seg__item input { inset: 0; margin: 0; opacity: 0; position: absolute; }
 .chth-seg__item > span {
   align-items: center;
-  border-radius: var(--chth-radius-full);
+  border-radius: calc(var(--chth-seg-radius) - 2px);
   display: flex;
   flex: 1;
   font-size: var(--chth-text-13);
@@ -1308,7 +1336,10 @@
 @media (hover: hover) and (pointer: fine) { .chth-seg__item:hover input:not(:checked) + span { opacity: 1; } }
 
 /* ---- Switch ---- */
-.chth-switch { align-items: center; cursor: pointer; display: flex; font-family: var(--chth-font-sans); gap: var(--chth-space-12); justify-content: space-between; padding: var(--chth-space-8) 0; position: relative; }
+.chth-switch { align-items: center; cursor: pointer; display: flex; gap: var(--chth-space-12); justify-content: space-between; position: relative; }
+/* A switch with words beside it gets room; a bare one sits in the line it's in. */
+.chth-switch:has(.chth-switch__text) { padding: var(--chth-space-8) 0; }
+.chth-switch:not(:has(.chth-switch__text)) { display: inline-flex; }
 .chth-switch__text { display: flex; flex-direction: column; gap: var(--chth-space-2); min-width: 0; }
 .chth-switch__label { font-size: var(--chth-text-14); font-weight: 600; }
 .chth-switch__hint { font-size: var(--chth-text-12); opacity: 0.65; }
@@ -1362,10 +1393,10 @@
 /* ---- Dialog and sheet ---- */
 .chth-dialog {
   border: 0;
-  border-radius: var(--chth-radius-xl);
+  border-radius: var(--chth-dialog-radius);
   box-sizing: border-box;
   color: var(--chth-glass-ink);
-  font-family: var(--chth-font-sans);
+  font: inherit;
   max-height: min(85vh, 720px);
   max-width: calc(100vw - 32px);
   padding: 0;
@@ -1418,7 +1449,6 @@
 /* ---- Tooltip ---- */
 .chth-tooltip {
   border-radius: var(--chth-radius-sm);
-  font-family: var(--chth-font-sans);
   font-size: var(--chth-text-12);
   font-weight: 500;
   line-height: 1.35;
@@ -1438,7 +1468,7 @@
 /* ---- Popover ---- */
 .chth-popover {
   border-radius: var(--chth-radius-lg);
-  font-family: var(--chth-font-sans);
+  font: inherit;
   font-size: var(--chth-text-14);
   inset: auto;
   margin: 0;
@@ -1459,10 +1489,9 @@
   --chth-badge-tone: currentColor;
   align-items: center;
   background: color-mix(in srgb, var(--chth-badge-tone) 14%, transparent);
-  border-radius: var(--chth-radius-full);
+  border-radius: var(--chth-badge-radius);
   color: var(--chth-badge-tone);
   display: inline-flex;
-  font-family: var(--chth-font-sans);
   font-size: var(--chth-text-12);
   font-variant-numeric: tabular-nums;
   font-weight: 600;
@@ -1487,9 +1516,8 @@
   align-items: center;
   background: var(--chth-field-bg);
   border: 1px solid var(--chth-field-line);
-  border-radius: var(--chth-radius-full);
+  border-radius: var(--chth-chip-radius);
   display: inline-flex;
-  font-family: var(--chth-font-sans);
   font-size: var(--chth-text-13);
   font-weight: 500;
   gap: var(--chth-space-6);
@@ -1499,12 +1527,12 @@
   transition: background-color var(--chth-dur-150) ease, border-color var(--chth-dur-150) ease, color var(--chth-dur-150) ease;
   white-space: nowrap;
 }
-label.chth-chip { cursor: pointer; user-select: none; }
+label.chth-chip, button.chth-chip { cursor: pointer; font: inherit; font-size: var(--chth-text-13); user-select: none; }
 .chth-chip--removable { padding-inline-end: var(--chth-space-4); }
 .chth-chip__icon svg { display: block; height: 1em; width: 1em; }
 .chth-chip__count { font-size: var(--chth-text-11); font-variant-numeric: tabular-nums; opacity: 0.6; }
-.chth-chip:has(input:checked) { background: var(--chth-product-accent); border-color: var(--chth-product-accent); color: var(--chth-product-on-accent); }
-.chth-chip:has(input:checked) .chth-chip__count { opacity: 0.8; }
+.chth-chip:is(:has(input:checked), [aria-pressed="true"]) { background: var(--chth-product-accent); border-color: var(--chth-product-accent); color: var(--chth-product-on-accent); }
+.chth-chip:is(:has(input:checked), [aria-pressed="true"]) .chth-chip__count { opacity: 0.8; }
 .chth-chip:has(input:focus-visible) { outline: 2px solid var(--chth-product-accent); outline-offset: 2px; }
 .chth-chip__remove {
   background: none; border: 0; border-radius: var(--chth-radius-full); color: inherit; cursor: pointer;
@@ -1512,7 +1540,7 @@ label.chth-chip { cursor: pointer; user-select: none; }
 }
 .chth-chip__remove svg { height: 0.8rem; width: 0.8rem; }
 .chth-chip__remove:hover, .chth-chip__remove:focus-visible { background: color-mix(in srgb, currentColor 14%, transparent); opacity: 1; outline: none; }
-@media (hover: hover) and (pointer: fine) { label.chth-chip:hover:not(:has(input:checked)) { border-color: color-mix(in srgb, currentColor 40%, transparent); } }
+@media (hover: hover) and (pointer: fine) { :is(label, button).chth-chip:hover:not(:has(input:checked), [aria-pressed="true"]) { border-color: color-mix(in srgb, currentColor 40%, transparent); } }
 
 /* ---- Avatar ---- */
 .chth-avatar {
@@ -1523,7 +1551,6 @@ label.chth-chip { cursor: pointer; user-select: none; }
   color: #fff;
   display: inline-flex;
   flex: none;
-  font-family: var(--chth-font-sans);
   font-size: calc(var(--chth-avatar) * 0.38);
   font-weight: 700;
   height: var(--chth-avatar);
@@ -1556,7 +1583,6 @@ label.chth-chip { cursor: pointer; user-select: none; }
 :root[data-theme="light"] .chth-avatar--more { background: var(--chth-paper-soft); color: var(--chth-ink); }
 
 /* ---- Tabs in a page ---- */
-.chth-tabset { font-family: var(--chth-font-sans); }
 .chth-tabset__list {
   border-bottom: 1px solid var(--chth-line);
   display: flex;
@@ -1588,7 +1614,7 @@ label.chth-chip { cursor: pointer; user-select: none; }
 .chth-tabset__panel:focus-visible { border-radius: var(--chth-radius-sm); outline: 2px solid var(--chth-product-accent); outline-offset: 2px; }
 
 /* ---- Onboarding checklist ---- */
-.chth-checklist { border-radius: var(--chth-radius-xl); font-family: var(--chth-font-sans); padding: var(--chth-space-16) var(--chth-space-18); }
+.chth-checklist { border-radius: var(--chth-card-radius); padding: var(--chth-space-16) var(--chth-space-18); }
 .chth-checklist.chth-dismissing { opacity: 0; transform: scale(0.98); transition: opacity var(--chth-dur-200) ease, transform var(--chth-dur-200) ease; }
 .chth-checklist__head { align-items: center; display: flex; gap: var(--chth-space-12); }
 .chth-checklist__titles { flex: 1; min-width: 0; }
@@ -1618,7 +1644,7 @@ label.chth-chip { cursor: pointer; user-select: none; }
 .chth-checklist__step.is-done .chth-checklist__text > span:first-child { opacity: 0.55; text-decoration: line-through; }
 
 /* ---- Date picker ---- */
-.chth-date { display: inline-flex; flex-wrap: wrap; font-family: var(--chth-font-sans); gap: var(--chth-space-8); position: relative; }
+.chth-date { display: inline-flex; flex-wrap: wrap; gap: var(--chth-space-8); position: relative; }
 .chth-date.is-enhanced .chth-date__native { height: 1px; opacity: 0; overflow: hidden; pointer-events: none; position: absolute; width: 1px; }
 .chth-date__button { align-items: center; cursor: pointer; display: inline-flex; gap: var(--chth-space-8); min-width: 12rem; text-align: start; width: auto; }
 .chth-date__button.is-empty .chth-date__text { opacity: 0.5; }
@@ -1661,7 +1687,7 @@ label.chth-chip { cursor: pointer; user-select: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chth-btn, .chth-seg__item > span, .chth-switch__thumb, .chth-switch__track, .chth-tabset__line, .chth-checklist__check, .chth-chip { transition: none; }
+  .chth-btn, .chth-seg__item > span, .chth-seg.is-ready .chth-seg__thumb, .chth-switch__thumb, .chth-switch__track, .chth-tabset__line, .chth-checklist__check, .chth-chip { transition: none; }
   .chth-dialog[open], .chth-dialog[open]::backdrop, .chth-dialog--sheet[open], .chth-tooltip, .chth-popover:popover-open, .chth-date__panel,
   .chth-copy.is-done .chth-btn__icon svg, .chth-share.is-done .chth-btn__icon svg, .chth-checklist__step.is-done .chth-checklist__check { animation: none; }
   .chth-btn.is-loading::after { animation-duration: var(--chth-dur-2400); }

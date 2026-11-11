@@ -46,6 +46,6 @@ declare global {
     chthShell?: { theme(): Theme; setTheme(theme: Theme, origin?: Element | null): void; toggleTheme(origin?: Element | null): void; toast: ToastFn; applyDismissed(scope?: ParentNode): void; startNav(scope?: ParentNode): void };
     chthToast?: ToastFn;
     chthApplyTheme?: (theme: Theme) => void;
-    chthUi?: { openDialog(id: string | HTMLDialogElement): void; closeDialog(id: string | HTMLDialogElement, value?: string): void; completeStep(listId: string | Element, stepId: string): void; scan(scope?: ParentNode): void };
+    chthUi?: { openDialog(id: string | HTMLDialogElement): void; closeDialog(id: string | HTMLDialogElement, value?: string): void; completeStep(listId: string | Element, stepId: string): void; scan(scope?: Element | Document): void };
   }
 }

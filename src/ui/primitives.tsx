@@ -1,5 +1,6 @@
 import React, { useId, useLayoutEffect, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, Info, AlertTriangle, Search, X, Minus, Plus } from 'lucide-react';
+import { initials, nameHue } from '../chth-kit/ui.js';
 
 type Tone = 'neutral' | 'positive' | 'danger' | 'warning' | 'info' | 'accent';
 const cx = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ');
@@ -15,6 +16,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;
 }
 
+/** The CHTH kit's button (chth-kit/controls.js); accent, tonal and danger-ghost are the café's own variants. */
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { variant = 'secondary', size = 'md', icon, block, loading, className, children, type = 'button', disabled, ...rest },
   ref
@@ -23,16 +25,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
     <button
       ref={ref}
       type={type}
-      className={cx('ws-btn', className)}
-      data-variant={variant}
-      data-size={size}
-      data-block={block || undefined}
+      className={cx('chth-btn', `chth-btn--${variant}`, `chth-btn--${size}`, block && 'chth-btn--block', loading && 'is-loading', className)}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       {...rest}
     >
-      {icon}
-      {children}
+      {icon && <span className="chth-btn__icon" aria-hidden="true">{icon}</span>}
+      {children !== undefined && children !== null && children !== false && <span className="chth-btn__label">{children}</span>}
     </button>
   );
 });
@@ -42,11 +41,7 @@ interface IconButtonProps extends Omit<ButtonProps, 'icon' | 'children'> {
   children: React.ReactNode;
 }
 export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton({ label, children, variant = 'ghost', size = 'sm', className, ...rest }, ref) {
-  return (
-    <Button ref={ref} variant={variant} size={size} aria-label={label} title={label} className={cx('ws-icon-btn', className)} {...rest}>
-      {children}
-    </Button>
-  );
+  return <Button ref={ref} variant={variant} size={size} aria-label={label} title={label} className={cx('chth-btn--icon', className)} icon={children} {...rest} />;
 });
 
 /* -------------------------------------------------------------------- Page */
@@ -151,10 +146,12 @@ export function Stat({ label, value, hint, icon, tone = 'neutral', active, onCli
 
 /* ------------------------------------------------------------------- Badge */
 
+// The kit's badge tones; 'solid' is the café's ink badge (the kit's accent, solid).
+const BADGE_TONE: Record<Tone | 'solid', string> = { neutral: 'neutral', positive: 'success', danger: 'danger', warning: 'warning', info: 'info', accent: 'accent', solid: 'accent chth-badge--solid' };
 export function Badge({ tone = 'neutral', dot, icon, children }: { tone?: Tone | 'solid'; dot?: boolean; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <span className="ws-badge" data-tone={tone}>
-      {dot && <span className="ws-badge-dot" aria-hidden="true" />}
+    <span className={`chth-badge chth-badge--${BADGE_TONE[tone]}`}>
+      {dot && <span className="chth-badge__dot" aria-hidden="true" />}
       {icon}
       {children}
     </span>
@@ -179,10 +176,10 @@ export function Notice({ tone = 'info', children, action, role }: { tone?: Tone;
 
 export function EmptyState({ icon, title, description, action }: { icon?: React.ReactNode; title: string; description?: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="ws-empty">
-      {icon && <div className="ws-empty-icon" aria-hidden="true">{icon}</div>}
-      <strong>{title}</strong>
-      {description && <p>{description}</p>}
+    <div className="chth-empty">
+      {icon && <div className="chth-empty__icon" aria-hidden="true">{icon}</div>}
+      <p className="chth-empty__title">{title}</p>
+      {description && <p className="chth-empty__text">{description}</p>}
       {action}
     </div>
   );
@@ -204,25 +201,26 @@ export function Field({ label, hint, error, optional, aside, className, children
   const id = useId();
   const hintId = hint || error ? `${id}-hint` : undefined;
   return (
-    <div className={cx('ws-field', className)}>
-      <label htmlFor={id} className="ws-label">
-        <span>{label}{optional && <span className="ws-optional"> (optional)</span>}</span>
+    <div className={cx('chth-field', error && 'is-invalid', className)}>
+      <label htmlFor={id} className="chth-field__label ws-label">
+        <span>{label}{optional && <span className="chth-field__optional"> (optional)</span>}</span>
         {aside}
       </label>
       {children(id, hintId)}
-      {error ? <span id={hintId} className="ws-error-text">{error}</span> : hint ? <span id={hintId} className="ws-hint">{hint}</span> : null}
+      {error ? <p id={hintId} className="chth-field__error">{error}</p> : hint ? <p id={hintId} className="chth-field__hint">{hint}</p> : null}
     </div>
   );
 }
 
+// The kit's fields (chth-kit/controls.js), in the café's shapes (workspace.css sets the hooks).
 export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
-  return <input ref={ref} className={cx('ws-input', className)} {...rest} />;
+  return <input ref={ref} className={cx('chth-input', className)} {...rest} />;
 });
 export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, ...rest }, ref) {
-  return <select ref={ref} className={cx('ws-input', className)} {...rest} />;
+  return <span className="chth-select-wrap"><select ref={ref} className={cx('chth-select', className)} {...rest} /></span>;
 });
 export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, ...rest }, ref) {
-  return <textarea ref={ref} className={cx('ws-input', className)} {...rest} />;
+  return <textarea ref={ref} className={cx('chth-textarea', className)} {...rest} />;
 });
 
 /** Text field with a leading symbol (e.g. currency). */
@@ -251,30 +249,28 @@ export function SearchInput({ value, onChange, placeholder = 'Search', label = '
   );
 }
 
+/** The kit's switch, without a visible label (the row around it says what it is). */
 export function Switch({ checked, onChange, label, disabled }: { checked: boolean; onChange: (checked: boolean) => void; label: string; disabled?: boolean }) {
   return (
-    <span className="ws-switch">
-      <input type="checkbox" role="switch" aria-label={label} checked={checked} disabled={disabled} onChange={e => onChange(e.target.checked)} />
-      <span className="ws-switch-track" aria-hidden="true" />
-      <span className="ws-switch-thumb" aria-hidden="true" />
-    </span>
+    <label className="chth-switch chth-switch--bare">
+      <input type="checkbox" role="switch" className="chth-switch__input" aria-label={label} checked={checked} disabled={disabled} onChange={e => onChange(e.target.checked)} />
+      <span className="chth-switch__track" aria-hidden="true"><span className="chth-switch__thumb" /></span>
+    </label>
   );
 }
 
 export function ToggleRow({ title, description, icon, checked, onChange, disabled }: {
   title: string; description?: string; icon?: React.ReactNode; checked: boolean; onChange: (checked: boolean) => void; disabled?: boolean;
 }) {
+  const hintId = useId();
   return (
-    <label className="ws-toggle-row">
+    <label className="chth-switch ws-toggle-row">
       <span style={{ display: 'flex', gap: 12, alignItems: 'flex-start', minWidth: 0 }}>
         {icon && <span style={{ color: 'var(--ws-muted)', marginTop: 2 }}>{icon}</span>}
-        <span><strong>{title}</strong>{description && <span className="ws-hint">{description}</span>}</span>
+        <span className="chth-switch__text"><strong className="chth-switch__label">{title}</strong>{description && <span className="chth-switch__hint" id={hintId}>{description}</span>}</span>
       </span>
-      <span className="ws-switch">
-        <input type="checkbox" role="switch" checked={checked} disabled={disabled} onChange={e => onChange(e.target.checked)} />
-        <span className="ws-switch-track" aria-hidden="true" />
-        <span className="ws-switch-thumb" aria-hidden="true" />
-      </span>
+      <input type="checkbox" role="switch" className="chth-switch__input" checked={checked} disabled={disabled} aria-describedby={description ? hintId : undefined} onChange={e => onChange(e.target.checked)} />
+      <span className="chth-switch__track" aria-hidden="true"><span className="chth-switch__thumb" /></span>
     </label>
   );
 }
@@ -291,36 +287,26 @@ export function Checkbox({ checked, onChange, children }: { checked: boolean; on
 /* --------------------------------------------------------------- Segmented */
 
 export interface SegmentOption<T extends string> { value: T; label: React.ReactNode; count?: number; icon?: React.ReactNode }
-/** iOS-style segmented control: a thumb slides to the chosen option and retargets mid-flight. */
+/** The kit's segmented control: radio buttons, with a thumb that slides to the chosen option. */
 export function Segmented<T extends string>({ options, value, onChange, label, block }: {
   options: SegmentOption<T>[]; value: T; onChange: (value: T) => void; label: string; block?: boolean;
 }) {
+  const name = useId();
   const rootRef = useRef<HTMLDivElement>(null);
-  const [ready, setReady] = useState(false);
-  useLayoutEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-    const place = () => {
-      const active = root.querySelector<HTMLElement>('button[aria-pressed="true"]');
-      if (!active) return;
-      root.style.setProperty('--x', `${active.offsetLeft}px`);
-      root.style.setProperty('--w', `${active.offsetWidth}px`);
-    };
-    place();
-    const raf = requestAnimationFrame(() => setReady(true));
-    const observer = new ResizeObserver(place);
-    observer.observe(root);
-    return () => { cancelAnimationFrame(raf); observer.disconnect(); };
-  }, [value, options.length]);
+  // The kit's script places the thumb; tell it when the value changes from code.
+  useLayoutEffect(() => { if (rootRef.current) window.chthUi?.scan(rootRef.current); }, [value, options.length]);
   return (
-    <div ref={rootRef} className="ws-segmented" role="group" aria-label={label} data-block={block || undefined} data-ready={ready}>
-      <span className="ws-segmented-thumb" aria-hidden="true" />
+    <div ref={rootRef} className={cx('chth-seg', block && 'chth-seg--block')} role="radiogroup" aria-label={label} data-chth-seg>
+      <span className="chth-seg__thumb" aria-hidden="true" />
       {options.map(option => (
-        <button key={option.value} type="button" aria-pressed={option.value === value} onClick={() => onChange(option.value)}>
-          {option.icon}
-          {option.label}
-          {option.count !== undefined && <span className="ws-seg-count">{option.count}</span>}
-        </button>
+        <label key={option.value} className="chth-seg__item">
+          <input type="radio" name={name} value={option.value} checked={option.value === value} onChange={() => onChange(option.value)} />
+          <span>
+            {option.icon && <span className="chth-seg__icon" aria-hidden="true">{option.icon}</span>}
+            {option.label}
+            {option.count !== undefined && <span className="chth-chip__count">{option.count}</span>}
+          </span>
+        </label>
       ))}
     </div>
   );
@@ -331,14 +317,16 @@ export function Segmented<T extends string>({ options, value, onChange, label, b
 export function Chips<T extends string>({ options, value, onChange, label }: {
   options: SegmentOption<T>[]; value: T; onChange: (value: T) => void; label: string;
 }) {
+  const name = useId();
   return (
-    <div className="ws-chips" role="group" aria-label={label}>
+    <div className="ws-chips" role="radiogroup" aria-label={label}>
       {options.map(option => (
-        <button key={option.value} type="button" className="ws-chip" aria-pressed={option.value === value} onClick={() => onChange(option.value)}>
-          {option.icon}
-          {option.label}
-          {option.count !== undefined && <span className="ws-chip-count">{option.count}</span>}
-        </button>
+        <label key={option.value} className="chth-chip">
+          <input type="radio" className="chth-sr-only" name={name} value={option.value} checked={option.value === value} onChange={() => onChange(option.value)} />
+          {option.icon && <span className="chth-chip__icon" aria-hidden="true">{option.icon}</span>}
+          <span className="chth-chip__label">{option.label}</span>
+          {option.count !== undefined && <span className="chth-chip__count">{option.count}</span>}
+        </label>
       ))}
     </div>
   );
@@ -445,10 +433,10 @@ export function Progress({ value, tone = 'accent', label }: { value: number; ton
 
 export function Stepper({ value, onDecrement, onIncrement, label }: { value: React.ReactNode; onDecrement: () => void; onIncrement: () => void; label: string }) {
   return (
-    <div className="ws-stepper" role="group" aria-label={label}>
-      <button type="button" onClick={onDecrement} aria-label={`Decrease ${label}`}><Minus /></button>
-      <span aria-live="polite">{value}</span>
-      <button type="button" onClick={onIncrement} aria-label={`Increase ${label}`}><Plus /></button>
+    <div className="chth-stepper chth-stepper--sm" role="group" aria-label={label}>
+      <button type="button" className="chth-stepper__btn" onClick={onDecrement} aria-label={`Decrease ${label}`}><Minus /></button>
+      <span className="chth-stepper__field"><span className="chth-stepper__input" aria-live="polite">{value}</span></span>
+      <button type="button" className="chth-stepper__btn" onClick={onIncrement} aria-label={`Increase ${label}`}><Plus /></button>
     </div>
   );
 }
@@ -468,9 +456,13 @@ export function KeyValue({ items, total }: { items: { label: React.ReactNode; va
   );
 }
 
+/** The kit's avatar: initials on a colour from the name ('positive' is the café's green one). */
 export function Avatar({ name, tone, size }: { name: string; tone?: 'positive'; size?: 'lg' }) {
-  const letters = name.trim().split(/\s+/).slice(0, 2).map(p => p[0]?.toUpperCase() || '').join('') || '?';
-  return <span className="ws-avatar" data-tone={tone} data-size={size} aria-hidden="true">{letters}</span>;
+  return (
+    <span className={cx('chth-avatar', size === 'lg' ? 'chth-avatar--lg' : 'chth-avatar--md', tone === 'positive' && 'chth-avatar--positive')} style={{ '--chth-avatar-hue': nameHue(name) } as React.CSSProperties} aria-hidden="true">
+      <span className="chth-avatar__initials">{initials(name)}</span>
+    </span>
+  );
 }
 
 export function Amount({ children, tone }: { children: React.ReactNode; tone?: 'positive' | 'danger' }) {
