@@ -6,6 +6,7 @@
 // Styles are in brand.css. Behaviour is in shell-runtime.js, wired by data-chth-* attributes.
 
 import './shell-runtime.js';
+import './ui-runtime.js';
 import { translator } from './locales.js';
 import { languageMenuHtml, languageMenuModel } from './language-menu.js';
 import { FOOTER_LOGO_SVG } from './footer.js';
@@ -210,6 +211,14 @@ for (const kind of ['success', 'danger', 'warning', 'info', 'accent', 'milestone
   toast[kind] = (message, opts) => shell()?.toast[kind](message, opts) ?? null;
 }
 toast.close = (id) => shell()?.toast.close(id);
+
+const ui = () => (typeof window === 'undefined' ? null : window.chthUi);
+
+/** Opens the kit dialog with this id (dialogHtml in ui.js); closeDialog closes it with a return value. */
+export const openDialog = (id) => ui()?.openDialog(id);
+export const closeDialog = (id, value) => ui()?.closeDialog(id, value);
+/** Ticks a step of an onboarding checklist on the page; the last one gets a milestone toast. */
+export const completeStep = (listId, stepId) => ui()?.completeStep(listId, stepId);
 
 /** Sets the theme ('dark' | 'light'); with `origin`, it spreads out from that element. */
 export const setTheme = (theme, origin) => shell()?.setTheme(theme, origin);

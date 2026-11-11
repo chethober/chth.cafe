@@ -35,6 +35,9 @@ export function bannerHtml(a: Announcement | null | undefined, locale?: Locale):
 export function cookieNoticeModel(locale: Locale): { text: string; gotIt: string; privacy: string };
 export function cookieNoticeHtml(locale: Locale, opts?: { privacyHref?: string; version?: string }): string;
 export const toast: ToastFn;
+export function openDialog(id: string): void;
+export function closeDialog(id: string, value?: string): void;
+export function completeStep(listId: string, stepId: string): void;
 export function setTheme(theme: Theme, origin?: Element | null): void;
 export function toggleTheme(origin?: Element | null): void;
 export function currentTheme(): Theme;
@@ -43,5 +46,6 @@ declare global {
     chthShell?: { theme(): Theme; setTheme(theme: Theme, origin?: Element | null): void; toggleTheme(origin?: Element | null): void; toast: ToastFn; applyDismissed(scope?: ParentNode): void; startNav(scope?: ParentNode): void };
     chthToast?: ToastFn;
     chthApplyTheme?: (theme: Theme) => void;
+    chthUi?: { openDialog(id: string | HTMLDialogElement): void; closeDialog(id: string | HTMLDialogElement, value?: string): void; completeStep(listId: string | Element, stepId: string): void; scan(scope?: ParentNode): void };
   }
 }

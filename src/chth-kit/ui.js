@@ -7,21 +7,9 @@
 // React markup gets it too. Milestones are toast.milestone() in shell.js.
 
 import { translator } from './locales.js';
+import { UI_STRINGS } from './ui-strings.js';
 
-export const UI_STRINGS = {
-  loading: { en: 'Loading…', fa: 'در حال بارگذاری…', ar: 'جارٍ التحميل…', ru: 'Загрузка…', es: 'Cargando…' },
-  progress: { en: 'Progress', fa: 'پیشرفت', ar: 'التقدّم', ru: 'Прогресс', es: 'Progreso' },
-  decrease: { en: 'Decrease', fa: 'کم کردن', ar: 'إنقاص', ru: 'Уменьшить', es: 'Disminuir' },
-  increase: { en: 'Increase', fa: 'زیاد کردن', ar: 'زيادة', ru: 'Увеличить', es: 'Aumentar' },
-  dropMany: { en: 'Drop files here or {browse}', fa: 'فایل‌ها را اینجا رها کنید یا {browse}', ar: 'أفلت الملفات هنا أو {browse}', ru: 'Перетащите файлы сюда или {browse}', es: 'Suelta archivos aquí o {browse}' },
-  dropOne: { en: 'Drop a file here or {browse}', fa: 'فایل را اینجا رها کنید یا {browse}', ar: 'أفلت ملفًا هنا أو {browse}', ru: 'Перетащите файл сюда или {browse}', es: 'Suelta un archivo aquí o {browse}' },
-  browse: { en: 'browse', fa: 'انتخاب کنید', ar: 'تصفّح', ru: 'выберите', es: 'elige uno' },
-  upTo: { en: 'Up to {size}', fa: 'تا {size}', ar: 'حتى {size}', ru: 'До {size}', es: 'Hasta {size}' },
-  remove: { en: 'Remove {name}', fa: 'حذف {name}', ar: 'إزالة {name}', ru: 'Убрать {name}', es: 'Quitar {name}' },
-  tooBig: { en: '{name} is over {size}.', fa: '{name} بیشتر از {size} است.', ar: '{name} أكبر من {size}.', ru: '{name} больше {size}.', es: '{name} supera {size}.' },
-  wrongType: { en: "{name} isn't a file this takes.", fa: '{name} از نوع فایل‌های قابل قبول نیست.', ar: '{name} ليس من نوع الملفات المقبولة.', ru: '{name}: такой тип файла не подходит.', es: '{name} no es un tipo de archivo admitido.' },
-  tooMany: { en: 'Only {count} at a time.', fa: 'هر بار فقط {count} فایل.', ar: '{count} فقط في كل مرة.', ru: 'Не больше {count} за раз.', es: 'Solo {count} a la vez.' },
-};
+export { UI_STRINGS };
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const cls = (base, extra) => (extra ? `${base} ${esc(extra)}` : base);
@@ -217,3 +205,9 @@ export function dropzoneHtml(locale, opts = {}) {
     + (m.hint ? `<span class="chth-drop__hint">${esc(m.hint)}</span>` : '')
     + '</label><ul class="chth-drop__files" hidden></ul><p class="chth-drop__error" role="alert" hidden></p></div>';
 }
+
+// The other pieces live in their own modules; ui.js is the one import for all of them.
+export * from './controls.js';
+export * from './overlays.js';
+export * from './display.js';
+export * from './datepicker.js';

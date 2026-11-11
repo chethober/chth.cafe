@@ -1,6 +1,6 @@
 // Generated from the CHTH kit (chth.hub/kit) by `npm run sync`. Do not edit here: edit the kit and sync.
 import type { Locale, Text } from './locales.js';
-export const UI_STRINGS: Record<'loading' | 'progress' | 'decrease' | 'increase' | 'dropMany' | 'dropOne' | 'browse' | 'upTo' | 'remove' | 'tooBig' | 'wrongType' | 'tooMany', Text>;
+export const UI_STRINGS: Record<string, Text>;
 export interface EmptyStateOptions { icon?: string; title: string; text?: string; action?: { label: string; href?: string; id?: string } | null; compact?: boolean; className?: string }
 export interface EmptyStateModel { className: string; icon: string; title: string; text: string; action: { label: string; href: string | null; id: string | null } | null }
 export function emptyStateModel(opts: EmptyStateOptions): EmptyStateModel;
@@ -36,3 +36,7 @@ export function dropzoneHtml(locale: Locale, opts?: DropzoneOptions): string;
 declare global {
   interface HTMLElementEventMap { 'chth:files': CustomEvent<{ files: File[] }> }
 }
+export * from './controls.js';
+export * from './overlays.js';
+export * from './display.js';
+export * from './datepicker.js';
