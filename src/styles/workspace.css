@@ -332,6 +332,11 @@ a.ws-platform { transition: border-color var(--chth-dur-150) ease, color var(--c
 .ws .chth-switch__input:checked + .chth-switch__track { background: var(--ws-positive); }
 .ws .chth-switch__input:checked + .chth-switch__track .chth-switch__thumb { background: #fff; }
 .ws .chth-switch__track { background: var(--ws-rule-strong); }
+/* The café's own switch size (44 × 26) */
+.ws .chth-switch__track { width: 44px; height: 26px; }
+.ws .chth-switch__thumb { width: 20px; height: 20px; inset-block-start: 3px; inset-inline-start: 3px; }
+.ws .chth-switch__input:checked + .chth-switch__track .chth-switch__thumb { transform: translateX(18px); }
+[dir='rtl'] .ws .chth-switch__input:checked + .chth-switch__track .chth-switch__thumb { transform: translateX(-18px); }
 .ws .chth-switch.ws-toggle-row { padding: var(--ws-row) 0; }
 /* Segmented: the café's soft tray with a rule round it */
 .ws .chth-seg { background: var(--ws-soft); border: 1px solid var(--ws-rule); padding: var(--chth-space-2); max-width: 100%; overflow-x: auto; scrollbar-width: none; }

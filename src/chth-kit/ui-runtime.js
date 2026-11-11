@@ -234,10 +234,17 @@
   });
 
   // ---- Segmented controls ([data-chth-seg]): the thumb slides to the chosen option ----
+  // The chosen option: a checked radio's face, or a button marked chosen by the page's own code
+  var SEG_ON = 'button.chth-seg__item.is-active, button.chth-seg__item[aria-pressed="true"], button.chth-seg__item[aria-selected="true"], button.chth-seg__item[aria-checked="true"]';
   function placeSeg(seg) {
     var thumb = seg.querySelector('.chth-seg__thumb');
     var on = seg.querySelector('input:checked');
-    var face = on && on.nextElementSibling;
+    var face = on ? on.nextElementSibling : seg.querySelector(SEG_ON);
+    // Buttons change state through classes and ARIA, not events: follow them
+    if (!seg.chthSegWatch && w.MutationObserver && seg.querySelector('button.chth-seg__item')) {
+      seg.chthSegWatch = new MutationObserver(function () { placeSeg(seg); });
+      seg.chthSegWatch.observe(seg, { subtree: true, attributes: true, attributeFilter: ['class', 'aria-pressed', 'aria-selected', 'aria-checked'] });
+    }
     if (!thumb || !face) { seg.classList.remove('is-ready'); return; }
     seg.style.setProperty('--chth-seg-x', face.offsetLeft + 'px');
     seg.style.setProperty('--chth-seg-w', face.offsetWidth + 'px');

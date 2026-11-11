@@ -1168,6 +1168,7 @@
   --chth-field-radius: var(--chth-radius-md);
   --chth-field-focus: var(--chth-product-accent);
   --chth-field-font: var(--chth-text-16); /* 16px: phones don't zoom into the field */
+  --chth-field-h: var(--chth-space-44);
   --chth-chip-radius: var(--chth-radius-full);
   --chth-badge-radius: var(--chth-radius-full);
   --chth-seg-radius: var(--chth-radius-full);
@@ -1190,8 +1191,8 @@
   font-weight: 600;
   gap: var(--chth-space-8);
   justify-content: center;
+  height: var(--chth-btn-h);
   line-height: 1;
-  min-height: var(--chth-btn-h);
   padding: 0 var(--chth-space-16);
   position: relative;
   text-decoration: none;
@@ -1205,7 +1206,7 @@
 .chth-btn--icon { padding: 0; width: var(--chth-btn-h); }
 .chth-btn--block { width: 100%; }
 .chth-btn__icon { display: inline-grid; flex: none; place-items: center; }
-.chth-btn__icon svg { height: 1.1em; width: 1.1em; }
+.chth-btn__icon svg, .chth-btn > svg { flex: none; height: 1.1em; width: 1.1em; }
 .chth-btn--icon .chth-btn__icon svg { height: 1.2em; width: 1.2em; }
 .chth-btn--primary { background: var(--chth-product-accent); color: var(--chth-product-on-accent); }
 .chth-btn--secondary { background: var(--chth-field-bg); border-color: var(--chth-field-line); }
@@ -1252,12 +1253,12 @@
   color: inherit;
   font: inherit;
   font-size: var(--chth-field-font);
-  min-height: var(--chth-space-44);
+  height: var(--chth-field-h);
   padding: var(--chth-space-10) var(--chth-space-12);
   transition: border-color var(--chth-dur-150) ease, box-shadow var(--chth-dur-150) ease, background-color var(--chth-dur-150) ease;
   width: 100%;
 }
-.chth-textarea { line-height: 1.5; resize: vertical; }
+.chth-textarea { height: auto; line-height: 1.5; min-height: calc(var(--chth-field-h) * 2); resize: vertical; }
 .chth-input::placeholder, .chth-textarea::placeholder { color: currentColor; opacity: 0.45; }
 .chth-input:focus, .chth-select:focus, .chth-textarea:focus { border-color: var(--chth-field-focus); box-shadow: 0 0 0 3px color-mix(in srgb, var(--chth-field-focus) 22%, transparent); outline: none; }
 .chth-input:disabled, .chth-select:disabled, .chth-textarea:disabled { cursor: not-allowed; opacity: 0.55; }
@@ -1311,6 +1312,16 @@
 }
 .chth-seg.is-ready .chth-seg__thumb { opacity: 1; transition: transform var(--chth-dur-300) var(--chth-ease-out), width var(--chth-dur-300) var(--chth-ease-out); }
 .chth-seg.is-ready .chth-seg__item input:checked + span { background: transparent; box-shadow: none; }
+/* Options can also be buttons the page marks as chosen (.is-active, aria-pressed/-selected/-checked). */
+:where(button).chth-seg__item {
+  align-items: center; background: none; border: 0; border-radius: calc(var(--chth-seg-radius) - 2px); color: inherit; cursor: pointer;
+  font: inherit; font-size: var(--chth-text-13); font-weight: 600; gap: var(--chth-space-6); justify-content: center;
+  min-height: var(--chth-space-32); opacity: 0.7; padding: 0 var(--chth-space-14); white-space: nowrap;
+  transition: background-color var(--chth-dur-200) var(--chth-ease-out), color var(--chth-dur-200) ease, opacity var(--chth-dur-150) ease;
+}
+:where(button).chth-seg__item:is(.is-active, [aria-pressed="true"], [aria-selected="true"], [aria-checked="true"]) { background: var(--chth-product-accent); color: var(--chth-product-on-accent); opacity: 1; }
+.chth-seg.is-ready button.chth-seg__item:is(.is-active, [aria-pressed="true"], [aria-selected="true"], [aria-checked="true"]) { background: transparent; box-shadow: none; }
+:where(button).chth-seg__item:focus-visible { outline: 2px solid var(--chth-product-accent); outline-offset: 2px; }
 .chth-seg__item { z-index: 1; }
 .chth-seg__item { cursor: pointer; display: flex; flex: 1; position: relative; }
 .chth-seg__item input { inset: 0; margin: 0; opacity: 0; position: absolute; }
@@ -1404,9 +1415,11 @@
 }
 .chth-dialog--sm { width: 360px; }
 .chth-dialog--lg { width: 640px; }
-/* A solid glass: what's under a dialog shouldn't show through its words */
-.chth-dialog.chth-glass { --chth-glass-bg: color-mix(in srgb, var(--chth-ink-soft) 92%, transparent); }
-:root[data-theme="light"] .chth-dialog.chth-glass { --chth-glass-bg: rgba(255, 255, 255, 0.94); }
+/* A solid glass: what's under a dialog (or anything with .chth-glass--solid) shouldn't show
+   through its words */
+.chth-dialog.chth-glass, .chth-glass--solid { --chth-glass-bg: color-mix(in srgb, var(--chth-ink-soft) 92%, transparent); }
+:root[data-theme="light"] :is(.chth-dialog.chth-glass, .chth-glass--solid) { --chth-glass-bg: rgba(255, 255, 255, 0.94); }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) :is(.chth-dialog.chth-glass, .chth-glass--solid) { --chth-glass-bg: rgba(255, 255, 255, 0.94); } }
 .chth-dialog::backdrop { -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); background: rgb(0 0 0 / 0.45); }
 .chth-dialog[open] { animation: chth-dialog-in var(--chth-dur-250) var(--chth-ease-out); }
 .chth-dialog[open]::backdrop { animation: chth-fade-in var(--chth-dur-250) ease; }
@@ -1527,12 +1540,12 @@
   transition: background-color var(--chth-dur-150) ease, border-color var(--chth-dur-150) ease, color var(--chth-dur-150) ease;
   white-space: nowrap;
 }
-label.chth-chip, button.chth-chip { cursor: pointer; font: inherit; font-size: var(--chth-text-13); user-select: none; }
+:where(label, button).chth-chip { cursor: pointer; font-family: inherit; user-select: none; }
 .chth-chip--removable { padding-inline-end: var(--chth-space-4); }
 .chth-chip__icon svg { display: block; height: 1em; width: 1em; }
 .chth-chip__count { font-size: var(--chth-text-11); font-variant-numeric: tabular-nums; opacity: 0.6; }
-.chth-chip:is(:has(input:checked), [aria-pressed="true"]) { background: var(--chth-product-accent); border-color: var(--chth-product-accent); color: var(--chth-product-on-accent); }
-.chth-chip:is(:has(input:checked), [aria-pressed="true"]) .chth-chip__count { opacity: 0.8; }
+.chth-chip:is(:has(input:checked), [aria-pressed="true"], .is-selected) { background: var(--chth-product-accent); border-color: var(--chth-product-accent); color: var(--chth-product-on-accent); }
+.chth-chip:is(:has(input:checked), [aria-pressed="true"], .is-selected) .chth-chip__count { opacity: 0.8; }
 .chth-chip:has(input:focus-visible) { outline: 2px solid var(--chth-product-accent); outline-offset: 2px; }
 .chth-chip__remove {
   background: none; border: 0; border-radius: var(--chth-radius-full); color: inherit; cursor: pointer;
@@ -1540,7 +1553,7 @@ label.chth-chip, button.chth-chip { cursor: pointer; font: inherit; font-size: v
 }
 .chth-chip__remove svg { height: 0.8rem; width: 0.8rem; }
 .chth-chip__remove:hover, .chth-chip__remove:focus-visible { background: color-mix(in srgb, currentColor 14%, transparent); opacity: 1; outline: none; }
-@media (hover: hover) and (pointer: fine) { :is(label, button).chth-chip:hover:not(:has(input:checked), [aria-pressed="true"]) { border-color: color-mix(in srgb, currentColor 40%, transparent); } }
+@media (hover: hover) and (pointer: fine) { :is(label, button).chth-chip:hover:not(:has(input:checked), [aria-pressed="true"], .is-selected) { border-color: color-mix(in srgb, currentColor 40%, transparent); } }
 
 /* ---- Avatar ---- */
 .chth-avatar {
