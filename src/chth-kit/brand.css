@@ -22,6 +22,38 @@
   --chth-radius-lg: 14px;
   --chth-radius-xl: 20px;
   --chth-radius-full: 9999px;
+  --chth-space-2xs: 0.25rem;
+  --chth-space-xs: 0.5rem;
+  --chth-space-sm: 0.75rem;
+  --chth-space-md: 1rem;
+  --chth-space-lg: 1.5rem;
+  --chth-space-xl: 2rem;
+  --chth-space-2xl: 3rem;
+  --chth-text-xs: 0.75rem;
+  --chth-text-sm: 0.875rem;
+  --chth-text-md: 1rem;
+  --chth-text-lg: 1.125rem;
+  --chth-text-xl: 1.375rem;
+  --chth-text-2xl: 1.75rem;
+  --chth-text-3xl: 2.25rem;
+  --chth-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --chth-shadow-md: 0 8px 24px -12px rgba(0, 0, 0, 0.45);
+  --chth-shadow-lg: 0 24px 48px -20px rgba(0, 0, 0, 0.55);
+  --chth-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --chth-ease-glass: cubic-bezier(0.22, 1, 0.36, 1);
+  --chth-dur-fast: 150ms;
+  --chth-dur-base: 200ms;
+  --chth-dur-slow: 320ms;
+  --chth-dur-glass: 460ms;
+  --chth-z-menu: 50;
+  --chth-z-nav: 60;
+  --chth-z-banner: 70;
+  --chth-z-cookies: 2147482000;
+  --chth-z-toast: 2147483000;
+  --chth-success-soft: color-mix(in srgb, var(--chth-success) 16%, transparent);
+  --chth-warning-soft: color-mix(in srgb, var(--chth-warning) 16%, transparent);
+  --chth-danger-soft: color-mix(in srgb, var(--chth-danger) 16%, transparent);
+  --chth-telegram-soft: color-mix(in srgb, var(--chth-telegram) 16%, transparent);
   --chth-cafe-accent: #d6d3d1;
   --chth-cafe-accent-hover: #e7e5e4;
   --chth-cafe-on-accent: #0c0a09;
@@ -40,36 +72,42 @@
   --chth-product-accent: var(--chth-accent);
   --chth-product-accent-hover: var(--chth-accent-hover);
   --chth-product-on-accent: var(--chth-on-accent);
+  --chth-product-accent-soft: color-mix(in srgb, var(--chth-product-accent) 14%, transparent);
 }
 
 [data-chth-product="cafe"] {
   --chth-product-accent: var(--chth-cafe-accent);
   --chth-product-accent-hover: var(--chth-cafe-accent-hover);
   --chth-product-on-accent: var(--chth-cafe-on-accent);
+  --chth-product-accent-soft: color-mix(in srgb, var(--chth-product-accent) 14%, transparent);
 }
 
 [data-chth-product="gym"] {
   --chth-product-accent: var(--chth-gym-accent);
   --chth-product-accent-hover: var(--chth-gym-accent-hover);
   --chth-product-on-accent: var(--chth-gym-on-accent);
+  --chth-product-accent-soft: color-mix(in srgb, var(--chth-product-accent) 14%, transparent);
 }
 
 [data-chth-product="shop"] {
   --chth-product-accent: var(--chth-shop-accent);
   --chth-product-accent-hover: var(--chth-shop-accent-hover);
   --chth-product-on-accent: var(--chth-shop-on-accent);
+  --chth-product-accent-soft: color-mix(in srgb, var(--chth-product-accent) 14%, transparent);
 }
 
 [data-chth-product="wtf"] {
   --chth-product-accent: var(--chth-wtf-accent);
   --chth-product-accent-hover: var(--chth-wtf-accent-hover);
   --chth-product-on-accent: var(--chth-wtf-on-accent);
+  --chth-product-accent-soft: color-mix(in srgb, var(--chth-product-accent) 14%, transparent);
 }
 
 [data-chth-product="hub"] {
   --chth-product-accent: var(--chth-hub-accent);
   --chth-product-accent-hover: var(--chth-hub-accent-hover);
   --chth-product-on-accent: var(--chth-hub-on-accent);
+  --chth-product-accent-soft: color-mix(in srgb, var(--chth-product-accent) 14%, transparent);
 }
 
 :root[data-theme="light"] {
@@ -161,7 +199,7 @@
   text-decoration: none;
   transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 }
-.chth-footer__btn span { display: inline-block; transition: transform 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+.chth-footer__btn span { display: inline-block; transition: transform 200ms var(--chth-ease-out); }
 [dir="rtl"] .chth-footer__btn span { transform: scaleX(-1); }
 .chth-footer__links {
   align-items: center;
@@ -195,7 +233,7 @@
   height: var(--chth-control-size, 2.5rem);
   justify-items: center;
   list-style: none;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 160ms var(--chth-ease-out);
   user-select: none;
   -webkit-user-select: none;
   width: var(--chth-control-size, 2.5rem);
@@ -218,9 +256,9 @@
   position: absolute;
   top: calc(100% + 0.5rem);
   transform-origin: top;
-  z-index: 50;
+  z-index: var(--chth-z-menu);
 }
-.chth-lang-menu[open] .chth-lang-menu__list { animation: chth-menu-in 160ms cubic-bezier(0.23, 1, 0.32, 1); }
+.chth-lang-menu[open] .chth-lang-menu__list { animation: chth-menu-in 160ms var(--chth-ease-out); }
 .chth-lang-menu__list :is(a, button) {
   background: none;
   border: 0;
@@ -256,10 +294,10 @@
   height: var(--chth-control-size, 2.5rem);
   justify-items: center;
   padding: 0;
-  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 160ms var(--chth-ease-out);
   width: var(--chth-control-size, 2.5rem);
 }
-.chth-theme svg { grid-area: 1 / 1; height: 1.15rem; transition: opacity 200ms ease, transform 300ms cubic-bezier(0.23, 1, 0.32, 1); width: 1.15rem; }
+.chth-theme svg { grid-area: 1 / 1; height: 1.15rem; transition: opacity 200ms ease, transform 300ms var(--chth-ease-out); width: 1.15rem; }
 .chth-theme__moon, :root[data-theme="light"] .chth-theme__sun { opacity: 0; transform: rotate(-90deg) scale(0.6); }
 :root[data-theme="light"] .chth-theme__moon { opacity: 1; transform: none; }
 /* No choice yet and no script to set one: the toggle follows the system. */
@@ -278,7 +316,7 @@
    only the toggle's own icon turns. */
 :root.chth-theme-switching::view-transition-old(root), :root.chth-theme-switching::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
 :root.chth-theme-switching *, :root.chth-theme-switching *::before, :root.chth-theme-switching *::after { transition: none !important; }
-:root.chth-theme-switching .chth-theme svg { transition: opacity 200ms ease, transform 300ms cubic-bezier(0.23, 1, 0.32, 1) !important; }
+:root.chth-theme-switching .chth-theme svg { transition: opacity 200ms ease, transform 300ms var(--chth-ease-out) !important; }
 
 /* Toasts: glass pills, bottom centre, stacked; the kind shows in the icon and in the line for the
    time left. Above a tab bar docked at the bottom: the script measures its room
@@ -294,12 +332,12 @@
   padding-inline: 1rem;
   pointer-events: none;
   position: fixed;
-  z-index: 2147483000;
+  z-index: var(--chth-z-toast);
 }
 .chth-toast {
   --chth-toast-tone: var(--chth-product-accent);
   align-items: center;
-  animation: chth-toast-in 320ms cubic-bezier(0.23, 1, 0.32, 1);
+  animation: chth-toast-in 320ms var(--chth-ease-out);
   border-radius: var(--chth-radius-full);
   display: flex;
   font-family: var(--chth-font-sans);
@@ -385,8 +423,8 @@
    (transform, opacity), so the bar's box never changes and the page under a sticky navbar never
    moves. Resizing the layer, not clipping it, keeps the ends round and the rim on the edge. */
 :root {
-  --chth-glass-dur: 460ms;
-  --chth-glass-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --chth-glass-dur: var(--chth-dur-glass);
+  --chth-glass-ease: var(--chth-ease-glass);
   --chth-glass-bg: rgba(28, 28, 32, 0.6);
   --chth-glass-rim: rgba(255, 255, 255, 0.14);
   --chth-glass-shine: rgba(255, 255, 255, 0.22);
@@ -449,7 +487,7 @@
   position: sticky;
   top: calc(var(--chth-banner-h, 0px) + 0.75rem);
   transition: top 200ms ease;
-  z-index: 60;
+  z-index: var(--chth-z-nav);
 }
 :root[data-theme="light"] .chth-nav { --chth-nav-bg: rgba(255, 255, 255, 0.94); --chth-nav-ink: var(--chth-ink); --chth-nav-muted: color-mix(in srgb, var(--chth-ink) 60%, transparent); --chth-nav-ring: rgba(0, 0, 0, 0.08); }
 @media (prefers-color-scheme: light) { :root:not([data-theme]) .chth-nav { --chth-nav-bg: rgba(255, 255, 255, 0.94); --chth-nav-ink: var(--chth-ink); --chth-nav-muted: color-mix(in srgb, var(--chth-ink) 60%, transparent); --chth-nav-ring: rgba(0, 0, 0, 0.08); } }
@@ -520,7 +558,7 @@
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-  transition: background-color 300ms ease, transform 300ms cubic-bezier(0.23, 1, 0.32, 1);
+  transition: background-color 300ms ease, transform 300ms var(--chth-ease-out);
   z-index: 2;
 }
 .chth-nav__logo svg { height: 1.55rem; width: 3.4rem; }
@@ -537,7 +575,7 @@
   padding: 0;
   position: relative;
   text-decoration: none;
-  transition: background-color 200ms ease, color 200ms ease, transform 200ms cubic-bezier(0.23, 1, 0.32, 1);
+  transition: background-color 200ms ease, color 200ms ease, transform 200ms var(--chth-ease-out);
   width: var(--chth-control-size);
 }
 .chth-nav__icon svg, .chth-nav .chth-lang-menu > summary svg { height: 1rem; width: 1rem; }
@@ -600,9 +638,9 @@
   padding: 0.4rem 0.4rem 0.4rem 0.9rem;
   position: relative;
   text-align: center;
-  transition: margin-top 220ms cubic-bezier(0.23, 1, 0.32, 1), opacity 220ms ease;
+  transition: margin-top 220ms var(--chth-ease-out), opacity 220ms ease;
   width: min(40rem, calc(100% - 2rem));
-  z-index: 70;
+  z-index: var(--chth-z-banner);
 }
 .chth-banner::before {
   background: var(--chth-product-accent);
@@ -615,7 +653,7 @@
 }
 /* One sheen across the strip when it first shows. */
 .chth-banner::after {
-  animation: chth-banner-sheen 1.4s 0.4s cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation: chth-banner-sheen 1.4s 0.4s var(--chth-ease-out) both;
   background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--chth-glass-shine) 60%, transparent) 50%, transparent 70%);
   content: "";
   inset: 0;
@@ -649,7 +687,7 @@
 /* Cookie notice: a small glass card in the corner, not a wall. */
 .chth-cookies {
   align-items: center;
-  animation: chth-toast-in 420ms 0.8s cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation: chth-toast-in 420ms 0.8s var(--chth-ease-out) both;
   border-radius: 1.5rem;
   bottom: var(--chth-bottom-safe);
   display: flex;
@@ -662,7 +700,7 @@
   padding: 0.75rem 0.75rem 0.75rem 0.875rem;
   position: fixed;
   transition: opacity 200ms ease, transform 200ms ease;
-  z-index: 2147482000;
+  z-index: var(--chth-z-cookies);
 }
 .chth-cookies p { flex: 1; margin: 0; }
 .chth-cookies p a { color: inherit; font-weight: 600; }
@@ -749,4 +787,162 @@
 .chth-tabs [data-chth-tab].is-scrub { color: var(--chth-nav-ink, currentColor); }
 @media (prefers-reduced-motion: reduce) {
   .chth-tabs, .chth-tabs::before, .chth-tabs::after, .chth-tabs__glider, .chth-tabs [data-chth-tab] > * { transition: none; }
+}
+
+/* ---- Content pieces: what goes inside a site's pages (kit/src/ui.js builds the markup) ---- */
+
+/* Empty state: an icon in a soft accent circle, a title, a line of help and one way forward. */
+.chth-empty {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--chth-font-sans);
+  gap: var(--chth-space-xs);
+  margin-inline: auto;
+  max-width: 24rem;
+  padding: var(--chth-space-xl) var(--chth-space-md);
+  text-align: center;
+}
+.chth-empty__icon {
+  background: var(--chth-product-accent-soft);
+  border-radius: var(--chth-radius-full);
+  color: var(--chth-product-accent);
+  display: grid;
+  font-size: 1.5rem;
+  height: 3.5rem;
+  line-height: 1;
+  margin-bottom: var(--chth-space-2xs);
+  place-items: center;
+  width: 3.5rem;
+}
+.chth-empty__icon svg { height: 1.5rem; width: 1.5rem; }
+.chth-empty__title { font-family: var(--chth-font-display); font-size: var(--chth-text-lg); font-weight: 700; line-height: 1.3; margin: 0; }
+.chth-empty__text { font-size: var(--chth-text-sm); line-height: 1.55; margin: 0; opacity: 0.68; }
+.chth-empty__action {
+  align-items: center;
+  background: var(--chth-product-accent);
+  border: 0;
+  border-radius: var(--chth-radius-full);
+  color: var(--chth-product-on-accent);
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: var(--chth-text-sm);
+  font-weight: 700;
+  gap: 0.4rem;
+  margin-top: var(--chth-space-xs);
+  min-height: 2.75rem;
+  padding: 0 1.25rem;
+  text-decoration: none;
+  transition: background-color var(--chth-dur-fast) ease, transform var(--chth-dur-fast) var(--chth-ease-out);
+}
+.chth-empty__action:active { transform: scale(0.97); }
+.chth-empty__action:focus-visible { outline: 2px solid var(--chth-product-accent); outline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) { .chth-empty__action:hover { background: var(--chth-product-accent-hover); } }
+.chth-empty--compact { padding: var(--chth-space-md); }
+.chth-empty--compact .chth-empty__icon { font-size: 1.15rem; height: 2.5rem; width: 2.5rem; }
+
+/* Skeleton: grey shapes in the page's own colour while content loads, with one soft sheen
+   passing over them. Lines (default), a circle (avatars) or a block (cards, images); the
+   container that's loading carries aria-busy="true". */
+.chth-skeleton {
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  border-radius: var(--chth-radius-sm);
+  display: block;
+  height: 0.85em;
+  overflow: hidden;
+  position: relative;
+}
+.chth-skeleton::after {
+  animation: chth-skeleton 1.6s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, currentColor 9%, transparent), transparent);
+  content: "";
+  inset: 0;
+  position: absolute;
+  transform: translateX(-100%);
+}
+[dir="rtl"] .chth-skeleton::after { animation-direction: reverse; }
+.chth-skeleton + .chth-skeleton { margin-top: 0.6em; }
+.chth-skeleton--circle { border-radius: var(--chth-radius-full); height: 2.5rem; width: 2.5rem; }
+.chth-skeleton--block { border-radius: var(--chth-radius-lg); height: 8rem; }
+.chth-skeleton ~ .chth-skeleton:last-child { width: 62%; }
+/* Text for screen readers only (a skeleton's "Loading…"). */
+.chth-sr-only { border: 0; clip-path: inset(50%); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; white-space: nowrap; width: 1px; }
+@keyframes chth-skeleton { to { transform: translateX(100%); } }
+
+/* Progress ring: a track and an arc in the product accent, with the number (or anything) in the
+   middle. The arc follows --chth-ring (0 to 1), so a site animates it by setting that alone. */
+.chth-ring {
+  --chth-ring: 0;
+  --chth-ring-size: 4rem;
+  --chth-ring-width: 8;
+  --chth-ring-tone: var(--chth-product-accent);
+  display: inline-grid;
+  flex: none;
+  font-family: var(--chth-font-sans);
+  height: var(--chth-ring-size);
+  place-items: center;
+  position: relative;
+  width: var(--chth-ring-size);
+}
+.chth-ring > svg { grid-area: 1 / 1; height: 100%; transform: rotate(-90deg); width: 100%; }
+[dir="rtl"] .chth-ring > svg { transform: rotate(-90deg) scaleY(-1); }
+.chth-ring circle { fill: none; stroke-width: var(--chth-ring-width); }
+.chth-ring__track { stroke: color-mix(in srgb, currentColor 12%, transparent); }
+.chth-ring__arc {
+  stroke: var(--chth-ring-tone);
+  stroke-dasharray: 100;
+  stroke-dashoffset: calc(100 - min(max(var(--chth-ring), 0), 1) * 100);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 700ms var(--chth-ease-out), stroke var(--chth-dur-base) ease;
+}
+.chth-ring__label { font-size: calc(var(--chth-ring-size) * 0.24); font-variant-numeric: tabular-nums; font-weight: 700; grid-area: 1 / 1; line-height: 1; }
+.chth-ring--done { --chth-ring-tone: var(--chth-success); }
+.chth-ring--sm { --chth-ring-size: 2.5rem; --chth-ring-width: 10; }
+.chth-ring--lg { --chth-ring-size: 6.5rem; --chth-ring-width: 7; }
+
+/* Milestone: a toast that celebrates (a first workout, a 7-day streak, a first order). Taller,
+   with a title and a line under it, an accent medal and a small burst of sparks as it arrives. */
+.chth-toast--milestone {
+  --chth-toast-tone: var(--chth-product-accent);
+  border-radius: var(--chth-radius-xl);
+  overflow: visible;
+  padding: 0.6rem;
+  padding-inline-end: 0.45rem;
+}
+.chth-toast--milestone .chth-toast__icon {
+  background: var(--chth-product-accent);
+  color: var(--chth-product-on-accent);
+  height: 2.5rem;
+  position: relative;
+  width: 2.5rem;
+}
+.chth-toast--milestone .chth-toast__icon svg { height: 1.25rem; width: 1.25rem; }
+.chth-toast__title { display: block; font-family: var(--chth-font-display); font-size: 0.95rem; font-weight: 700; }
+.chth-toast__detail { display: block; font-size: 0.8125rem; opacity: 0.72; }
+.chth-toast--milestone .chth-toast__time { inset-inline: var(--chth-space-lg); }
+.chth-toast__sparks { inset: 0; pointer-events: none; position: absolute; }
+.chth-toast__sparks i {
+  animation: chth-spark 700ms var(--chth-ease-out) forwards;
+  background: var(--chth-product-accent);
+  border-radius: var(--chth-radius-full);
+  height: 0.375rem;
+  inset-block-start: calc(50% - 0.1875rem);
+  inset-inline-start: calc(50% - 0.1875rem);
+  opacity: 0;
+  position: absolute;
+  transform: rotate(var(--a)) translateX(0);
+  width: 0.375rem;
+}
+.chth-toast--milestone .chth-toast__icon { animation: chth-medal 520ms var(--chth-ease-out); }
+@keyframes chth-spark {
+  0% { opacity: 1; transform: rotate(var(--a)) translateX(0.9rem) scale(1); }
+  100% { opacity: 0; transform: rotate(var(--a)) translateX(2rem) scale(0.4); }
+}
+@keyframes chth-medal { 0% { transform: scale(0.4) rotate(-20deg); } 60% { transform: scale(1.12) rotate(6deg); } 100% { transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .chth-skeleton::after, .chth-toast__sparks { display: none; }
+  .chth-ring__arc, .chth-empty__action { transition: none; }
+  .chth-toast--milestone .chth-toast__icon { animation: none; }
 }

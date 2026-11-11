@@ -88,9 +88,13 @@
     warning: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4M12 17h.01"/>',
     info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
     accent: '<path d="M12 3l1.9 5.8H20l-4.9 3.6 1.9 5.8-5-3.6-5 3.6 1.9-5.8L4 8.8h6.1z"/>',
+    // Lucide's award: a medal on a ribbon.
+    milestone: '<circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/>',
   };
-  var KINDS = { success: 1, danger: 1, warning: 1, info: 1, accent: 1, error: 'danger', default: 'info' };
+  var KINDS = { success: 1, danger: 1, warning: 1, info: 1, accent: 1, milestone: 1, error: 'danger', default: 'info' };
   var CLOSE = { en: 'Close', fa: 'بستن', ar: 'إغلاق', ru: 'Закрыть', es: 'Cerrar' };
+  var NOTIFICATIONS = { en: 'Notifications', fa: 'اعلان‌ها', ar: 'الإشعارات', ru: 'Уведомления', es: 'Notificaciones' };
+  var lang = function () { return (root.lang || 'en').slice(0, 2); };
   var seq = 0, live = {};
 
   function region() {
@@ -98,7 +102,7 @@
     if (!r) {
       r = d.createElement('section');
       r.className = 'chth-toasts';
-      r.setAttribute('aria-label', 'Notifications');
+      r.setAttribute('aria-label', NOTIFICATIONS[lang()] || NOTIFICATIONS.en);
       d.body.appendChild(r);
     }
     return r;
@@ -123,8 +127,9 @@
   /**
    * Shows a toast and returns its id.
    * @param {string} message
-   * @param {{ type?: 'success'|'danger'|'warning'|'info'|'accent', duration?: number,
-   *   action?: { label: string, onClick?: Function }, onClose?: Function }} [opts]
+   * @param {{ type?: 'success'|'danger'|'warning'|'info'|'accent'|'milestone', duration?: number,
+   *   detail?: string, action?: { label: string, onClick?: Function }, onClose?: Function }} [opts]
+   * With `detail`, the message is a title and the detail a line under it (milestones use this).
    */
   function toast(message, opts) {
     opts = opts || {};
@@ -140,7 +145,29 @@
     icon.innerHTML = svg(ICONS[kind]);
     var text = d.createElement('span');
     text.className = 'chth-toast__text';
-    text.textContent = String(message == null ? '' : message);
+    if (opts.detail) {
+      var title = d.createElement('strong');
+      title.className = 'chth-toast__title';
+      title.textContent = String(message == null ? '' : message);
+      var detail = d.createElement('span');
+      detail.className = 'chth-toast__detail';
+      detail.textContent = String(opts.detail);
+      text.appendChild(title);
+      text.appendChild(detail);
+    } else text.textContent = String(message == null ? '' : message);
+    if (kind === 'milestone' && !reduced()) {
+      // Eight sparks fly out of the medal as it lands.
+      var sparks = d.createElement('span');
+      sparks.className = 'chth-toast__sparks';
+      sparks.setAttribute('aria-hidden', 'true');
+      for (var s = 0; s < 8; s++) {
+        var i = d.createElement('i');
+        i.style.setProperty('--a', (s * 45 + 22) + 'deg');
+        i.style.animationDelay = (120 + (s % 2) * 60) + 'ms';
+        sparks.appendChild(i);
+      }
+      icon.appendChild(sparks);
+    }
     el.appendChild(icon);
     el.appendChild(text);
     if (opts.action && opts.action.label) {
@@ -157,25 +184,30 @@
     var x = d.createElement('button');
     x.type = 'button';
     x.className = 'chth-toast__close';
-    var lang = (root.lang || 'en').slice(0, 2);
-    x.setAttribute('aria-label', CLOSE[lang] || CLOSE.en);
+    x.setAttribute('aria-label', CLOSE[lang()] || CLOSE.en);
     x.innerHTML = svg('<path d="M18 6 6 18M6 6l12 12"/>');
     x.addEventListener('click', function () { close(id); });
     el.appendChild(x);
 
-    var duration = opts.duration == null ? (kind === 'danger' ? 6000 : 4000) : opts.duration;
+    var duration = opts.duration == null ? (kind === 'danger' || kind === 'milestone' ? 6000 : 4000) : opts.duration;
     var t = live[id] = { el: el, onClose: opts.onClose, timer: 0, left: duration, started: 0 };
     if (duration > 0) {
       var bar = d.createElement('span');
       bar.className = 'chth-toast__time';
       bar.style.animationDuration = duration + 'ms';
       el.appendChild(bar);
-      var run = function () { t.started = Date.now(); t.timer = setTimeout(function () { close(id); }, t.left); el.classList.remove('chth-toast--paused'); };
-      var pause = function () { if (!live[id]) return; clearTimeout(t.timer); t.left -= Date.now() - t.started; el.classList.add('chth-toast--paused'); };
+      // Hover, focus and touch can overlap (a tap also sends mouse events), so each is a no-op twice.
+      var running = false;
+      var run = function () { if (running || !live[id]) return; running = true; t.started = Date.now(); t.timer = setTimeout(function () { close(id); }, t.left); el.classList.remove('chth-toast--paused'); };
+      var pause = function () { if (!running) return; running = false; clearTimeout(t.timer); t.left -= Date.now() - t.started; el.classList.add('chth-toast--paused'); };
       el.addEventListener('mouseenter', pause);
       el.addEventListener('mouseleave', run);
       el.addEventListener('focusin', pause);
       el.addEventListener('focusout', function (e) { if (!el.contains(e.relatedTarget)) run(); });
+      // On phones, holding a toast keeps it, like hovering does.
+      el.addEventListener('touchstart', pause, { passive: true });
+      el.addEventListener('touchend', run);
+      el.addEventListener('touchcancel', run);
       run();
     }
     var r = region();
@@ -184,7 +216,7 @@
     for (var i = 0; i < shown.length - 3; i++) close(shown[i].id);
     return id;
   }
-  ['success', 'danger', 'warning', 'info', 'accent'].forEach(function (k) {
+  ['success', 'danger', 'warning', 'info', 'accent', 'milestone'].forEach(function (k) {
     toast[k] = function (message, opts) { var o = {}; for (var p in opts || {}) o[p] = opts[p]; o.type = k; return toast(message, o); };
   });
   toast.error = toast.danger;

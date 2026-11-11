@@ -1,8 +1,8 @@
 // Generated from the CHTH kit (chth.hub/kit) by `npm run sync`. Do not edit here: edit the kit and sync.
 import type { Locale, Text } from './locales.js';
 export type Theme = 'dark' | 'light';
-export type ToastKind = 'success' | 'danger' | 'warning' | 'info' | 'accent';
-export interface ToastOptions { type?: ToastKind | 'error'; duration?: number; action?: { label: string; onClick?: () => void }; onClose?: () => void }
+export type ToastKind = 'success' | 'danger' | 'warning' | 'info' | 'accent' | 'milestone';
+export interface ToastOptions { type?: ToastKind | 'error'; duration?: number; detail?: string; action?: { label: string; onClick?: () => void }; onClose?: () => void }
 export interface ToastFn {
   (message: string, opts?: ToastOptions): string | null;
   success(message: string, opts?: ToastOptions): string | null;
@@ -11,6 +11,8 @@ export interface ToastFn {
   warning(message: string, opts?: ToastOptions): string | null;
   info(message: string, opts?: ToastOptions): string | null;
   accent(message: string, opts?: ToastOptions): string | null;
+  /** A celebration: `message` is the title, `opts.detail` the line under it. */
+  milestone(message: string, opts?: ToastOptions): string | null;
   close(id: string | null | undefined): void;
 }
 export const THEME_KEY: 'chth_theme';

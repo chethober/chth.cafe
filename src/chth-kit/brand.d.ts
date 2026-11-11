@@ -8,6 +8,11 @@ export const BRAND: {
   font: Record<'sans' | 'display' | 'mono' | 'rtl', string>;
   fontCss: Record<'latin' | 'rtl', string>;
   radius: Record<'sm' | 'md' | 'lg' | 'xl' | 'full', string>;
+  space: Record<'2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl', string>;
+  text: Record<'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl', string>;
+  shadow: Record<'sm' | 'md' | 'lg', string>;
+  motion: Record<'easeOut' | 'easeGlass' | 'durFast' | 'durBase' | 'durSlow' | 'durGlass', string>;
+  z: Record<'menu' | 'nav' | 'banner' | 'cookies' | 'toast', string>;
 };
 export const LOGO_SVG: string;
 export const BRAND_CSS: string;

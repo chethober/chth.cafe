@@ -200,12 +200,13 @@ const shell = () => (typeof window === 'undefined' ? null : window.chthShell);
 
 /**
  * Shows a toast; returns its id (null on the server). toast.success / danger / warning / info /
- * accent pick the kind; toast.close(id) closes one.
+ * accent pick the kind; toast.close(id) closes one. toast.milestone(title, { detail }) celebrates
+ * (a first workout, a streak, a first order): a taller toast with a medal and a line under it.
  * @param {string} message
- * @param {{ type?: string, duration?: number, action?: { label: string, onClick?: () => void }, onClose?: () => void }} [opts]
+ * @param {{ type?: string, duration?: number, detail?: string, action?: { label: string, onClick?: () => void }, onClose?: () => void }} [opts]
  */
 export function toast(message, opts) { return shell()?.toast(message, opts) ?? null; }
-for (const kind of ['success', 'danger', 'warning', 'info', 'accent', 'error']) {
+for (const kind of ['success', 'danger', 'warning', 'info', 'accent', 'milestone', 'error']) {
   toast[kind] = (message, opts) => shell()?.toast[kind](message, opts) ?? null;
 }
 toast.close = (id) => shell()?.toast.close(id);
