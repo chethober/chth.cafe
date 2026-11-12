@@ -311,7 +311,7 @@
   font-size: var(--chth-text-14);
   gap: var(--chth-space-2);
   inset-inline-end: 0;
-  min-width: 10rem;
+  min-width: 13.5rem;
   padding: var(--chth-space-6);
   position: absolute;
   top: calc(100% + 0.5rem);
@@ -320,21 +320,56 @@
 }
 .chth-lang-menu[open] .chth-lang-menu__list { animation: chth-menu-in var(--chth-dur-150) var(--chth-ease-out); }
 .chth-lang-menu__list :is(a, button) {
+  align-items: center;
   background: none;
   border: 0;
-  cursor: pointer;
-  font: inherit;
-  text-align: start;
-  width: 100%;
   border-radius: var(--chth-radius-md);
+  box-sizing: border-box;
   color: inherit;
-  display: block;
-  padding: var(--chth-space-8) var(--chth-space-12);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: var(--chth-space-10);
+  min-height: 2.625rem;
+  padding: 0 var(--chth-space-12);
+  text-align: start;
   text-decoration: none;
+  width: 100%;
 }
 .chth-lang-menu__list :is(a, button):hover, .chth-lang-menu__list :is(a, button):focus-visible { background: color-mix(in srgb, currentColor 8%, transparent); outline: none; }
 .chth-lang-menu__list :is(a, button):is(:lang(fa), :lang(ar)) { font-family: var(--chth-font-rtl); letter-spacing: 0; }
-.chth-lang-menu__list :is(a, button)[aria-current="true"] { color: var(--chth-product-accent); font-weight: 700; }
+.chth-lang-menu__list :is(a, button)[aria-current="true"] { background: color-mix(in srgb, currentColor 7%, transparent); color: var(--chth-product-accent); font-weight: 700; }
+/* A row: the check (current only), the flag, the language's own name, its code at the far end */
+.chth-lang-menu__check { display: inline-grid; flex: none; height: 1rem; place-items: center; width: 1rem; }
+.chth-lang-menu__check svg { height: 1rem; width: 1rem; }
+/* Each name keeps its own script's direction (isolated) but lines up with the menu's start */
+.chth-lang-menu__name { flex: 1; text-align: start; unicode-bidi: isolate; }
+.chth-lang-menu__code { flex: none; font-family: var(--chth-font-sans); font-size: var(--chth-text-11); font-weight: 600; letter-spacing: 0.06em; opacity: 0.6; }
+.chth-lang-menu__list .chth-lang-menu__code { color: inherit; }
+/* Flags (flags.js): 3:2 with soft corners and a hairline edge, so a white band holds its shape */
+.chth-flag { border-radius: var(--chth-radius-4); box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 16%, transparent); display: inline-block; flex: none; height: 0.875rem; overflow: hidden; vertical-align: middle; width: 1.3125rem; }
+/* The globe's badge: the current language's code, hanging off the button's upper corner so it
+   only touches the globe's edge, even on a phone's 30px navbar buttons */
+.chth-lang-menu > summary { position: relative; }
+.chth-lang-menu__badge {
+  background: var(--chth-product-accent);
+  border-radius: var(--chth-radius-full);
+  box-shadow: 0 0 0 2px var(--chth-lang-badge-ring, var(--chth-ink-soft));
+  color: var(--chth-product-on-accent);
+  font-family: var(--chth-font-sans);
+  font-size: var(--chth-text-10);
+  font-weight: 800;
+  height: 0.9375rem;
+  inset-inline-end: calc(var(--chth-space-6) * -1);
+  letter-spacing: 0.04em;
+  line-height: 0.9375rem;
+  padding: 0 var(--chth-space-4);
+  pointer-events: none;
+  position: absolute;
+  top: calc(var(--chth-space-4) * -1);
+}
+:root[data-theme="light"] .chth-lang-menu__badge { --chth-lang-badge-ring: #fff; }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) .chth-lang-menu__badge { --chth-lang-badge-ring: #fff; } }
 @keyframes chth-menu-in { from { opacity: 0; transform: translateY(-4px) scale(0.97); } }
 @media (prefers-reduced-motion: reduce) { .chth-lang-menu[open] .chth-lang-menu__list { animation: none; } }
 @media (hover: hover) and (pointer: fine) {
