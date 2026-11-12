@@ -543,7 +543,9 @@
   --chth-control-size: 2.25rem;
   --chth-nav-bg: color-mix(in srgb, var(--chth-ink-soft) 94%, transparent);
   --chth-nav-ink: var(--chth-paper);
-  --chth-nav-muted: color-mix(in srgb, var(--chth-paper) 62%, transparent);
+  /* Solid, not see-through: an icon's strokes that cross (the globe's) would paint twice and show
+     brighter spots where they meet */
+  --chth-nav-muted: color-mix(in srgb, var(--chth-paper) 62%, var(--chth-ink-soft));
   --chth-nav-ring: rgba(255, 255, 255, 0.09);
   font-family: var(--chth-font-sans);
   padding: 0 var(--chth-space-16);
@@ -553,8 +555,8 @@
   transition: top var(--chth-dur-200) ease;
   z-index: var(--chth-z-nav);
 }
-:root[data-theme="light"] .chth-nav { --chth-nav-bg: rgba(255, 255, 255, 0.94); --chth-nav-ink: var(--chth-ink); --chth-nav-muted: color-mix(in srgb, var(--chth-ink) 60%, transparent); --chth-nav-ring: rgba(0, 0, 0, 0.08); }
-@media (prefers-color-scheme: light) { :root:not([data-theme]) .chth-nav { --chth-nav-bg: rgba(255, 255, 255, 0.94); --chth-nav-ink: var(--chth-ink); --chth-nav-muted: color-mix(in srgb, var(--chth-ink) 60%, transparent); --chth-nav-ring: rgba(0, 0, 0, 0.08); } }
+:root[data-theme="light"] .chth-nav { --chth-nav-bg: rgba(255, 255, 255, 0.94); --chth-nav-ink: var(--chth-ink); --chth-nav-muted: color-mix(in srgb, var(--chth-ink) 60%, var(--chth-paper)); --chth-nav-ring: rgba(0, 0, 0, 0.08); }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) .chth-nav { --chth-nav-bg: rgba(255, 255, 255, 0.94); --chth-nav-ink: var(--chth-ink); --chth-nav-muted: color-mix(in srgb, var(--chth-ink) 60%, var(--chth-paper)); --chth-nav-ring: rgba(0, 0, 0, 0.08); } }
 .chth-nav:not(.chth-nav--overlay) { margin: var(--chth-space-12) 0; }
 .chth-nav--overlay { inset-inline: 0; position: fixed; }
 .chth-nav__pill {
