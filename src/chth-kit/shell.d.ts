@@ -25,7 +25,7 @@ export const USER_SVG: string;
 export interface NavbarOptions { home?: string; leadHref?: string; words?: string[]; account?: { href: string; label?: string } | null }
 export interface NavbarModel { home: string; homeLabel: string; logoSvg: string; words: string[]; leadHref: string; account: { href: string; label: string } | null; userSvg: string }
 export function navbarModel(locale: Locale, self: string, opts?: NavbarOptions): NavbarModel;
-export function navbarHtml(locale: Locale, self: string, opts?: NavbarOptions & { extra?: string; theme?: boolean; themeFormAction?: string; language?: boolean; overlay?: boolean; className?: string; langHref?: (code: Locale) => string }): string;
+export function navbarHtml(locale: Locale, self: string, opts?: NavbarOptions & { extra?: string; theme?: boolean; themeFormAction?: string; language?: boolean; overlay?: boolean; className?: string; langHref?: (code: Locale) => string; flagBase?: string }): string;
 export function themeToggleModel(locale: Locale): { label: string; iconsSvg: string };
 export function themeToggleHtml(locale: Locale, opts?: { className?: string; formAction?: string }): string;
 export interface Announcement { text: string; url: string | null }

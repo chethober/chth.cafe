@@ -169,6 +169,8 @@ export function cafeNav(locale: Locale, spec: NavSpec) {
     theme: spec.theme,
     themeFormAction: '/theme',
     language: spec.language,
+    // The switcher's flags: public/chth-flags, which the control plane serves from release/assets
+    flagBase: '/assets/chth-flags',
   });
 }
 
