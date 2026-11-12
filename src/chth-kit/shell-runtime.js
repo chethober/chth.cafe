@@ -105,8 +105,67 @@
       r.setAttribute('aria-label', NOTIFICATIONS[lang()] || NOTIFICATIONS.en);
       d.body.appendChild(r);
     }
+    if (floats.indexOf(r) < 0) float(r);
     return r;
   }
+
+  // ---- Above dialogs ----
+  // A modal <dialog> sits in the browser's top layer and makes the rest of the page inert, so a
+  // toast, or a page's own floating control (a rest timer, a player), would be stuck under its
+  // backdrop. Floating pieces become manual popovers and ride inside the topmost open modal
+  // dialog: the top layer still places them against the viewport, and inside the dialog they
+  // stay clickable. They go back to <body> when it closes. The toast region floats on its own;
+  // a page floats anything else with chthShell.float(el).
+
+  var floats = [], modals = [];
+  var isModal = function (dl) { try { return dl.matches(':modal'); } catch (e) { return dl.open; } };
+
+  function topModal() {
+    modals = modals.filter(function (m) { return m.isConnected && m.open; });
+    for (var i = modals.length - 1; i >= 0; i--) if (isModal(modals[i])) return modals[i];
+    var open = d.querySelectorAll('dialog[open]');
+    for (var j = open.length - 1; j >= 0; j--) if (isModal(open[j])) return open[j];
+    return null;
+  }
+
+  function place(el, host) {
+    var moved = el.parentNode !== host;
+    if (moved) host.appendChild(el);
+    if (!el.showPopover) return;
+    try {
+      // Shown again, so it stacks above whatever entered the top layer since
+      if (el.matches(':popover-open')) el.hidePopover();
+      el.showPopover();
+    } catch (e) { /* not a popover after all */ }
+  }
+
+  /** Puts every floating piece above the topmost open modal dialog, or back on the page. */
+  function refloat(opened) {
+    if (!d.body) return;
+    if (opened && opened.nodeName === 'DIALOG') { modals = modals.filter(function (m) { return m !== opened; }); modals.push(opened); }
+    floats = floats.filter(function (el) { return el.isConnected; });
+    var host = topModal() || d.body;
+    for (var i = 0; i < floats.length; i++) place(floats[i], host);
+  }
+
+  /** Keeps `el` (position: fixed) visible and usable above dialogs. */
+  function float(el) {
+    if (!el || floats.indexOf(el) >= 0) return el;
+    el.setAttribute('popover', 'manual');
+    el.setAttribute('data-chth-float', '');
+    floats.push(el);
+    if (d.body) place(el, topModal() || d.body);
+    return el;
+  }
+
+  // Dialogs opened with showModal() directly announce themselves with a toggle event where the
+  // browser supports it; chthUi.openDialog calls refloat itself. 'close' doesn't bubble: capture.
+  d.addEventListener('toggle', function (e) {
+    if (e.target && e.target.nodeName === 'DIALOG' && e.newState === 'open') refloat(e.target);
+  }, true);
+  d.addEventListener('close', function (e) {
+    if (e.target && e.target.nodeName === 'DIALOG' && floats.length) refloat();
+  }, true);
 
   function svg(paths) {
     return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + '</svg>';
@@ -709,6 +768,6 @@
     if (zone) zone.focus();
   });
 
-  w.chthShell = { theme: currentTheme, setTheme: setTheme, toggleTheme: toggleTheme, toast: toast, applyDismissed: applyDismissed, startNav: startNav };
+  w.chthShell = { theme: currentTheme, setTheme: setTheme, toggleTheme: toggleTheme, toast: toast, applyDismissed: applyDismissed, startNav: startNav, float: float, refloat: refloat };
   w.chthToast = toast;
 })();

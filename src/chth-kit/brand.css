@@ -382,6 +382,10 @@
    time left. Above a tab bar docked at the bottom: the script measures its room
    (--chth-bottom-room), and toasts and the cookie notice keep clear of it. */
 :root { --chth-bottom-safe: max(calc(1rem + env(safe-area-inset-bottom, 0px)), var(--chth-bottom-room, 0px)); }
+/* Floating pieces (toasts, a page's chthShell.float(el)) are manual popovers so they stay above
+   an open dialog: drop the browser's popover box, keep each piece's own position (zero
+   specificity, so .chth-toasts and the page's own classes win). */
+:where([data-chth-float][popover]) { background: none; border: 0; color: inherit; height: auto; inset: auto; margin: 0; max-height: none; max-width: none; overflow: visible; padding: 0; width: auto; }
 .chth-toasts {
   align-items: center;
   bottom: var(--chth-bottom-safe);
@@ -1408,6 +1412,8 @@
   box-sizing: border-box;
   color: var(--chth-glass-ink);
   font: inherit;
+  /* Centred by the browser's own dialog style; said again for CSS resets (Tailwind 4's) that zero it */
+  margin: auto;
   max-height: min(85vh, 720px);
   max-width: calc(100vw - 32px);
   padding: 0;
