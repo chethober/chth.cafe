@@ -346,8 +346,10 @@
 .chth-lang-menu__name { flex: 1; text-align: start; unicode-bidi: isolate; }
 .chth-lang-menu__code { flex: none; font-family: var(--chth-font-sans); font-size: var(--chth-text-11); font-weight: 600; letter-spacing: 0.06em; opacity: 0.6; }
 .chth-lang-menu__list .chth-lang-menu__code { color: inherit; }
-/* Flags (flags.js): 3:2 with soft corners and a hairline edge, so a white band holds its shape */
-.chth-flag { border-radius: var(--chth-radius-4); box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 16%, transparent); display: inline-block; flex: none; height: 0.875rem; overflow: hidden; vertical-align: middle; width: 1.3125rem; }
+/* Flags (kit/flags, real flag-icons artwork at 4:3): soft corners and a hairline edge, so a white
+   band holds its shape on a light menu */
+.chth-flag { border-radius: var(--chth-radius-2); box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 16%, transparent); display: inline-block; flex: none; height: 0.9375rem; object-fit: cover; vertical-align: middle; width: 1.25rem; }
+.chth-flag--none { box-shadow: none; }
 /* The globe's badge: the current language's code, hanging off the button's upper corner so it
    only touches the globe's edge, even on a phone's 30px navbar buttons */
 .chth-lang-menu > summary { position: relative; }

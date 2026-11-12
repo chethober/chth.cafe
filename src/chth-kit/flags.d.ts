@@ -1,5 +1,6 @@
 // Generated from the CHTH kit (chth.hub/kit) by `npm run sync`. Do not edit here: edit the kit and sync.
 import type { Locale } from './locales.js';
-/** Inline SVG flags (class="chth-flag", decorative) for the five languages; Persian is the Lion and Sun flag. */
-export const FLAGS: Readonly<Record<Locale, string>>;
-export function flagSvg(code: string): string;
+/** The languages that have a flag file in kit/flags (real flag-icons artwork, MIT). */
+export const FLAG_CODES: readonly Locale[];
+/** The flag file's URL under `base` (where the site serves kit/flags), or '' when there is none. */
+export function flagSrc(code: string, base?: string | null): string;

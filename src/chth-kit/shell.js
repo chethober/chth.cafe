@@ -138,7 +138,7 @@ export function navbarHtml(locale, self, opts = {}) {
   const first = m.words[0] ?? '';
   const account = m.account
     ? `<a class="chth-nav__icon" href="${esc(m.account.href)}" aria-label="${esc(m.account.label)}" title="${esc(m.account.label)}">${m.userSvg}</a>` : '';
-  const prefs = (opts.language === false ? '' : languageMenuHtml(locale, { langHref: opts.langHref, className: 'chth-nav__lang' }))
+  const prefs = (opts.language === false ? '' : languageMenuHtml(locale, { langHref: opts.langHref, className: 'chth-nav__lang', flagBase: opts.flagBase }))
     + (opts.theme === false ? '' : themeToggleHtml(locale, { className: 'chth-nav__icon', formAction: opts.themeFormAction }));
   return `<header class="chth-nav${opts.overlay ? ' chth-nav--overlay' : ''}${opts.className ? ` ${esc(opts.className)}` : ''}" data-chth-nav>`
     + `<div class="chth-nav__pill">`
