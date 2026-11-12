@@ -67,16 +67,21 @@
   // ---- Dialogs and sheets ----
   function openDialog(id) {
     var dlg = typeof id === 'string' ? d.getElementById(id) : id;
-    if (!dlg || dlg.open || !dlg.showModal) return;
+    if (!dlg || !dlg.showModal) return;
+    // Opened again while it was still animating shut: keep it open
+    if (dlg.chthClosing) { clearTimeout(dlg.chthClosing); dlg.chthClosing = null; dlg.classList.remove('is-closing'); dlg.style.transform = ''; }
+    if (dlg.open) return;
     dlg.returnValue = '';
     dlg.showModal();
+    // Toasts and the page's floating controls move above it (shell-runtime.js, "Above dialogs")
+    if (w.chthShell && w.chthShell.refloat) w.chthShell.refloat(dlg);
   }
   function closeDialog(id, value) {
     var dlg = typeof id === 'string' ? d.getElementById(id) : id;
-    if (!dlg || !dlg.open) return;
+    if (!dlg || !dlg.open || dlg.chthClosing) return;
     if (reduced()) return dlg.close(value);
     dlg.classList.add('is-closing');
-    setTimeout(function () { dlg.classList.remove('is-closing'); dlg.style.transform = ''; dlg.close(value); }, 180);
+    dlg.chthClosing = setTimeout(function () { dlg.chthClosing = null; dlg.classList.remove('is-closing'); dlg.style.transform = ''; dlg.close(value); }, 180);
   }
   d.addEventListener('click', function (e) {
     var opener = e.target.closest && e.target.closest('[data-chth-open]');
@@ -126,6 +131,8 @@
     tip.setAttribute('role', 'tooltip');
     tip.hidden = true;
     d.body.appendChild(tip);
+    // Above an open dialog too, like the toasts (shell-runtime.js, "Above dialogs")
+    if (w.chthShell && w.chthShell.float) w.chthShell.float(tip);
     return tip;
   }
   function place(el, anchor, gap) {

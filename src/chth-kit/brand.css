@@ -382,6 +382,10 @@
    time left. Above a tab bar docked at the bottom: the script measures its room
    (--chth-bottom-room), and toasts and the cookie notice keep clear of it. */
 :root { --chth-bottom-safe: max(calc(1rem + env(safe-area-inset-bottom, 0px)), var(--chth-bottom-room, 0px)); }
+/* Floating pieces (toasts, a page's chthShell.float(el)) are manual popovers so they stay above
+   an open dialog: drop the browser's popover box, keep each piece's own position (zero
+   specificity, so .chth-toasts and the page's own classes win). */
+:where([data-chth-float][popover]) { background: none; border: 0; color: inherit; height: auto; inset: auto; margin: 0; max-height: none; max-width: none; overflow: visible; padding: 0; width: auto; }
 .chth-toasts {
   align-items: center;
   bottom: var(--chth-bottom-safe);
@@ -539,7 +543,9 @@
   --chth-control-size: 2.25rem;
   --chth-nav-bg: color-mix(in srgb, var(--chth-ink-soft) 94%, transparent);
   --chth-nav-ink: var(--chth-paper);
-  --chth-nav-muted: color-mix(in srgb, var(--chth-paper) 62%, transparent);
+  /* Solid, not see-through: an icon's strokes that cross (the globe's) would paint twice and show
+     brighter spots where they meet */
+  --chth-nav-muted: color-mix(in srgb, var(--chth-paper) 62%, var(--chth-ink-soft));
   --chth-nav-ring: rgba(255, 255, 255, 0.09);
   font-family: var(--chth-font-sans);
   padding: 0 var(--chth-space-16);
@@ -549,8 +555,8 @@
   transition: top var(--chth-dur-200) ease;
   z-index: var(--chth-z-nav);
 }
-:root[data-theme="light"] .chth-nav { --chth-nav-bg: rgba(255, 255, 255, 0.94); --chth-nav-ink: var(--chth-ink); --chth-nav-muted: color-mix(in srgb, var(--chth-ink) 60%, transparent); --chth-nav-ring: rgba(0, 0, 0, 0.08); }
-@media (prefers-color-scheme: light) { :root:not([data-theme]) .chth-nav { --chth-nav-bg: rgba(255, 255, 255, 0.94); --chth-nav-ink: var(--chth-ink); --chth-nav-muted: color-mix(in srgb, var(--chth-ink) 60%, transparent); --chth-nav-ring: rgba(0, 0, 0, 0.08); } }
+:root[data-theme="light"] .chth-nav { --chth-nav-bg: rgba(255, 255, 255, 0.94); --chth-nav-ink: var(--chth-ink); --chth-nav-muted: color-mix(in srgb, var(--chth-ink) 60%, var(--chth-paper)); --chth-nav-ring: rgba(0, 0, 0, 0.08); }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) .chth-nav { --chth-nav-bg: rgba(255, 255, 255, 0.94); --chth-nav-ink: var(--chth-ink); --chth-nav-muted: color-mix(in srgb, var(--chth-ink) 60%, var(--chth-paper)); --chth-nav-ring: rgba(0, 0, 0, 0.08); } }
 .chth-nav:not(.chth-nav--overlay) { margin: var(--chth-space-12) 0; }
 .chth-nav--overlay { inset-inline: 0; position: fixed; }
 .chth-nav__pill {
@@ -1408,6 +1414,8 @@
   box-sizing: border-box;
   color: var(--chth-glass-ink);
   font: inherit;
+  /* Centred by the browser's own dialog style; said again for CSS resets (Tailwind 4's) that zero it */
+  margin: auto;
   max-height: min(85vh, 720px);
   max-width: calc(100vw - 32px);
   padding: 0;
