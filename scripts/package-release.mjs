@@ -21,7 +21,8 @@ const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const git = (...args) => { try { return execFileSync('git', args, { encoding: 'utf8' }).trim(); } catch { return ''; } };
 const commit = process.env.GITHUB_SHA || git('rev-parse', 'HEAD') || 'unknown';
 const builtAt = new Date().toISOString();
-const version = `${pkg.version}-${builtAt.slice(0, 10).replaceAll('-', '')}.${commit.slice(0, 7)}`;
+// CI gives the release its version (RELEASE_VERSION, from .github/scripts/release.mjs); a local build is named by its day and commit.
+const version = (process.env.RELEASE_VERSION ?? '').replace(/^v/, '') || `${pkg.version}-${builtAt.slice(0, 10).replaceAll('-', '')}.${commit.slice(0, 7)}`;
 
 const TYPES = {
   html: 'text/html; charset=utf-8', js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8',

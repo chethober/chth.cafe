@@ -9,7 +9,7 @@ execFileSync('node', ['scripts/package-release.mjs'], { stdio: 'inherit' });
 const manifest = JSON.parse(readFileSync('release/manifest.json', 'utf8'));
 let checks = 0;
 const check = (actual, expected) => { assert.deepEqual(actual, expected); checks++; };
-assert.match(manifest.version, /^\d+\.\d+\.\d+-\d{8}\.[0-9a-f]{7}$/); checks++;
+assert.match(manifest.version, /^\d+\.\d+\.\d+(-\d{8}\.[0-9a-f]{7})?$/); checks++;
 check([manifest.mainModule, manifest.crons, manifest.runWorkerFirst], ['server.js', ['0 * * * *'], true]);
 assert.ok(manifest.assets['/index.html'] && !manifest.assets['/_redirects']); checks++;
 for (const [path, asset] of Object.entries(manifest.assets)) {

@@ -1,7 +1,10 @@
 name: Release
 
-# Packages every push to the default branch as a versioned café release, attaches it to a GitHub
-# release, and deploys the control plane with it, so owners see "Update to <version>" on their dashboard.
+# Packages every push to the default branch as a versioned café release (vX.Y.Z, the patch number
+# raised by each push), attaches it to a GitHub release, and deploys the control plane with it, so
+# owners see "Update to <version>" on their dashboard. The CHTH hub posts each release to the
+# updates channel. A push that changes nothing in the café itself (only the landing and control
+# plane, CI, docs or tests) keeps the latest version and publishes no release.
 on:
   push:
     branches: [main, master]
@@ -21,7 +24,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # the release post lists the commits since the last push
+          fetch-depth: 0 # the version comes from the tags, the notes from the commits since
+
+      - name: Work out the version
+        id: plan
+        env:
+          RELEASE_EXCLUDE: control-plane
+        run: |
+          node .github/scripts/release.mjs plan
+          echo "RELEASE_VERSION=$(grep '^version=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2)" >> "$GITHUB_ENV"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -45,14 +56,15 @@ jobs:
         run: npm test
 
       - name: Publish GitHub release
+        if: steps.plan.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.package.outputs.version }}
+          RELEASE_EXCLUDE: control-plane
+          RELEASE_TITLE: CHTH Café
         run: |
           tar -czf "cafe-release-$VERSION.tar.gz" -C release .
-          gh release create "cafe-v$VERSION" "cafe-release-$VERSION.tar.gz" release/manifest.json \
-            --target "$GITHUB_SHA" --title "Café $VERSION" \
-            --notes "Café release built from $GITHUB_SHA. The control plane deploys this version to owners' Cloudflare accounts."
+          node .github/scripts/release.mjs publish "cafe-release-$VERSION.tar.gz" release/manifest.json
 
       - name: Check Cloudflare credentials
         id: check-creds
@@ -73,16 +85,3 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy -c control-plane/wrangler.jsonc
-
-      # Posts the notes to the CHTH updates channel through the hub. Only the café itself counts:
-      # a push that touches nothing but the landing and control plane posts nothing.
-      - name: Announce release
-        env:
-          CHTH_HUB_URL: ${{ secrets.CHTH_HUB_URL }}
-          CHTH_RELEASE_SECRET: ${{ secrets.CHTH_RELEASE_SECRET }}
-          RELEASE_PRODUCT: cafe
-          RELEASE_VERSION: ${{ steps.package.outputs.version }}
-          RELEASE_BASE: ${{ github.event.before }}
-          RELEASE_EXCLUDE: control-plane
-          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/cafe-v${{ steps.package.outputs.version }}
-        run: node .github/scripts/announce-release.mjs
