@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the release post lists the commits since the last push
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -71,3 +73,16 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy -c control-plane/wrangler.jsonc
+
+      # Posts the notes to the CHTH updates channel through the hub. Only the café itself counts:
+      # a push that touches nothing but the landing and control plane posts nothing.
+      - name: Announce release
+        env:
+          CHTH_HUB_URL: ${{ secrets.CHTH_HUB_URL }}
+          CHTH_RELEASE_SECRET: ${{ secrets.CHTH_RELEASE_SECRET }}
+          RELEASE_PRODUCT: cafe
+          RELEASE_VERSION: ${{ steps.package.outputs.version }}
+          RELEASE_BASE: ${{ github.event.before }}
+          RELEASE_EXCLUDE: control-plane
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/cafe-v${{ steps.package.outputs.version }}
+        run: node .github/scripts/announce-release.mjs
