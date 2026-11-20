@@ -1,5 +1,6 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
+import { isolateNumber, tr } from '../../i18n';
 
 // Shared chart furniture: sizing, number formats, ticks, card + table-view toggle, tooltip.
 
@@ -23,13 +24,13 @@ const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFracti
 
 /** Full money value, e.g. ₹1,284.50 or −₹320.00. */
 export const money = (currency: string, value: number) =>
-  `${value < 0 ? '−' : ''}${currency}${cents.format(Math.abs(value))}`;
+  isolateNumber(`${value < 0 ? '−' : ''}${currency}${cents.format(Math.abs(value))}`);
 
 /** Stat-tile money: exact under 10K, then auto-compact (12.9K, 4.2M). */
 export const moneyShort = (currency: string, value: number) => {
   const abs = Math.abs(value);
   const body = abs >= 10_000 ? compact.format(abs) : abs >= 1_000 ? grouped.format(abs) : cents.format(abs);
-  return `${value < 0 ? '−' : ''}${currency}${body}`;
+  return isolateNumber(`${value < 0 ? '−' : ''}${currency}${body}`);
 };
 
 export const tickLabel = (currency: string, value: number) =>
@@ -90,10 +91,10 @@ export function ChartCard({
           className="viz-toggle"
           aria-pressed={showTable}
           onClick={() => setShowTable((value) => !value)}
-          title={showTable ? 'Show chart' : 'Show as table'}
+          title={showTable ? tr('Show chart') : tr('Show as table')}
         >
           {showTable ? <BarChart3 className="w-4 h-4" aria-hidden /> : <Table2 className="w-4 h-4" aria-hidden />}
-          <span>{showTable ? 'Chart' : 'Table'}</span>
+          <span>{showTable ? tr('Chart') : tr('Table')}</span>
         </button>
       </figcaption>
       {legend && !showTable && <div className="viz-legend">{legend}</div>}

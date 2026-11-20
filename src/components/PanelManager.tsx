@@ -24,6 +24,7 @@ import {
   MenuPicker, OrderDetailsDialog, OrderEditDialog, OrderLinesEditor, TaskFormDialog, TaskRow, TASK_CATEGORIES, TASK_CATEGORY_ICONS, nextTaskStatus,
   addMenuItem, discountOff, lineQuantities, toOrderLines, type DiscountType, type EditableLine
 } from './shared';
+import { intlTag, tr } from '../i18n';
 
 export type PanelSection = 'orders' | 'pos' | 'customers' | 'events' | 'tasks' | 'shifts';
 type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
@@ -45,10 +46,10 @@ interface PanelManagerProps {
   onStateChange: () => void;
 }
 
-const LANES: { status: 'pending' | 'preparing' | 'ready'; label: string; color: string; next: OrderStatus; action: string }[] = [
-  { status: 'pending', label: 'Waiting', color: 'var(--ws-warning)', next: 'preparing', action: 'Start prep' },
-  { status: 'preparing', label: 'Preparing', color: 'var(--ws-info)', next: 'ready', action: 'Mark ready' },
-  { status: 'ready', label: 'Ready', color: 'var(--ws-positive)', next: 'completed', action: 'Collected & paid' }
+const LANES: { status: 'pending' | 'preparing' | 'ready'; label: string; empty: string; color: string; next: OrderStatus; action: string }[] = [
+  { status: 'pending', get empty() { return tr('Nothing waiting.'); }, get label() { return tr('Waiting'); }, color: 'var(--ws-warning)', next: 'preparing', get action() { return tr('Start prep'); } },
+  { status: 'preparing', get empty() { return tr('Nothing preparing.'); }, get label() { return tr('Preparing'); }, color: 'var(--ws-info)', next: 'ready', get action() { return tr('Mark ready'); } },
+  { status: 'ready', get empty() { return tr('Nothing ready.'); }, get label() { return tr('Ready'); }, color: 'var(--ws-positive)', next: 'completed', get action() { return tr('Collected & paid'); } }
 ];
 const LATE_AFTER_MIN = 15;
 
@@ -244,47 +245,47 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
       {section === 'orders' && (
         <Page>
           <PageHeader
-            title="Orders"
-            description="Oldest orders come first. Move each one along as it's made."
-            actions={<Button variant="primary" icon={<Plus />} onClick={() => onNavigate('pos')}>New order</Button>}
+            title={tr('Orders')}
+            description={tr('Oldest orders come first. Move each one along as it\'s made.')}
+            actions={<Button variant="primary" icon={<Plus />} onClick={() => onNavigate('pos')}>{tr('New order')}</Button>}
           />
           <StatGrid>
-            <Stat label="Waiting" value={countBy('pending')} tone={countBy('pending') ? 'warning' : 'neutral'} onClick={() => showOrders('pending')} />
-            <Stat label="Preparing" value={countBy('preparing')} onClick={() => showOrders('preparing')} />
-            <Stat label="Ready to hand over" value={countBy('ready')} tone={countBy('ready') ? 'positive' : 'neutral'} onClick={() => showOrders('ready')} />
-            <Stat label="Team on shift" value={activeShifts.length} icon={<Users />} onClick={() => onNavigate('shifts')} />
+            <Stat label={tr('Waiting')} value={countBy('pending')} tone={countBy('pending') ? 'warning' : 'neutral'} onClick={() => showOrders('pending')} />
+            <Stat label={tr('Preparing')} value={countBy('preparing')} onClick={() => showOrders('preparing')} />
+            <Stat label={tr('Ready to hand over')} value={countBy('ready')} tone={countBy('ready') ? 'positive' : 'neutral'} onClick={() => showOrders('ready')} />
+            <Stat label={tr('Team on shift')} value={activeShifts.length} icon={<Users />} onClick={() => onNavigate('shifts')} />
           </StatGrid>
 
           <div className="ws-toolbar">
-            <Segmented label="Orders view" value={orderView} onChange={setOrderView} options={[
-              { value: 'board', label: 'Live board', icon: <LayoutGrid />, count: boardOrders.length },
-              { value: 'history', label: 'History', icon: <History /> }
+            <Segmented label={tr('Orders view')} value={orderView} onChange={setOrderView} options={[
+              { value: 'board', label: tr('Live board'), icon: <LayoutGrid />, count: boardOrders.length },
+              { value: 'history', label: tr('History'), icon: <History /> }
             ]} />
-            <SearchInput className="ws-grow" value={orderSearch} onChange={setOrderSearch} placeholder="Search order number or customer" label="Search orders" />
-            <Select aria-label="Order type" value={orderType} onChange={e => setOrderType(e.target.value as typeof orderType)} style={{ width: 'auto' }}>
-              <option value="all">All order types</option>
-              <option value="dine_in">Dine-in</option>
-              <option value="takeout">Takeout</option>
-              <option value="pickup">Pickup</option>
+            <SearchInput className="ws-grow" value={orderSearch} onChange={setOrderSearch} placeholder={tr('Search order number or customer')} label={tr('Search orders')} />
+            <Select aria-label={tr('Order type')} value={orderType} onChange={e => setOrderType(e.target.value as typeof orderType)} style={{ width: 'auto' }}>
+              <option value="all">{tr('All order types')}</option>
+              <option value="dine_in">{tr('Dine-in')}</option>
+              <option value="takeout">{tr('Takeout')}</option>
+              <option value="pickup">{tr('Pickup')}</option>
             </Select>
           </div>
 
           {orderView === 'board' ? (
             <>
               <div className="ws-hide-desktop">
-                <Segmented block label="Board column" value={mobileLane} onChange={setMobileLane} options={LANES.map(l => ({ value: l.status, label: l.label, count: boardOrders.filter(o => o.status === l.status).length }))} />
+                <Segmented block label={tr('Board column')} value={mobileLane} onChange={setMobileLane} options={LANES.map(l => ({ value: l.status, label: l.label, count: boardOrders.filter(o => o.status === l.status).length }))} />
               </div>
               <div className="ws-board">
                 {LANES.map(lane => {
                   const laneOrders = boardOrders.filter(o => o.status === lane.status);
                   return (
-                    <section key={lane.status} className={`ws-lane ${mobileLane === lane.status ? '' : 'ws-hide-mobile'}`} aria-label={`${lane.label} orders`}>
+                    <section key={lane.status} className={`ws-lane ${mobileLane === lane.status ? '' : 'ws-hide-mobile'}`} aria-label={tr('{label} orders', { label: lane.label })}>
                       <div className="ws-lane-head">
                         <strong><span className="ws-lane-dot" style={{ background: lane.color }} />{lane.label}</strong>
                         <span className="ws-hint tabular">{laneOrders.length}</span>
                       </div>
                       {laneOrders.length === 0 ? (
-                        <div className="ws-lane-empty">Nothing {lane.label.toLowerCase()}.</div>
+                        <div className="ws-lane-empty">{lane.empty}</div>
                       ) : laneOrders.map(order => {
                         const lines = itemsByOrder.get(order.id) || [];
                         const age = minutesSince(order.createdAt, now);
@@ -294,29 +295,29 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                             className="ws-ticket"
                             data-interactive=""
                             tabIndex={0}
-                            aria-label={`Order ${order.orderNumber} for ${order.customerName || 'walk-in'}`}
+                            aria-label={tr('Order {orderNumber} for {value}', { orderNumber: order.orderNumber, value: order.customerName || tr('Walk-in') })}
                             onClick={() => setDetailsOrder(order)}
                             onKeyDown={e => { if (e.key === 'Enter' && e.target === e.currentTarget) setDetailsOrder(order); }}
                           >
                             <div className="ws-ticket-head">
                               <div style={{ minWidth: 0 }}>
                                 <div className="ws-ticket-num">{order.orderNumber}</div>
-                                <div className="ws-hint ws-truncate">{order.customerName || 'Walk-in'} · {orderTypeLabel(order.orderType)}{store.isQueuedOrder(order.id) && ' · on this device, not sent yet'}</div>
+                                <div className="ws-hint ws-truncate">{order.customerName || tr('Walk-in')} · {orderTypeLabel(order.orderType)}{store.isQueuedOrder(order.id) && tr(' · on this device, not sent yet')}</div>
                               </div>
                               <span className="ws-ticket-age" data-late={lane.status !== 'ready' && age >= LATE_AFTER_MIN ? '' : undefined}>
-                                <Clock width={12} height={12} style={{ display: 'inline', verticalAlign: '-1px', marginRight: 4 }} />{ageLabel(age)}
+                                <Clock width={12} height={12} style={{ display: 'inline', verticalAlign: '-1px', marginInlineEnd: 4 }} />{ageLabel(age)}
                               </span>
                             </div>
                             <ul className="ws-ticket-lines">
                               {lines.map(line => <li key={line.id}><span><strong className="tabular">{line.quantity}×</strong> {line.itemName}</span></li>)}
-                              {lines.length === 0 && <li className="ws-hint">No items recorded</li>}
+                              {lines.length === 0 && <li className="ws-hint">{tr('No items recorded')}</li>}
                             </ul>
                             <div className="ws-ticket-foot">
                               <span className="ws-hint"><strong className="tabular" style={{ color: 'var(--ws-ink)' }}>{fmt(order.totalAmount)}</strong> · {paymentLabel(order.paymentMethod)}</span>
                             </div>
                             <div className="ws-ticket-foot" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-                              <Button size="sm" variant="danger-ghost" onClick={() => setCancelTarget(order)}>Cancel</Button>
-                              {canEdit(order) && <Button size="sm" variant="ghost" icon={<Pencil />} onClick={() => setEditTarget(order)}>Edit</Button>}
+                              <Button size="sm" variant="danger-ghost" onClick={() => setCancelTarget(order)}>{tr('Cancel')}</Button>
+                              {canEdit(order) && <Button size="sm" variant="ghost" icon={<Pencil />} onClick={() => setEditTarget(order)}>{tr('Edit')}</Button>}
                               <Button size="sm" variant={lane.status === 'ready' ? 'accent' : 'primary'} onClick={() => updateOrderStatus(order.id, lane.next)}>{lane.action}</Button>
                             </div>
                           </article>
@@ -328,9 +329,9 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
               </div>
             </>
           ) : (
-            <Card flush title="Order history" description={`${plural(historyOrders.length, 'order')} completed or cancelled`}>
+            <Card flush title={tr('Order history')} description={tr('{length} completed or cancelled', { length: plural(historyOrders.length, 'order') })}>
               {historyOrders.length === 0 ? (
-                <EmptyState icon={<History />} title="No past orders" description="Completed and cancelled orders appear here." />
+                <EmptyState icon={<History />} title={tr('No past orders')} description={tr('Completed and cancelled orders appear here.')} />
               ) : (
                 <>
                   <List>
@@ -338,17 +339,17 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                       <ListItem
                         key={order.id}
                         onClick={() => setDetailsOrder(order)}
-                        title={<><span className="mono">{order.orderNumber}</span><span className="ws-truncate">{order.customerName || 'Walk-in'}</span></>}
+                        title={<><span className="mono">{order.orderNumber}</span><span className="ws-truncate">{order.customerName || tr('Walk-in')}</span></>}
                         subtitle={<><span>{formatDate(order.createdAt)} · {formatTime(order.createdAt)}</span><span>{paymentLabel(order.paymentMethod)}</span></>}
                         trail={<>
                           <span className="ws-amount">{fmt(order.totalAmount)}</span>
-                          <Badge tone={order.status === 'completed' ? 'positive' : 'danger'}>{order.status === 'completed' ? 'Completed' : 'Cancelled'}</Badge>
+                          <Badge tone={order.status === 'completed' ? 'positive' : 'danger'}>{order.status === 'completed' ? tr('Completed') : tr('Cancelled')}</Badge>
                         </>}
                       />
                     ))}
                   </List>
                   {historyOrders.length > historyLimit && (
-                    <div style={{ padding: 16, textAlign: 'center' }}><Button size="sm" onClick={() => setHistoryLimit(l => l + 30)}>Show more</Button></div>
+                    <div style={{ padding: 16, textAlign: 'center' }}><Button size="sm" onClick={() => setHistoryLimit(l => l + 30)}>{tr('Show more')}</Button></div>
                   )}
                 </>
               )}
@@ -360,29 +361,29 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
       {section === 'pos' && (
         <Page>
           <PageHeader
-            title="New order"
-            description={`${menuItems.filter(i => i.isInStock).length} items available · ${menuItems.filter(i => !i.isInStock).length} sold out`}
-            actions={<Button icon={<Tag />} onClick={() => setCustomOpen(true)}>Custom item</Button>}
+            title={tr('New order')}
+            description={tr('{length} items available · {length2} sold out', { length: menuItems.filter(i => i.isInStock).length, length2: menuItems.filter(i => !i.isInStock).length })}
+            actions={<Button icon={<Tag />} onClick={() => setCustomOpen(true)}>{tr('Custom item')}</Button>}
           />
           <div className="ws-grid ws-grid-pos">
             <div className="ws-toolbar-stack" style={{ minWidth: 0 }}>
-              <SearchInput value={posSearch} onChange={setPosSearch} placeholder="Find a drink or dish" label="Search menu" />
+              <SearchInput value={posSearch} onChange={setPosSearch} placeholder={tr('Find a drink or dish')} label={tr('Search menu')} />
               <div className={`ws-pick is-${pick.phase}`}>
                 <div className="ws-pick-reel" aria-hidden={pick.phase !== 'landed'}>
-                  <span className="ws-pick-label">{pick.phase === 'landed' ? 'How about' : 'Can’t decide?'}</span>
-                  <span key={pick.tick} className="ws-pick-name">{pickedItem ? pickedItem.name : 'Let the menu choose'}</span>
+                  <span className="ws-pick-label">{pick.phase === 'landed' ? tr('How about') : tr('Can’t decide?')}</span>
+                  <span key={pick.tick} className="ws-pick-name">{pickedItem ? pickedItem.name : tr('Let the menu choose')}</span>
                 </div>
-                <span className="sr-only" role="status">{pick.phase === 'landed' && pickedItem ? `Picked ${pickedItem.name}, ${fmt(pickedItem.basePrice)}` : ''}</span>
+                <span className="sr-only" role="status">{pick.phase === 'landed' && pickedItem ? tr('Picked {name}, {basePrice}', { name: pickedItem.name, basePrice: fmt(pickedItem.basePrice) }) : ''}</span>
                 {pick.phase === 'landed' && pickedItem ? (
                   <div className="ws-pick-actions">
                     <Button variant="primary" icon={<Plus />} disabled={!pickedItem.isInStock || savingOrder} onClick={() => addToCart(pickedItem)}>
-                      {pickedItem.isInStock ? `Add · ${fmt(pickedItem.basePrice)}` : 'Sold out'}
+                      {pickedItem.isInStock ? tr('Add · {basePrice}', { basePrice: fmt(pickedItem.basePrice) }) : tr('Sold out')}
                     </Button>
-                    <IconButton label="Pick again" onClick={pickForMe} disabled={!pickable.length || savingOrder}><Shuffle /></IconButton>
+                    <IconButton label={tr('Pick again')} onClick={pickForMe} disabled={!pickable.length || savingOrder}><Shuffle /></IconButton>
                   </div>
                 ) : (
                   <Button icon={<Shuffle />} onClick={pickForMe} disabled={!pickable.length || pick.phase === 'spinning' || savingOrder}>
-                    {pick.phase === 'spinning' ? 'Picking…' : 'Pick for me'}
+                    {pick.phase === 'spinning' ? tr('Picking…') : tr('Pick for me')}
                   </Button>
                 )}
               </div>
@@ -396,48 +397,48 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                 onAdd={addToCart}
                 fmt={fmt}
                 itemActions={item => <>
-                  <IconButton label={`Recipe for ${item.name}`} onClick={() => setRecipeItem(item)}><Boxes /></IconButton>
-                  <Switch label={`${item.name} available`} checked={item.isInStock} onChange={() => { store.toggleStock(item.id); onStateChange(); }} />
+                  <IconButton label={tr('Recipe for {name}', { name: item.name })} onClick={() => setRecipeItem(item)}><Boxes /></IconButton>
+                  <Switch label={tr('{name} available', { name: item.name })} checked={item.isInStock} onChange={() => { store.toggleStock(item.id); onStateChange(); }} />
                 </>}
               />
             </div>
 
             <div ref={ticketRef} className="ws-sticky-col" style={{ scrollMarginTop: 80 }}>
-              <Card title="Current order" description={cartCount ? plural(cartCount, 'item') : 'Tap menu items to add them'} actions={cart.length > 0 && <Button size="sm" variant="ghost" onClick={() => setCart([])}>Clear</Button>}>
+              <Card title={tr('Current order')} description={cartCount ? plural(cartCount, 'item') : tr('Tap menu items to add them')} actions={cart.length > 0 && <Button size="sm" variant="ghost" onClick={() => setCart([])}>{tr('Clear')}</Button>}>
                 <form className="ws-form" onSubmit={submitOrder} aria-busy={savingOrder}>
-                  {orderPlaced && <Notice tone="positive" action={<Button size="sm" variant="ghost" onClick={() => onNavigate('orders')}>View board</Button>}>{orderPlaced}</Notice>}
+                  {orderPlaced && <Notice tone="positive" action={<Button size="sm" variant="ghost" onClick={() => onNavigate('orders')}>{tr('View board')}</Button>}>{orderPlaced}</Notice>}
                   {orderError && <Notice tone="danger">{orderError}</Notice>}
                   {cart.length === 0 ? (
-                    <div className="ws-lane-empty"><Receipt width={20} height={20} style={{ margin: '0 auto var(--chth-space-8)' }} />The order is empty.</div>
+                    <div className="ws-lane-empty"><Receipt width={20} height={20} style={{ margin: '0 auto var(--chth-space-8)' }} />{tr('The order is empty.')}</div>
                   ) : (
                     <OrderLinesEditor lines={cart} onChange={setCart} currency={currency} editablePrice flush />
                   )}
 
-                  <Segmented block label="Order type" value={posOrderType} onChange={setPosOrderType} options={[
-                    { value: 'dine_in', label: 'Dine-in' }, { value: 'takeout', label: 'Takeout' }, { value: 'pickup', label: 'Pickup' }
+                  <Segmented block label={tr('Order type')} value={posOrderType} onChange={setPosOrderType} options={[
+                    { value: 'dine_in', label: tr('Dine-in') }, { value: 'takeout', label: tr('Takeout') }, { value: 'pickup', label: tr('Pickup') }
                   ]} />
                   <CustomerPicker customers={customers} orders={orders} text={posCustomer} onTextChange={setPosCustomer} member={posMember} onMemberChange={setPosMember} />
                   <div className="ws-form-row cols-2">
-                    <Field label="Payment">{id => (
+                    <Field label={tr('Payment')}>{id => (
                       <Select id={id} value={posPayment} onChange={e => setPosPayment(e.target.value as OrderPaymentMethod)}>
                         {ORDER_PAYMENT_METHODS.map(m => <option key={m} value={m}>{paymentLabel(m)}</option>)}
                       </Select>
                     )}</Field>
-                    <Field label="Order date" hint={posDate !== localDateKey() ? 'Back-dated order' : undefined}>{id => <Input id={id} type="date" value={posDate} max={localDateKey()} onChange={e => setPosDate(e.target.value || localDateKey())} />}</Field>
+                    <Field label={tr('Order date')} hint={posDate !== localDateKey() ? tr('Back-dated order') : undefined}>{id => <Input id={id} type="date" value={posDate} max={localDateKey()} onChange={e => setPosDate(e.target.value || localDateKey())} />}</Field>
                   </div>
-                  <Field label="Order discount" hint={lineDiscounts > 0 ? 'On top of the item discounts' : undefined} aside={
-                    <Segmented label="Discount type" value={posDiscountType} onChange={setPosDiscountType} options={[{ value: 'percent', label: '%' }, { value: 'fixed', label: currency }]} />
+                  <Field label={tr('Order discount')} hint={lineDiscounts > 0 ? tr('On top of the item discounts') : undefined} aside={
+                    <Segmented label={tr('Discount type')} value={posDiscountType} onChange={setPosDiscountType} options={[{ value: 'percent', label: '%' }, { value: 'fixed', label: currency }]} />
                   }>{id => <Input id={id} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" value={posDiscount} onChange={e => setPosDiscount(e.target.value)} />}</Field>
                   <KeyValue
                     items={[
-                      { label: 'Subtotal', value: fmt(subtotal) },
-                      ...(discount > 0 ? [{ label: 'Discounts', value: `−${fmt(discount)}`, tone: 'positive' as const }] : []),
-                      { label: `Tax (${settings.taxRate}%)`, value: fmt(tax) }
+                      { label: tr('Subtotal'), value: fmt(subtotal) },
+                      ...(discount > 0 ? [{ label: tr('Discounts'), value: `−${fmt(discount)}`, tone: 'positive' as const }] : []),
+                      { label: tr('Tax ({taxRate}%)', { taxRate: settings.taxRate }), value: fmt(tax) }
                     ]}
-                    total={{ label: 'Total', value: fmt(total) }}
+                    total={{ label: tr('Total'), value: fmt(total) }}
                   />
                   <Button type="submit" variant="primary" size="lg" block loading={savingOrder} disabled={cart.length === 0}>
-                    {savingOrder ? 'Sending…' : `Send to board · ${fmt(total)}`}
+                    {savingOrder ? tr('Sending…') : tr('Send to board · {total}', { total: fmt(total) })}
                   </Button>
                 </form>
               </Card>
@@ -446,7 +447,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
           {cart.length > 0 && (
             <div className="ws-mobile-bar">
               <Button variant="primary" size="lg" block icon={<ShoppingBag />} onClick={() => ticketRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-                Review order · {plural(cartCount, 'item')} · {fmt(total)}
+                {tr('Review order · {cartCount} · {total}', { cartCount: plural(cartCount, 'item'), total: fmt(total) })}
               </Button>
             </div>
           )}
@@ -460,38 +461,38 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
       {section === 'tasks' && (
         <Page>
           <PageHeader
-            title="Checklist"
-            description="Tap a task to move it from to do, to in progress, to done."
-            actions={<Button variant="primary" icon={<Plus />} onClick={() => setTaskFormOpen(true)}>New task</Button>}
+            title={tr('Checklist')}
+            description={tr('Tap a task to move it from to do, to in progress, to done.')}
+            actions={<Button variant="primary" icon={<Plus />} onClick={() => setTaskFormOpen(true)}>{tr('New task')}</Button>}
           />
           <Card>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
-              <strong style={{ fontSize: 15 }}>{doneCount} of {tasks.length} done</strong>
-              <span className="ws-hint">{progressCount} in progress · {tasks.length - doneCount - progressCount} to do</span>
+              <strong style={{ fontSize: 15 }}>{tr('{doneCount} of {length} done', { doneCount, length: tasks.length })}</strong>
+              <span className="ws-hint">{tr('{progressCount} in progress · {value} to do', { progressCount, value: tasks.length - doneCount - progressCount })}</span>
             </div>
-            <Meter size="lg" label={`${doneCount} done, ${progressCount} in progress`} segments={[
-              { value: doneCount, tone: 'positive', label: 'Done' },
-              { value: progressCount, tone: 'accent', label: 'In progress' },
-              { value: tasks.length - doneCount - progressCount, tone: 'muted', label: 'To do' }
+            <Meter size="lg" label={tr('{doneCount} done, {progressCount} in progress', { doneCount, progressCount })} segments={[
+              { value: doneCount, tone: 'positive', label: tr('Done') },
+              { value: progressCount, tone: 'accent', label: tr('In progress') },
+              { value: tasks.length - doneCount - progressCount, tone: 'muted', label: tr('To do') }
             ]} />
           </Card>
           <div className="ws-toolbar-stack">
-            <Segmented label="Task status" value={taskStatus} onChange={setTaskStatus} options={[
-              { value: 'all', label: 'All', count: tasks.length },
-              { value: 'pending', label: 'To do', count: tasks.filter(t => t.status === 'pending').length },
-              { value: 'in_progress', label: 'In progress', count: progressCount },
-              { value: 'completed', label: 'Done', count: doneCount }
+            <Segmented label={tr('Task status')} value={taskStatus} onChange={setTaskStatus} options={[
+              { value: 'all', label: tr('All'), count: tasks.length },
+              { value: 'pending', label: tr('To do'), count: tasks.filter(t => t.status === 'pending').length },
+              { value: 'in_progress', label: tr('In progress'), count: progressCount },
+              { value: 'completed', label: tr('Done'), count: doneCount }
             ]} />
-            <Chips label="Task category" value={taskCategory} onChange={setTaskCategory} options={[
-              { value: 'all', label: 'All categories' },
-              ...TASK_CATEGORIES.map(c => ({ value: c, label: c, icon: TASK_CATEGORY_ICONS[c], count: tasks.filter(t => t.category === c).length }))
+            <Chips label={tr('Task category')} value={taskCategory} onChange={setTaskCategory} options={[
+              { value: 'all', label: tr('All categories') },
+              ...TASK_CATEGORIES.map(c => ({ value: c, label: tr(c), icon: TASK_CATEGORY_ICONS[c], count: tasks.filter(t => t.category === c).length }))
             ]} />
           </div>
           <Card flush>
             {visibleTasks.length === 0 ? (
-              <EmptyState icon={<CheckSquare />} title="No tasks here" description="Nothing matches these filters." />
+              <EmptyState icon={<CheckSquare />} title={tr('No tasks here')} description={tr('Nothing matches these filters.')} />
             ) : (
-              <List label="Tasks">
+              <List label={tr('Tasks')}>
                 {visibleTasks.map(task => (
                   <TaskRow key={task.id} task={task} staffName={staff.find(s => s.id === task.assignedStaffId)?.name}
                     onCycle={() => { store.updateTaskStatus(task.id, nextTaskStatus(task.status)); onStateChange(); }} />
@@ -504,18 +505,18 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
 
       {section === 'shifts' && (
         <Page>
-          <PageHeader title="Clock in / out" description="Choose your name, then enter your PIN." />
+          <PageHeader title={tr('Clock in / out')} description={tr('Choose your name, then enter your PIN.')} />
           <Card>
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
               <div>
-                <div className="ws-clock" aria-live="off">{now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</div>
-                <div className="ws-hint" style={{ marginTop: 8 }}>{now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+                <div className="ws-clock" aria-live="off">{now.toLocaleTimeString(intlTag(), { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</div>
+                <div className="ws-hint" style={{ marginTop: 8 }}>{now.toLocaleDateString(intlTag(), { weekday: 'long', month: 'long', day: 'numeric' })}</div>
               </div>
-              <Badge tone={activeShifts.length ? 'positive' : 'neutral'} dot>{plural(activeShifts.length, 'person', 'people')} on shift</Badge>
+              <Badge tone={activeShifts.length ? 'positive' : 'neutral'} dot>{tr('{length} on shift', { length: plural(activeShifts.length, 'person', 'people') })}</Badge>
             </div>
           </Card>
           {staff.length === 0 ? (
-            <Card><EmptyState icon={<Users />} title="No team members yet" description="Add staff from the admin workspace." /></Card>
+            <Card><EmptyState icon={<Users />} title={tr('No team members yet')} description={tr('Add staff from the admin workspace.')} /></Card>
           ) : (
             <div className="ws-people">
               {staff.map(member => {
@@ -534,7 +535,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                       <strong style={{ display: 'block' }}>{member.name}</strong>
                       <span className="ws-hint">{member.role}</span>
                     </span>
-                    {shift ? <Badge tone="positive" dot>Since {formatTime(shift.clockIn)}</Badge> : <Badge>Off shift</Badge>}
+                    {shift ? <Badge tone="positive" dot>{tr('Since {clockIn}', { clockIn: formatTime(shift.clockIn) })}</Badge> : <Badge>{tr('Off shift')}</Badge>}
                   </button>
                 );
               })}
@@ -551,8 +552,8 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
         taxRate={settings.taxRate}
         onClose={() => setDetailsOrder(null)}
         actions={detailsOrder && ['pending', 'preparing', 'ready'].includes(detailsOrder.status) && <>
-          <span className="ws-spacer"><Button variant="danger-ghost" onClick={() => { setCancelTarget(detailsOrder); setDetailsOrder(null); }}>Cancel order</Button></span>
-          {canEdit(detailsOrder) && <Button icon={<Pencil />} onClick={() => { setEditTarget(detailsOrder); setDetailsOrder(null); }}>Edit</Button>}
+          <span className="ws-spacer"><Button variant="danger-ghost" onClick={() => { setCancelTarget(detailsOrder); setDetailsOrder(null); }}>{tr('Cancel order')}</Button></span>
+          {canEdit(detailsOrder) && <Button icon={<Pencil />} onClick={() => { setEditTarget(detailsOrder); setDetailsOrder(null); }}>{tr('Edit')}</Button>}
         </>}
       />
 
@@ -570,9 +571,9 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
         open={!!cancelTarget}
         onClose={() => setCancelTarget(null)}
         onConfirm={() => cancelTarget && updateOrderStatus(cancelTarget.id, 'cancelled')}
-        title={`Cancel ${cancelTarget?.orderNumber || 'order'}?`}
-        confirmLabel="Cancel order"
-        description="Ingredients for this order stay deducted from stock. An admin can delete the order to return them."
+        title={tr('Cancel {value}?', { value: cancelTarget?.orderNumber || 'order' })}
+        confirmLabel={tr('Cancel order')}
+        description={tr('Ingredients for this order stay deducted from stock. An admin can delete the order to return them.')}
       />
 
       <FormDialog
@@ -580,8 +581,8 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
         onClose={() => { setClockTarget(null); setClockFeedback(null); }}
         size="sm"
         title={clockTarget ? `${targetIsIn ? 'Clock out' : 'Clock in'} ${clockTarget.name}` : ''}
-        description="Enter your PIN to confirm."
-        submitLabel={targetIsIn ? 'Clock out' : 'Clock in'}
+        description={tr('Enter your PIN to confirm.')}
+        submitLabel={targetIsIn ? tr('Clock out') : tr('Clock in')}
         submitDisabled={!pin || clockFeedback?.success}
         onSubmit={confirmClock}
       >
@@ -594,16 +595,16 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
 
       <TaskFormDialog open={taskFormOpen} onClose={() => setTaskFormOpen(false)} onCreated={onStateChange} />
 
-      <FormDialog open={customOpen} onClose={() => setCustomOpen(false)} title="Custom item" description="For catering, specials, or an agreed price." submitLabel="Add to order" submitDisabled={!customName.trim() || customPrice === ''} onSubmit={addCustomItem}>
-        <Field label="Item name">{id => <Input id={id} autoFocus required value={customName} onChange={e => setCustomName(e.target.value)} placeholder="e.g. Event tea blend" />}</Field>
-        <Field label="Unit price">{id => <AffixInput id={id} affix={currency} type="number" inputMode="decimal" step="any" min="0" required value={customPrice} onChange={e => setCustomPrice(e.target.value)} placeholder="0.00" />}</Field>
+      <FormDialog open={customOpen} onClose={() => setCustomOpen(false)} title={tr('Custom item')} description={tr('For catering, specials, or an agreed price.')} submitLabel={tr('Add to order')} submitDisabled={!customName.trim() || customPrice === ''} onSubmit={addCustomItem}>
+        <Field label={tr('Item name')}>{id => <Input id={id} autoFocus required value={customName} onChange={e => setCustomName(e.target.value)} placeholder={tr('e.g. Event tea blend')} />}</Field>
+        <Field label={tr('Unit price')}>{id => <AffixInput id={id} affix={currency} type="number" inputMode="decimal" step="any" min="0" required value={customPrice} onChange={e => setCustomPrice(e.target.value)} placeholder="0.00" />}</Field>
       </FormDialog>
 
-      <Dialog open={!!recipeItem} onClose={() => setRecipeItem(null)} title={recipeItem ? `Recipe · ${recipeItem.name}` : ''} description="Raw materials used per portion." footer={<Button variant="primary" onClick={() => setRecipeItem(null)}>Done</Button>}>
+      <Dialog open={!!recipeItem} onClose={() => setRecipeItem(null)} title={recipeItem ? tr('Recipe · {name}', { name: recipeItem.name }) : ''} description={tr('Raw materials used per portion.')} footer={<Button variant="primary" onClick={() => setRecipeItem(null)}>{tr('Done')}</Button>}>
         {recipeItem && (() => {
           const recipe = store.getMenuItemRecipe(recipeItem.id);
           const stock = store.getStockItems();
-          if (recipe.length === 0) return <EmptyState icon={<ChefHat />} title="No recipe yet" description="Add ingredients from the admin menu editor." />;
+          if (recipe.length === 0) return <EmptyState icon={<ChefHat />} title={tr('No recipe yet')} description={tr('Add ingredients from the admin menu editor.')} />;
           return (
             <ul className="ws-list" style={{ margin: '0 calc(-1 * var(--chth-space-24))' }}>
               {recipe.map(ing => {
@@ -612,9 +613,9 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                 return (
                   <ListItem
                     key={ing.id || ing.stockItemId}
-                    title={material?.name || 'Removed material'}
-                    subtitle={<span>{ing.quantityRequired} {material?.unit || 'units'} per portion</span>}
-                    trail={material && <Badge tone={enough ? 'positive' : 'danger'}>{enough ? `${material.quantity} ${material.unit} left` : 'Not enough stock'}</Badge>}
+                    title={material?.name || tr('Removed material')}
+                    subtitle={<span>{tr('{quantityRequired} {value} per portion', { quantityRequired: ing.quantityRequired, value: material?.unit || 'units' })}</span>}
+                    trail={material && <Badge tone={enough ? 'positive' : 'danger'}>{enough ? tr('{quantity} {unit} left', { quantity: material.quantity, unit: material.unit }) : tr('Not enough stock')}</Badge>}
                   />
                 );
               })}

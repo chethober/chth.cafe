@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { Bucket } from '../../utils/financeSeries';
 import { columnPath, EmptyChart, niceTicks, tickLabel, Tooltip, TooltipRow, useElementWidth, money } from './ChartKit';
+import { tr } from '../../i18n';
 
 // Revenue and expenses as two lines, with net profit as a diverging column strip
 // beneath on the same x positions. One crosshair drives both plots and the tooltip.
@@ -12,8 +13,8 @@ const TOP = 12;
 const RIGHT = 12;
 
 export const SERIES = [
-  { key: 'revenue' as const, label: 'Revenue', color: 'var(--viz-s1)' },
-  { key: 'expenses' as const, label: 'Expenses', color: 'var(--viz-s2)' }
+  { key: 'revenue' as const, get label() { return tr('Revenue'); }, color: 'var(--viz-s1)' },
+  { key: 'expenses' as const, get label() { return tr('Expenses'); }, color: 'var(--viz-s2)' }
 ];
 
 export function TrendChart({ buckets, granularity, currency }: { buckets: Bucket[]; granularity: 'day' | 'week' | 'month'; currency: string }) {
@@ -76,12 +77,12 @@ export function TrendChart({ buckets, granularity, currency }: { buckets: Bucket
       className="viz-plot"
       tabIndex={0}
       role="group"
-      aria-label="Revenue, expenses and net profit over time. Use left and right arrow keys to read each period; the table view lists every value."
+      aria-label={tr('Revenue, expenses and net profit over time. Use left and right arrow keys to read each period; the table view lists every value.')}
       onKeyDown={onKeyDown}
       onFocus={() => setActive((i) => i ?? n - 1)}
       onBlur={() => setActive(null)}
     >
-      {!hasData && <EmptyChart>No sales or expenses in this range yet.</EmptyChart>}
+      {!hasData && <EmptyChart>{tr('No sales or expenses in this range yet.')}</EmptyChart>}
       {width > 0 && (
         <>
           <svg width={width} height={LINE_HEIGHT} className="block touch-pan-y" {...interactive} aria-hidden>
@@ -106,7 +107,7 @@ export function TrendChart({ buckets, granularity, currency }: { buckets: Bucket
             })}
           </svg>
 
-          <div className="viz-subplot-label">Net profit per {granularity}</div>
+          <div className="viz-subplot-label">{{ day: tr('Net profit per day'), week: tr('Net profit per week'), month: tr('Net profit per month') }[granularity]}</div>
           <svg width={width} height={NET_HEIGHT} className="block touch-pan-y" {...interactive} aria-hidden>
             {netTicks.map((t) => (
               <g key={t}>
@@ -132,7 +133,7 @@ export function TrendChart({ buckets, granularity, currency }: { buckets: Bucket
               ))}
               <TooltipRow
                 color={current.net >= 0 ? 'var(--viz-pos)' : 'var(--viz-neg)'}
-                label={current.net >= 0 ? 'Net profit' : 'Net loss'}
+                label={current.net >= 0 ? tr('Net profit') : tr('Net loss')}
                 value={money(currency, current.net)}
               />
               <TooltipRow label={current.orders === 1 ? 'order' : 'orders'} value={String(current.orders)} />

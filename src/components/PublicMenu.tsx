@@ -7,7 +7,7 @@ import { OrderTracking, OrderReceipt } from './OrderTracking';
 import { Modal } from './Modal';
 import { PublicEvents } from './PublicEvents';
 import { reducedMotion } from '../ui';
-import { applyDocumentLocale, detectLocale, setLocale, useLocale, useT, type Locale } from '../i18n';
+import { applyDocumentLocale, detectLocale, isolateNumber, setLocale, useLocale, useT, type Locale } from '../i18n';
 import { LOCALES } from '../chth-kit/locales.js';
 import { footerModel } from '../chth-kit/footer.js';
 import { themeToggleModel, toast } from '../chth-kit/shell.js';
@@ -200,7 +200,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
 
   const opening = getOpeningStatus(settings.openHours, now, settings.timeZone || 'Asia/Tehran');
   const greeting = t(greetingFor(now, settings.timeZone || 'Asia/Tehran'));
-  const money = (amount: number) => `${settings.currency}${amount.toFixed(2).replace(/\.00$/, '')}`;
+  const money = (amount: number) => isolateNumber(`${settings.currency}${amount.toFixed(2).replace(/\.00$/, '')}`);
   const query = searchQuery.trim().toLocaleLowerCase();
   const matchingItems = menuItems.filter(item =>
     (!dietaryFilter || item.dietaryLabels?.split(',').some(label => label.trim().toLowerCase() === dietaryFilter)) &&
@@ -427,8 +427,8 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
             <span>{opening.detail}</span>
           </div>
           <div className="pm-contact">
-            {settings.address && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(settings.address)}`} target="_blank" rel="noreferrer"><MapPin size={15} />{settings.address}</a>}
-            {settings.contactPhone && <a href={`tel:${settings.contactPhone.replace(/[^+\d]/g, '')}`}><Phone size={15} />{settings.contactPhone}</a>}
+            {settings.address && <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(settings.address)}`} target="_blank" rel="noreferrer"><MapPin size={15} /><bdi>{settings.address}</bdi></a>}
+            {settings.contactPhone && <a href={`tel:${settings.contactPhone.replace(/[^+\d]/g, '')}`}><Phone size={15} /><bdi dir="ltr">{settings.contactPhone}</bdi></a>}
           </div>
         </div>
 
@@ -495,7 +495,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
         {sections.map(section => <section key={section.id} id={`section-${section.id}`} aria-labelledby={`category-${section.id}`} className="pm-section">
           <header className="pm-section-head">
             <span className="pm-section-icon"><section.Icon size={22} /></span>
-            <h2 id={`category-${section.id}`}>{section.name}</h2>
+            <h2 id={`category-${section.id}`} className="pm-own">{section.name}</h2>
             <span className="pm-section-count">{t('{count} to try', { count: section.items.length })}</span>
           </header>
           <div className="pm-grid">
@@ -514,8 +514,8 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
                     {!item.isInStock && <span className="pm-sold-out">{t('Sold out')}</span>}
                   </div>
                   <div className="pm-card-body">
-                    <h3>{item.name}</h3>
-                    {item.description && <p>{item.description}</p>}
+                    <h3 className="pm-own">{item.name}</h3>
+                    {item.description && <p className="pm-own">{item.description}</p>}
                     {labels.length > 0 && <ul className="pm-tags">{labels.map(label => <li key={label}>{label}</li>)}</ul>}
                   </div>
                 </button>
@@ -550,11 +550,11 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
         </button>
       </div>}
 
-      <Modal isOpen={!!activeItem} onClose={() => setActiveItem(null)} appearance="paper" maxWidth="max-w-lg" title={<span className="text-lg font-semibold">{activeItem?.name}</span>}>
+      <Modal isOpen={!!activeItem} onClose={() => setActiveItem(null)} appearance="paper" maxWidth="max-w-lg" title={<span className="text-lg font-semibold pm-own">{activeItem?.name}</span>}>
         {activeItem && <div className="public-menu pm-detail space-y-5 text-sm">
           <div className="pm-detail-art"><ItemArt item={activeItem} Icon={itemIcon(activeItem)} large /></div>
           {activeItem.badge && <span className="pm-detail-badge">{activeItem.badge}</span>}
-          {activeItem.description && <p className="text-zinc-400 leading-relaxed">{activeItem.description}</p>}
+          {activeItem.description && <p className="text-zinc-400 leading-relaxed pm-own">{activeItem.description}</p>}
           <dl className="pm-detail-facts">
             <div><dt>{t('Allergens')}</dt><dd>{activeItem.allergens || t('Not confirmed — ask staff')}</dd></div>
             {activeItem.dietaryLabels && <div><dt>{t('Dietary')}</dt><dd>{activeItem.dietaryLabels}</dd></div>}
@@ -564,7 +564,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {menuVariants.filter(variant => variant.menuItemId === activeItem.id && variant.groupName === group).map(variant => <label key={variant.id} className={`flex min-h-12 items-center gap-3 p-3 rounded-xl border cursor-pointer ${selectedVariants[group]?.id === variant.id ? 'border-amber-500 brand-text bg-amber-500/20' : 'border-zinc-800 text-zinc-300 bg-zinc-900'}`}>
                 <input type="radio" name={`variant-${group}`} checked={selectedVariants[group]?.id === variant.id} onChange={() => setSelectedVariants(previous => ({ ...previous, [group]: variant }))} className="accent-amber-500" />
-                <span className="flex-1">{variant.name}</span>{variant.priceModifier !== 0 && <span className="text-xs whitespace-nowrap">{variant.priceModifier > 0 ? '+' : '−'}{money(Math.abs(variant.priceModifier))}</span>}
+                <span className="flex-1 pm-own">{variant.name}</span>{variant.priceModifier !== 0 && <span className="text-xs whitespace-nowrap">{variant.priceModifier > 0 ? '+' : '−'}{money(Math.abs(variant.priceModifier))}</span>}
               </label>)}
             </div>
           </fieldset>)}
@@ -587,7 +587,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
               {cart.map(line => {
                 const available = menuItems.find(item => item.id === line.item.id)?.isInStock;
                 return <li key={line.id} className="pm-checkout-line" data-unavailable={!available || undefined}>
-                  <div className="pm-checkout-line-text"><b>{line.item.name}</b>
+                  <div className="pm-checkout-line-text"><b className="pm-own">{line.item.name}</b>
                     {!!line.variants.length && <small>{line.variants.map(variant => `${variant.groupName}: ${variant.name}`).join(', ')}</small>}
                     {!available && <small className="pm-checkout-warn">{t('Sold out · please remove this item')}</small>}
                     <span className="pm-price">{money(line.unitPrice * line.quantity)}</span>

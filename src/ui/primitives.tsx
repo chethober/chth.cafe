@@ -1,6 +1,7 @@
 import React, { useId, useLayoutEffect, useRef, useState } from 'react';
 import { AlertCircle, CheckCircle2, Info, AlertTriangle, Search, X, Minus, Plus } from 'lucide-react';
 import { initials, nameHue } from '../chth-kit/ui.js';
+import { tr, useStrings } from '../i18n';
 
 type Tone = 'neutral' | 'positive' | 'danger' | 'warning' | 'info' | 'accent';
 const cx = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ');
@@ -203,7 +204,7 @@ export function Field({ label, hint, error, optional, aside, className, children
   return (
     <div className={cx('chth-field', error && 'is-invalid', className)}>
       <label htmlFor={id} className="chth-field__label ws-label">
-        <span>{label}{optional && <span className="chth-field__optional"> (optional)</span>}</span>
+        <span>{label}{optional && <span className="chth-field__optional">{' '}{tr('(optional)')}</span>}</span>
         {aside}
       </label>
       {children(id, hintId)}
@@ -242,7 +243,7 @@ export function SearchInput({ value, onChange, placeholder = 'Search', label = '
       <Input type="search" aria-label={label} placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} />
       {value && (
         <span className="ws-input-suffix">
-          <IconButton label="Clear search" onClick={() => onChange('')}><X /></IconButton>
+          <IconButton label={tr('Clear search')} onClick={() => onChange('')}><X /></IconButton>
         </span>
       )}
     </div>
@@ -293,8 +294,10 @@ export function Segmented<T extends string>({ options, value, onChange, label, b
 }) {
   const name = useId();
   const rootRef = useRef<HTMLDivElement>(null);
-  // The kit's script places the thumb; tell it when the value changes from code.
-  useLayoutEffect(() => { if (rootRef.current) window.chthUi?.scan(rootRef.current); }, [value, options.length]);
+  // The kit's script places the thumb; tell it when the value changes from code, or the labels
+  // change size (another language).
+  const strings = useStrings();
+  useLayoutEffect(() => { if (rootRef.current) window.chthUi?.scan(rootRef.current); }, [value, options.length, strings]);
   return (
     <div ref={rootRef} className={cx('chth-seg', block && 'chth-seg--block')} role="radiogroup" aria-label={label} data-chth-seg>
       <span className="chth-seg__thumb" aria-hidden="true" />
@@ -434,9 +437,9 @@ export function Progress({ value, tone = 'accent', label }: { value: number; ton
 export function Stepper({ value, onDecrement, onIncrement, label }: { value: React.ReactNode; onDecrement: () => void; onIncrement: () => void; label: string }) {
   return (
     <div className="chth-stepper chth-stepper--sm" role="group" aria-label={label}>
-      <button type="button" className="chth-stepper__btn" onClick={onDecrement} aria-label={`Decrease ${label}`}><Minus /></button>
+      <button type="button" className="chth-stepper__btn" onClick={onDecrement} aria-label={tr('Decrease {label}', { label })}><Minus /></button>
       <span className="chth-stepper__field"><span className="chth-stepper__input" aria-live="polite">{value}</span></span>
-      <button type="button" className="chth-stepper__btn" onClick={onIncrement} aria-label={`Increase ${label}`}><Plus /></button>
+      <button type="button" className="chth-stepper__btn" onClick={onIncrement} aria-label={tr('Increase {label}', { label })}><Plus /></button>
     </div>
   );
 }

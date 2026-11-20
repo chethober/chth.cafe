@@ -43,12 +43,12 @@
   background: radial-gradient(120% 100% at 0% 0%, color-mix(in srgb, var(--menu-accent) 20%, var(--menu-sheet)), var(--menu-sheet) 62%);
 }
 .pm-hero::after {
-  content: ''; position: absolute; z-index: -1; right: -90px; bottom: -140px; width: 340px; height: 340px; border-radius: 50%;
+  content: ''; position: absolute; z-index: -1; inset-inline-end: -90px; bottom: -140px; width: 340px; height: 340px; border-radius: 50%;
   background: color-mix(in srgb, var(--menu-accent) 7%, transparent);
 }
 /* Theme toggle: the sun and moon trade places with a quarter turn. */
 .pm-theme-toggle {
-  position: absolute; top: clamp(14px, 2.4vw, 24px); right: clamp(14px, 2.4vw, 24px); z-index: 1;
+  position: absolute; top: clamp(14px, 2.4vw, 24px); inset-inline-end: clamp(14px, 2.4vw, 24px); z-index: 1;
   display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
   border: 1px solid var(--pm-line); color: var(--menu-ink);
   background: color-mix(in srgb, var(--menu-sheet) 72%, transparent);
@@ -99,19 +99,19 @@
 .pm-spin.is-landed .pm-reel-name { color: var(--menu-accent); animation: pm-reel-land var(--chth-dur-500) var(--pm-spring); }
 .pm-spin-button { width: 100%; }
 .pm-spin-actions { display: flex; align-items: center; justify-content: center; gap: var(--chth-space-10); }
-.pm-spin-price { font: 700 var(--chth-text-15) var(--font-sans); font-variant-numeric: tabular-nums; margin-right: var(--chth-space-2); }
+.pm-spin-price { font: 700 var(--chth-text-15) var(--font-sans); font-variant-numeric: tabular-nums; margin-inline-end: var(--chth-space-2); }
 
 /* ── Search and toggles ──────────────────────────────────── */
 .pm-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--chth-space-12); }
 .pm-search { position: relative; flex: 1 1 320px; }
-.pm-search > svg { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); color: var(--menu-muted); pointer-events: none; }
+.pm-search > svg { position: absolute; inset-inline-start: 18px; top: 50%; transform: translateY(-50%); color: var(--menu-muted); pointer-events: none; }
 .pm-search input {
   width: 100%; min-height: 52px; padding: 0 var(--chth-space-48); border-radius: var(--chth-radius-full); border: 1px solid; font-size: var(--chth-text-16);
   transition: border-color var(--chth-dur-150) ease, box-shadow var(--chth-dur-150) ease;
 }
 .pm-search input::-webkit-search-cancel-button { appearance: none; }
 html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !important; box-shadow: 0 0 0 4px color-mix(in srgb, var(--menu-accent) 22%, transparent); outline: none; }
-.pm-search > button { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 44px; height: 44px; color: var(--menu-muted); }
+.pm-search > button { position: absolute; inset-inline-end: 4px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 44px; height: 44px; color: var(--menu-muted); }
 .pm-toggles { display: flex; flex-wrap: wrap; gap: var(--chth-space-8); }
 .pm-chip {
   display: inline-flex; align-items: center; gap: var(--chth-space-6); min-height: 44px; padding: 0 var(--chth-space-16);
@@ -154,7 +154,7 @@ html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !i
 .pm-rail-indicator[data-ready] { transition: transform var(--chth-dur-300) var(--pm-move), width var(--chth-dur-300) var(--pm-move), opacity var(--chth-dur-150) ease; }
 .pm-rail-chip {
   position: relative; z-index: 1; flex-shrink: 0; display: inline-flex; align-items: center; gap: var(--chth-space-8);
-  min-height: 46px; padding: 0 var(--chth-space-16) 0 var(--chth-space-6); border-radius: var(--chth-radius-full); white-space: nowrap;
+  min-height: 46px; padding-block: 0 0; padding-inline: var(--chth-space-6) var(--chth-space-16); border-radius: var(--chth-radius-full); white-space: nowrap;
   color: var(--menu-muted); font: 600 var(--chth-text-14) var(--font-sans);
   transition: color var(--chth-dur-200) ease;
 }
@@ -168,7 +168,7 @@ html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !i
 .pm-section-head { display: flex; align-items: center; gap: var(--chth-space-12); margin-bottom: var(--chth-space-18); }
 .pm-section-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--chth-radius-lg); background: color-mix(in srgb, var(--menu-accent) 20%, var(--menu-sheet)); color: var(--menu-accent); transform: rotate(-6deg); }
 .pm-section-head h2 { font: 600 clamp(26px, 3.4vw, 38px)/1.1 var(--pm-display); letter-spacing: -.02em; }
-.pm-section-count { margin-left: auto; padding: var(--chth-space-4) var(--chth-space-10); border-radius: var(--chth-radius-full); background: var(--pm-soft); color: var(--menu-muted); font: 600 var(--chth-text-12) var(--font-sans); white-space: nowrap; }
+.pm-section-count { margin-inline-start: auto; padding: var(--chth-space-4) var(--chth-space-10); border-radius: var(--chth-radius-full); background: var(--pm-soft); color: var(--menu-muted); font: 600 var(--chth-text-12) var(--font-sans); white-space: nowrap; }
 
 .pm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--chth-space-14); }
 @media (min-width: 640px) { .pm-grid { gap: var(--chth-space-18); } }
@@ -185,7 +185,7 @@ html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !i
 }
 .pm-card.is-in-order { border-color: var(--menu-accent); }
 .pm-card:has(.pm-card-open:active) { transform: scale(0.98); }
-.pm-card-open { display: flex; flex-direction: column; flex: 1; width: 100%; text-align: left; border-radius: inherit; color: inherit; }
+.pm-card-open { display: flex; flex-direction: column; flex: 1; width: 100%; text-align: start; border-radius: inherit; color: inherit; }
 .pm-art { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: calc(var(--pm-radius) - 1px) calc(var(--pm-radius) - 1px) 0 0; background: var(--pm-soft); }
 .pm-art-photo, .pm-art-swatch { width: 100%; height: 100%; object-fit: cover; transition: transform var(--chth-dur-500) var(--ease-out), filter var(--chth-dur-200) ease; }
 .pm-art-swatch {
@@ -195,9 +195,9 @@ html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !i
     linear-gradient(135deg, color-mix(in oklab, hsl(var(--pm-hue) 45% 58%) 62%, var(--menu-sheet)), color-mix(in oklab, hsl(calc(var(--pm-hue) + 40) 48% 42%) 72%, var(--menu-sheet)));
 }
 .pm-art-swatch svg { transform: rotate(-8deg); filter: drop-shadow(0 4px 8px rgb(0 0 0 / .18)); }
-.pm-art-swatch span { position: absolute; left: 12px; bottom: 6px; font: italic 600 var(--chth-text-26) var(--pm-display); opacity: .5; }
+.pm-art-swatch span { position: absolute; inset-inline-start: 12px; bottom: 6px; font: italic 600 var(--chth-text-26) var(--pm-display); opacity: .5; }
 .pm-badge {
-  position: absolute; top: 10px; left: 10px; max-width: calc(100% - 64px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  position: absolute; top: 10px; inset-inline-start: 10px; max-width: calc(100% - 64px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   padding: var(--chth-space-4) var(--chth-space-10); border-radius: var(--chth-radius-full); background: var(--menu-note); color: var(--menu-note-ink);
   font: 700 var(--chth-text-11) var(--font-sans); transform: rotate(-3deg); box-shadow: 0 4px 10px -4px rgb(0 0 0 / .35);
 }
@@ -213,7 +213,7 @@ html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !i
 @media (min-width: 640px) { .pm-card-body h3 { font-size: var(--chth-text-18); } }
 
 .pm-heart {
-  position: absolute; top: 8px; right: 8px; z-index: 2; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+  position: absolute; top: 8px; inset-inline-end: 8px; z-index: 2; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
   background: color-mix(in srgb, var(--menu-paper) 82%, transparent); color: var(--menu-ink);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   transition: transform var(--chth-dur-150) var(--ease-out), color var(--chth-dur-150) ease;
@@ -229,26 +229,26 @@ html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !i
   animation: pm-sparks var(--chth-dur-600) var(--ease-out) forwards;
 }
 
-.pm-card-foot { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--chth-space-6) var(--chth-space-8); padding: var(--chth-space-8) var(--chth-space-10) var(--chth-space-12) var(--chth-space-14); }
+.pm-card-foot { position: relative; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--chth-space-6) var(--chth-space-8); padding-block: var(--chth-space-8) var(--chth-space-12); padding-inline: var(--chth-space-14) var(--chth-space-10); }
 .pm-price { font: 700 var(--chth-text-15) var(--font-sans); font-variant-numeric: tabular-nums; }
-.pm-price small { margin-right: var(--chth-space-4); font-size: var(--chth-text-11); font-weight: 500; color: var(--menu-muted); }
+.pm-price small { margin-inline-end: var(--chth-space-4); font-size: var(--chth-text-11); font-weight: 500; color: var(--menu-muted); }
 .pm-add {
-  position: relative; display: grid; place-items: center; width: 44px; height: 44px; margin-left: auto; border-radius: 50%;
+  position: relative; display: grid; place-items: center; width: 44px; height: 44px; margin-inline-start: auto; border-radius: 50%;
   background: var(--menu-ink); color: var(--menu-paper);
   transition: transform var(--chth-dur-150) var(--ease-out);
 }
 .pm-add svg { transition: transform var(--chth-dur-250) var(--pm-move); }
 .pm-add:active:not(:disabled) { transform: scale(0.88); }
-.pm-add b { position: absolute; top: -4px; right: -4px; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--chth-space-4); border-radius: var(--chth-radius-full); background: var(--pm-heart); color: #fff; font-size: var(--chth-text-11); }
+.pm-add b { position: absolute; top: -4px; inset-inline-end: -4px; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--chth-space-4); border-radius: var(--chth-radius-full); background: var(--pm-heart); color: #fff; font-size: var(--chth-text-11); }
 .pm-stepper {
-  display: inline-flex; align-items: center; margin-left: auto; height: 44px; border-radius: var(--chth-radius-full);
+  display: inline-flex; align-items: center; margin-inline-start: auto; height: 44px; border-radius: var(--chth-radius-full);
   background: var(--menu-ink); color: var(--menu-paper);
   animation: pm-pop-in var(--chth-dur-300) var(--pm-spring);
 }
 .pm-stepper button { display: grid; place-items: center; width: 34px; height: 44px; color: inherit; transition: transform var(--chth-dur-100) var(--ease-out); }
 .pm-stepper button:active:not(:disabled) { transform: scale(0.82); }
 .pm-stepper span { min-width: 18px; text-align: center; font: 700 var(--chth-text-14) var(--font-sans); font-variant-numeric: tabular-nums; }
-.pm-plus-one { position: absolute; right: 22px; top: -4px; color: var(--menu-accent); font: 800 var(--chth-text-15) var(--font-sans); pointer-events: none; animation: pm-float var(--chth-dur-800) var(--ease-out) forwards; }
+.pm-plus-one { position: absolute; inset-inline-end: 22px; top: -4px; color: var(--menu-accent); font: 800 var(--chth-text-15) var(--font-sans); pointer-events: none; animation: pm-float var(--chth-dur-800) var(--ease-out) forwards; }
 
 @media (hover: hover) and (pointer: fine) {
   .pm-card:hover { transform: translateY(-4px); box-shadow: 0 1px 0 var(--pm-line), 0 24px 40px -22px rgb(0 0 0 / .6); }
@@ -268,18 +268,18 @@ html .app-shell .pm .pm-search input:focus { border-color: var(--menu-accent) !i
 .pm-empty p { max-width: 36ch; font-size: var(--chth-text-14); }
 .pm-empty .pm-button { margin-top: var(--chth-space-6); }
 
-.pm-cart-bar { position: fixed; z-index: 40; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); animation: pm-cart-in var(--chth-dur-400) cubic-bezier(0.34, 1.3, 0.64, 1); }
-@media (min-width: 768px) { .pm-cart-bar { left: auto; right: 24px; width: 380px; } }
+.pm-cart-bar { position: fixed; z-index: 40; inset-inline-start: 16px; inset-inline-end: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); animation: pm-cart-in var(--chth-dur-400) cubic-bezier(0.34, 1.3, 0.64, 1); }
+@media (min-width: 768px) { .pm-cart-bar { inset-inline-start: auto; inset-inline-end: 24px; width: 380px; } }
 .pm-cart-bar > button {
-  display: flex; align-items: center; gap: var(--chth-space-12); width: 100%; min-height: 60px; padding: var(--chth-space-8) var(--chth-space-14) var(--chth-space-8) var(--chth-space-8); border-radius: var(--chth-radius-full);
+  display: flex; align-items: center; gap: var(--chth-space-12); width: 100%; min-height: 60px; padding-block: var(--chth-space-8) var(--chth-space-8); padding-inline: var(--chth-space-8) var(--chth-space-14); border-radius: var(--chth-radius-full);
   background: var(--menu-ink); color: var(--menu-paper); font: 600 var(--chth-text-15) var(--font-sans);
   box-shadow: 0 18px 40px -16px rgb(0 0 0 / .6);
   transition: transform var(--chth-dur-150) var(--ease-out);
 }
 .pm-cart-bar > button:active { transform: scale(0.98); }
 .pm-cart-count { position: relative; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: color-mix(in srgb, var(--menu-paper) 16%, transparent); }
-.pm-cart-count b { position: absolute; top: -3px; right: -5px; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--chth-space-4); border-radius: var(--chth-radius-full); background: var(--pm-heart); color: #fff; font-size: var(--chth-text-11); }
-.pm-cart-label { flex: 1; text-align: left; }
+.pm-cart-count b { position: absolute; top: -3px; inset-inline-end: -5px; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 var(--chth-space-4); border-radius: var(--chth-radius-full); background: var(--pm-heart); color: #fff; font-size: var(--chth-text-11); }
+.pm-cart-label { flex: 1; text-align: start; }
 .pm-cart-total { display: inline-flex; align-items: center; gap: var(--chth-space-4); font-weight: 700; font-variant-numeric: tabular-nums; }
 
 
@@ -320,21 +320,21 @@ html .menu-paper-dialog {
 .pm-detail-soldout { padding: var(--chth-space-12) var(--chth-space-14); border-radius: var(--chth-radius-lg); border: 1px dashed var(--menu-rule); color: var(--menu-muted); }
 /* Sizes the menu's own controls up for the sheet. */
 .menu-paper-dialog .pm-detail .pm-button { flex: 1; min-height: 50px; border-radius: var(--chth-radius-full); background: var(--menu-ink) !important; color: var(--menu-paper) !important; }
-.menu-paper-dialog .pm-detail .pm-stepper { margin-left: 0; height: 50px; border-radius: var(--chth-radius-full); }
+.menu-paper-dialog .pm-detail .pm-stepper { margin-inline-start: 0; height: 50px; border-radius: var(--chth-radius-full); }
 .menu-paper-dialog .pm-detail label.rounded-xl { border-radius: var(--chth-radius-16); }
 .menu-paper-dialog .pm-detail .pm-stepper button { width: 44px; height: 50px; border-radius: var(--chth-radius-full); }
 
 /* ── Checkout sheet ──────────────────────────────────────── */
 .pm-checkout, .pm-checkout-fields { display: grid; gap: var(--chth-space-22); min-width: 0; font-size: var(--chth-text-14); }
 .pm-checkout-lines { display: grid; gap: var(--chth-space-8); }
-.pm-checkout-line { display: flex; align-items: center; gap: var(--chth-space-12); padding: var(--chth-space-10) var(--chth-space-10) var(--chth-space-10) var(--chth-space-16); border-radius: var(--chth-radius-18); background: var(--menu-sheet); }
+.pm-checkout-line { display: flex; align-items: center; gap: var(--chth-space-12); padding-block: var(--chth-space-10) var(--chth-space-10); padding-inline: var(--chth-space-16) var(--chth-space-10); border-radius: var(--chth-radius-18); background: var(--menu-sheet); }
 .pm-checkout-line[data-unavailable] { box-shadow: inset 0 0 0 1px var(--status-danger); }
 .pm-checkout-line-text { display: grid; gap: var(--chth-space-2); flex: 1; min-width: 0; }
 .pm-checkout-line b { font-weight: 600; overflow-wrap: anywhere; }
 .pm-checkout-line small { font-size: var(--chth-text-12); color: var(--menu-muted); }
 .pm-checkout-line .pm-checkout-warn { color: var(--status-danger); font-weight: 600; }
 .pm-checkout-line .pm-price { margin-top: var(--chth-space-2); }
-.menu-paper-dialog .pm-checkout .pm-stepper { margin-left: 0; flex-shrink: 0; animation: none; }
+.menu-paper-dialog .pm-checkout .pm-stepper { margin-inline-start: 0; flex-shrink: 0; animation: none; }
 .menu-paper-dialog .pm-checkout .pm-stepper button { width: 40px; border-radius: var(--chth-radius-full); }
 .pm-checkout-group > legend, .pm-checkout-field > span { display: block; margin-bottom: var(--chth-space-10); font: 600 var(--chth-text-18) var(--pm-display); }
 .pm-checkout-choices { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: var(--chth-space-8); }
@@ -386,7 +386,7 @@ html .menu-paper-dialog .pm-checkout-field input:focus { border-color: var(--men
   .pm { gap: var(--chth-space-22); }
   .pm-hero { grid-template-columns: 1fr; gap: var(--chth-space-22); border-radius: var(--chth-radius-26); }
   .pm-hero h1 { font-size: clamp(44px, 13vw, 72px); }
-  .pm-eyebrow { padding-right: 52px; }
+  .pm-eyebrow { padding-inline-end: 52px; }
   .pm-hero-side { flex-direction: row; align-items: center; }
   .pm-cup, .pm-logo { width: 84px; height: auto; flex-shrink: 0; }
   .pm-logo { padding: var(--chth-space-4) var(--chth-space-4) var(--chth-space-14); }
@@ -398,7 +398,7 @@ html .menu-paper-dialog .pm-checkout-field input:focus { border-color: var(--men
   .pm-toggles .pm-chip { justify-content: center; padding: 0 var(--chth-space-8); }
   .pm-section-head { margin-bottom: var(--chth-space-14); }
   .pm-card-body { padding: var(--chth-space-10) var(--chth-space-12) var(--chth-space-2); }
-  .pm-card-foot { padding: var(--chth-space-6) var(--chth-space-8) var(--chth-space-10) var(--chth-space-12); }
+  .pm-card-foot { padding-block: var(--chth-space-6) var(--chth-space-10); padding-inline: var(--chth-space-12) var(--chth-space-8); }
 }
 
 /* Reduced motion: keep colour and opacity feedback, drop movement. */
@@ -411,7 +411,7 @@ html .menu-paper-dialog .pm-checkout-field input:focus { border-color: var(--men
 /* Language picker, beside the theme toggle: a globe icon over the native select, which keeps the
    phone's own picker and keyboard support. */
 .pm-lang {
-  position: absolute; top: clamp(14px, 2.4vw, 24px); right: calc(clamp(14px, 2.4vw, 24px) + 52px); z-index: 1;
+  position: absolute; top: clamp(14px, 2.4vw, 24px); inset-inline-end: calc(clamp(14px, 2.4vw, 24px) + 52px); z-index: 1;
   display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
   border: 1px solid var(--pm-line); color: var(--menu-ink);
   background: color-mix(in srgb, var(--menu-sheet) 72%, transparent);
@@ -428,3 +428,9 @@ html .menu-paper-dialog .pm-checkout-field input:focus { border-color: var(--men
 :root[dir='rtl'] .public-menu :is(h1, h2, h3) { font-family: var(--chth-font-rtl); }
 .chth-footer { color: var(--menu-ink); --chth-line: var(--pm-line); --chth-product-accent: var(--menu-accent); margin-top: var(--chth-space-32); padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px)); }
 :root[dir='rtl'] .public-menu :is(.pm-tagline, em, i) { font-style: normal; }
+[dir='rtl'] .pm-rail-scroller { mask-image: linear-gradient(to left, transparent, #000 12px, #000 calc(100% - 32px), transparent); }
+[dir='rtl'] .public-menu :is(.lucide-chevron-right, .lucide-chevron-left, .lucide-arrow-right, .lucide-arrow-left, .lucide-arrow-up-right, .lucide-send) { transform: scaleX(-1); }
+[dir='rtl'] .public-menu :is(input[type='tel'], input[type='email'], input[type='number']) { direction: ltr; text-align: end; }
+/* What the café wrote (names, descriptions) may be English inside a Persian or Arabic page: each
+   line takes its own direction so punctuation stays put, and stays aligned with the page. */
+[dir='rtl'] .pm-own { unicode-bidi: plaintext; text-align: right; }

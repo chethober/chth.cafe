@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, Input, Switch } from '../ui';
+import { tr } from '../i18n';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 type Day = typeof DAYS[number];
@@ -45,7 +46,7 @@ export const OpeningHoursEditor: React.FC<{
   const copyToAll = (day: Day) => onChange(Object.fromEntries(DAYS.map(d => [d, { ...hours[day] }])) as OpeningHours);
 
   return (
-    <Card title="Opening hours" description="The public menu shows open or closed from these, and only takes orders while open. Closing earlier than opening runs past midnight.">
+    <Card title={tr('Opening hours')} description={tr('The public menu shows open or closed from these, and only takes orders while open. Closing earlier than opening runs past midnight.')}>
       <div className="ws-hours">
         {DAYS.map(day => {
           const { open, close, closed } = hours[day];
@@ -53,20 +54,20 @@ export const OpeningHoursEditor: React.FC<{
           return (
             <div key={day} className="ws-hours-row" role="group" aria-label={day}>
               <span className="ws-hours-day">
-                <Switch label={`Open on ${day}`} checked={!closed} disabled={disabled} onChange={isOpen => setDay(day, { closed: !isOpen })} />
+                <Switch label={tr('Open on {day}', { day })} checked={!closed} disabled={disabled} onChange={isOpen => setDay(day, { closed: !isOpen })} />
                 <strong>{day}</strong>
               </span>
               {closed ? (
-                <span className="ws-hint ws-hours-times">Closed</span>
+                <span className="ws-hint ws-hours-times">{tr('Closed')}</span>
               ) : (
                 <span className="ws-hours-times">
-                  <Input type="time" aria-label={`${day} opening time`} aria-invalid={!!error} required value={open} onChange={e => setDay(day, { open: e.target.value })} />
-                  <span aria-hidden="true" className="ws-hint">to</span>
-                  <Input type="time" aria-label={`${day} closing time`} aria-invalid={!!error} required value={close} onChange={e => setDay(day, { close: e.target.value })} />
-                  {!error && TIME.test(open) && TIME.test(close) && close < open && <span className="ws-hint">next day</span>}
+                  <Input type="time" aria-label={tr('{day} opening time', { day })} aria-invalid={!!error} required value={open} onChange={e => setDay(day, { open: e.target.value })} />
+                  <span aria-hidden="true" className="ws-hint">{tr('to')}</span>
+                  <Input type="time" aria-label={tr('{day} closing time', { day })} aria-invalid={!!error} required value={close} onChange={e => setDay(day, { close: e.target.value })} />
+                  {!error && TIME.test(open) && TIME.test(close) && close < open && <span className="ws-hint">{tr('next day')}</span>}
                 </span>
               )}
-              <button type="button" className="ws-link ws-hours-copy" onClick={() => copyToAll(day)} disabled={disabled}>Copy to all</button>
+              <button type="button" className="ws-link ws-hours-copy" onClick={() => copyToAll(day)} disabled={disabled}>{tr('Copy to all')}</button>
               {error && <span className="ws-error-text ws-hours-error" role="alert">{error}</span>}
             </div>
           );

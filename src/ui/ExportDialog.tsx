@@ -3,6 +3,7 @@ import { Check, Copy, Download, FileCode, FileSpreadsheet, RotateCcw } from 'luc
 import { Dialog } from './Dialog';
 import { Button, Column, DataTable, Field, Input, Segmented } from './primitives';
 import { DATE_PRESETS, DatePreset } from './format';
+import { tr } from '../i18n';
 
 export interface ExportSummaryItem { label: string; value: React.ReactNode; tone?: 'positive' | 'danger' | 'warning' }
 
@@ -43,11 +44,11 @@ export function ExportDialog<T>({ open, onClose, title, description, filters, su
       description={description}
       footer={
         <>
-          <span className="ws-spacer"><Button variant="ghost" size="sm" icon={<RotateCcw />} onClick={onReset}>Reset filters</Button></span>
-          <Button size="sm" disabled={empty} icon={copied ? <Check /> : <Copy />} onClick={async () => setCopied(await onCopy())}>{copied ? 'Copied' : 'Copy CSV'}</Button>
-          <Button size="sm" disabled={empty} icon={<FileCode />} onClick={onJSON}>JSON</Button>
-          <Button size="sm" disabled={empty} icon={<Download />} onClick={onCSV}>CSV</Button>
-          <Button size="sm" variant="primary" disabled={empty} icon={<FileSpreadsheet />} onClick={onExcel}>Excel ({records.length})</Button>
+          <span className="ws-spacer"><Button variant="ghost" size="sm" icon={<RotateCcw />} onClick={onReset}>{tr('Reset filters')}</Button></span>
+          <Button size="sm" disabled={empty} icon={copied ? <Check /> : <Copy />} onClick={async () => setCopied(await onCopy())}>{copied ? tr('Copied') : tr('Copy CSV')}</Button>
+          <Button size="sm" disabled={empty} icon={<FileCode />} onClick={onJSON}>{tr('JSON')}</Button>
+          <Button size="sm" disabled={empty} icon={<Download />} onClick={onCSV}>{tr('CSV')}</Button>
+          <Button size="sm" variant="primary" disabled={empty} icon={<FileSpreadsheet />} onClick={onExcel}>{tr('Excel ({length})', { length: records.length })}</Button>
         </>
       }
     >
@@ -63,11 +64,11 @@ export function ExportDialog<T>({ open, onClose, title, description, filters, su
         </div>
         <div className="ws-card" style={{ overflow: 'hidden' }}>
           <DataTable
-            caption="Export preview"
+            caption={tr('Export preview')}
             columns={previewColumns}
             rows={records.slice(0, 6)}
             rowKey={rowKey}
-            empty={<p className="ws-hint" style={{ padding: 20, textAlign: 'center', margin: 0 }}>No records match these filters.</p>}
+            empty={<p className="ws-hint" style={{ padding: 20, textAlign: 'center', margin: 0 }}>{tr('No records match these filters.')}</p>}
             note={records.length > 6 ? `Showing 6 of ${records.length} records. All of them will be exported.` : undefined}
           />
         </div>
@@ -82,11 +83,11 @@ export function DateRangeFilter({ preset, onPreset, start, end, onStart, onEnd }
 }) {
   return (
     <div className="ws-field">
-      <span className="ws-label">Period</span>
-      <Segmented label="Period" value={preset} onChange={onPreset} options={DATE_PRESETS.map(p => ({ value: p.id, label: p.label }))} />
+      <span className="ws-label">{tr('Period')}</span>
+      <Segmented label={tr('Period')} value={preset} onChange={onPreset} options={DATE_PRESETS.map(p => ({ value: p.id, label: p.label }))} />
       {preset === 'custom' && (
         <div className="ws-form-row cols-2">
-          <Field label="From">{id => <Input id={id} type="date" value={start} onChange={e => onStart(e.target.value)} />}</Field>
+          <Field label={tr('From')}>{id => <Input id={id} type="date" value={start} onChange={e => onStart(e.target.value)} />}</Field>
           <Field label="To">{id => <Input id={id} type="date" value={end} onChange={e => onEnd(e.target.value)} />}</Field>
         </div>
       )}
@@ -100,15 +101,15 @@ export function SortFilter<T extends string>({ value, onChange, order, onOrder, 
 }) {
   return (
     <div className="ws-form-row cols-2">
-      <Field label="Sort by">{id => (
+      <Field label={tr('Sort by')}>{id => (
         <span className="chth-select-wrap"><select id={id} className="chth-select" value={value} onChange={e => onChange(e.target.value as T)}>
           {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select></span>
       )}</Field>
-      <Field label="Order">{id => (
+      <Field label={tr('Order')}>{id => (
         <span className="chth-select-wrap"><select id={id} className="chth-select" value={order} onChange={e => onOrder(e.target.value as 'asc' | 'desc')}>
-          <option value="desc">Highest / newest first</option>
-          <option value="asc">Lowest / oldest first</option>
+          <option value="desc">{tr('Highest / newest first')}</option>
+          <option value="asc">{tr('Lowest / oldest first')}</option>
         </select></span>
       )}</Field>
     </div>

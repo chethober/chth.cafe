@@ -1,3 +1,4 @@
+import { intlTag } from '../i18n/translate';
 import type { ExpenseSelect, OrderItemSelect, OrderSelect, ShiftSelect } from '../db/schema';
 
 // Pure aggregation for the admin finance dashboard. Every record is keyed by its
@@ -65,7 +66,7 @@ const monthStart = (index: number) => `${Math.floor(index / 12)}-${String((index
 const monthEnd = (index: number) => addDays(monthStart(index + 1), -1);
 
 const formatKey = (key: string, options: Intl.DateTimeFormatOptions) =>
-  new Date(keyToUtc(key)).toLocaleDateString('en-GB', { timeZone: 'UTC', ...options });
+  new Date(keyToUtc(key)).toLocaleDateString(intlTag(), { timeZone: 'UTC', ...options });
 
 export function makeDayKeyer(timeZone?: string) {
   let format: Intl.DateTimeFormat;

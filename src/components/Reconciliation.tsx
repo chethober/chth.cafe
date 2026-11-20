@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { SettingsSelect } from '../db/schema';
 import { AffixInput, Button, Card, Field, Input, KeyValue, Notice, Textarea, money } from '../ui';
+import { tr } from '../i18n';
 
 interface Totals { expectedCash: number; expectedCard: number; saved?: { opening_cash: number; actual_cash: number; actual_card: number; notes: string; updated_at: string } | null }
 
@@ -42,34 +43,34 @@ export function Reconciliation({ settings }: { settings: SettingsSelect }) {
     try {
       const result = await api<{ data: Totals }>('/api/reconciliation', { date, openingCash: Number(opening), actualCash: Number(cash), actualCard: Number(card), notes });
       setTotals({ ...result.data, expectedCash: result.data.expectedCash - Number(opening) });
-      setMessage({ tone: 'positive', text: 'Day closed and saved.' });
+      setMessage({ tone: 'positive', text: tr('Day closed and saved.') });
     } catch (e) {
-      setMessage({ tone: 'danger', text: e instanceof Error ? e.message : 'Save failed.' });
+      setMessage({ tone: 'danger', text: e instanceof Error ? e.message : tr('Save failed.') });
     } finally { setBusy(false); }
   };
 
   return (
-    <Card title="Close the day" description={`Count the drawer and card terminal. Completed orders only, dates in ${timeZone}.`}>
+    <Card title={tr('Close the day')} description={tr('Count the drawer and card terminal. Completed orders only, dates in {timeZone}.', { timeZone })}>
       <form className="ws-form" onSubmit={save} aria-busy={busy}>
         <fieldset className="ws-fieldset ws-form" disabled={busy}>
           <div className="ws-form-row cols-2">
-            <Field label="Business date">{id => <Input id={id} type="date" required value={date} onChange={e => setDate(e.target.value)} />}</Field>
-            <Field label="Opening float">{id => <AffixInput id={id} affix={settings.currency} type="number" inputMode="decimal" min="0" step="0.01" required value={opening} onChange={e => setOpening(e.target.value)} />}</Field>
-            <Field label="Counted cash">{id => <AffixInput id={id} affix={settings.currency} type="number" inputMode="decimal" min="0" step="0.01" required value={cash} onChange={e => setCash(e.target.value)} />}</Field>
-            <Field label="Card terminal total">{id => <AffixInput id={id} affix={settings.currency} type="number" inputMode="decimal" min="0" step="0.01" required value={card} onChange={e => setCard(e.target.value)} />}</Field>
+            <Field label={tr('Business date')}>{id => <Input id={id} type="date" required value={date} onChange={e => setDate(e.target.value)} />}</Field>
+            <Field label={tr('Opening float')}>{id => <AffixInput id={id} affix={settings.currency} type="number" inputMode="decimal" min="0" step="0.01" required value={opening} onChange={e => setOpening(e.target.value)} />}</Field>
+            <Field label={tr('Counted cash')}>{id => <AffixInput id={id} affix={settings.currency} type="number" inputMode="decimal" min="0" step="0.01" required value={cash} onChange={e => setCash(e.target.value)} />}</Field>
+            <Field label={tr('Card terminal total')}>{id => <AffixInput id={id} affix={settings.currency} type="number" inputMode="decimal" min="0" step="0.01" required value={card} onChange={e => setCard(e.target.value)} />}</Field>
           </div>
           {totals && (
             <KeyValue items={[
-              { label: 'Expected cash (incl. float, less cash expenses)', value: fmt(expectedCash) },
-              ...(cashDiff !== null ? [{ label: 'Cash', value: diffText(cashDiff), tone: cashDiff === 0 ? 'positive' as const : 'danger' as const }] : []),
-              { label: 'Expected card', value: fmt(totals.expectedCard) },
-              ...(cardDiff !== null ? [{ label: 'Card', value: diffText(cardDiff), tone: cardDiff === 0 ? 'positive' as const : 'danger' as const }] : [])
+              { label: tr('Expected cash (incl. float, less cash expenses)'), value: fmt(expectedCash) },
+              ...(cashDiff !== null ? [{ label: tr('Cash'), value: diffText(cashDiff), tone: cashDiff === 0 ? 'positive' as const : 'danger' as const }] : []),
+              { label: tr('Expected card'), value: fmt(totals.expectedCard) },
+              ...(cardDiff !== null ? [{ label: tr('Card'), value: diffText(cardDiff), tone: cardDiff === 0 ? 'positive' as const : 'danger' as const }] : [])
             ]} />
           )}
-          <Field label="Notes" optional>{id => <Textarea id={id} value={notes} onChange={e => setNotes(e.target.value)} maxLength={1000} rows={2} placeholder="Anything that explains a difference" />}</Field>
+          <Field label={tr('Notes')} optional>{id => <Textarea id={id} value={notes} onChange={e => setNotes(e.target.value)} maxLength={1000} rows={2} placeholder={tr('Anything that explains a difference')} />}</Field>
         </fieldset>
         {message && <Notice tone={message.tone}>{message.text}</Notice>}
-        <div><Button type="submit" variant="primary" loading={busy} disabled={!totals}>{busy ? 'Saving…' : 'Save day'}</Button></div>
+        <div><Button type="submit" variant="primary" loading={busy} disabled={!totals}>{busy ? tr('Saving…') : tr('Save day')}</Button></div>
       </form>
     </Card>
   );

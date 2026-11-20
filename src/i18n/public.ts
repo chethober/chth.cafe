@@ -1,10 +1,10 @@
 // Translations for what customers see: the public menu, ordering, order tracking, events and
-// opening hours. Keys are the English text, so a missing translation shows English. The staff
-// apps (admin and panel) stay in English for now.
+// opening hours. Keys are the English text, so a missing translation shows English. The admin and
+// panel add their own strings from staff.ts.
 
 import type { Locale } from '../chth-kit/locales.js';
 
-type Row = Partial<Record<Exclude<Locale, 'en'>, string>>;
+export type Row = Partial<Record<Exclude<Locale, 'en'>, string>>;
 
 export const PUBLIC_STRINGS: Record<string, Row> = {
   // Greeting and hero
@@ -189,4 +189,14 @@ export const PUBLIC_STRINGS: Record<string, Row> = {
   'All rights reserved.': { fa: 'همهٔ حقوق محفوظ است.', ar: 'جميع الحقوق محفوظة.', ru: 'Все права защищены.', es: 'Todos los derechos reservados.' },
   'See you at the café.': { fa: 'توی کافه می‌بینیمت.', ar: 'نراك في المقهى.', ru: 'Ждём вас в кафе.', es: 'Nos vemos en el café.' },
   'Language': { fa: 'زبان', ar: 'اللغة', ru: 'Язык', es: 'Idioma' },
+  // Shared with the workspace: the calendar and dialogs
+  'Previous month': { fa: 'ماه قبل', ar: 'الشهر السابق', ru: 'Предыдущий месяц', es: 'Mes anterior' },
+  'Next month': { fa: 'ماه بعد', ar: 'الشهر التالي', ru: 'Следующий месяц', es: 'Mes siguiente' },
+  'Back to today': { fa: 'برگشت به امروز', ar: 'العودة إلى اليوم', ru: 'К сегодняшнему дню', es: 'Volver a hoy' },
+  'Close dialog': { fa: 'بستن پنجره', ar: 'إغلاق النافذة', ru: 'Закрыть окно', es: 'Cerrar ventana' },
+  'Close (Esc)': { fa: 'بستن (Esc)', ar: 'إغلاق (Esc)', ru: 'Закрыть (Esc)', es: 'Cerrar (Esc)' },
+  ', {count} event': { fa: '، {count} برنامه', ar: '، {count} فعالية', ru: ', событий: {count}', es: ', {count} evento' },
+  ', {count} events': { fa: '، {count} برنامه', ar: '، {count} فعاليات', ru: ', событий: {count}', es: ', {count} eventos' },
+  ', today': { fa: '، امروز', ar: '، اليوم', ru: ', сегодня', es: ', hoy' },
+  '+{count} more': { fa: '+{count} برنامهٔ دیگر', ar: '+{count} أخرى', ru: 'Ещё {count}', es: '+{count} más' },
 };

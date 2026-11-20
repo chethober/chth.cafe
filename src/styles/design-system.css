@@ -39,7 +39,7 @@ html .app-shell.app-shell > header {
 }
 .app-shell > main, .app-shell > header > div, .app-shell > footer > div { max-width: 1160px; }
 /* viewport-fit=cover paints under the notch; keep content clear of it in landscape. */
-.app-shell { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.app-shell { padding-inline-start: env(safe-area-inset-left, 0px); padding-inline-end: env(safe-area-inset-right, 0px); }
 .app-shell > header { padding-top: env(safe-area-inset-top, 0px); }
 .app-shell > main { padding-top: var(--chth-space-32); }
 .app-shell > header img { border-radius: 50%; box-shadow: none; --tw-ring-color: transparent; filter: saturate(.6); }
@@ -101,7 +101,7 @@ html :is(.app-shell, .menu-paper-dialog) :is(.text-blue-400, .text-sky-400, .tex
   display: flex; flex-direction: column; gap: var(--chth-space-8); min-width: 0; padding: var(--chth-space-16);
   background: var(--cafe-paper-dark); color: var(--cafe-ink-dark);
   border: 1px solid var(--cafe-rule-dark); border-radius: var(--control-radius);
-  text-align: left; font-family: var(--font-sans); overflow-wrap: anywhere; cursor: pointer;
+  text-align: start; font-family: var(--font-sans); overflow-wrap: anywhere; cursor: pointer;
 }
 html.light .appearance-theme-card { background: var(--cafe-paper-light); color: var(--cafe-ink-light); border-color: var(--cafe-rule-light); }
 .appearance-theme-card[aria-pressed='true'] { outline: 2px solid var(--menu-accent); outline-offset: 2px; }

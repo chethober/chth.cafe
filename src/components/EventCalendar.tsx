@@ -4,6 +4,7 @@ import {
   addDays, calendarParts, formatDateKey, expandOccurrences, monthBounds, monthGrid, monthTitle, weekdayLabels,
   type CafeEvent, type CalendarSystem, type Occurrence
 } from '../utils/events';
+import { tr } from '../i18n';
 
 /** Occurrences touching each day of [from, to], keyed by date; multi-day events appear on every day they span. */
 export function occurrencesByDay(events: CafeEvent[], from: string, to: string) {
@@ -48,7 +49,9 @@ export function EventCalendar({ events, calendar, secondary, today, month, onMon
 
   // Arrow keys move the selected day, as in a native date picker.
   const onKeyDown = (event: React.KeyboardEvent) => {
-    const step = ({ ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 } as Record<string, number>)[event.key];
+    // The grid is mirrored right to left, so the horizontal arrows swap there.
+    const ahead = getComputedStyle(event.currentTarget).direction === 'rtl' ? -1 : 1;
+    const step = ({ ArrowLeft: -ahead, ArrowRight: ahead, ArrowUp: -7, ArrowDown: 7 } as Record<string, number>)[event.key];
     if (!step) return;
     event.preventDefault();
     const grid = event.currentTarget as HTMLElement;
@@ -61,14 +64,14 @@ export function EventCalendar({ events, calendar, secondary, today, month, onMon
   return (
     <div className="evcal">
       <div className="evcal-head">
-        <button type="button" className="evcal-nav" aria-label="Previous month" onClick={() => onMonth(addDays(first, -1))}><ChevronLeft size={18} /></button>
+        <button type="button" className="evcal-nav" aria-label={tr('Previous month')} onClick={() => onMonth(addDays(first, -1))}><ChevronLeft size={18} /></button>
         <div className="evcal-title" aria-live="polite">
           <strong>{monthTitle(month, calendar)}</strong>
           {second && <small>{monthTitle(first, second)}{monthTitle(first, second) !== monthTitle(last, second) ? ` – ${monthTitle(last, second)}` : ''}</small>}
         </div>
-        <button type="button" className="evcal-nav" aria-label="Next month" onClick={() => onMonth(addDays(last, 1))}><ChevronRight size={18} /></button>
+        <button type="button" className="evcal-nav" aria-label={tr('Next month')} onClick={() => onMonth(addDays(last, 1))}><ChevronRight size={18} /></button>
       </div>
-      {(today < first || today > last) && <button type="button" className="evcal-today" onClick={() => { onMonth(today); onSelect(today); }}>Back to today</button>}
+      {(today < first || today > last) && <button type="button" className="evcal-today" onClick={() => { onMonth(today); onSelect(today); }}>{tr('Back to today')}</button>}
       <div className="evcal-grid" role="grid" aria-label={monthTitle(month, calendar)} onKeyDown={onKeyDown}>
         <div role="row" className="evcal-row">
           {labels.map(label => <span key={label} role="columnheader" className="evcal-weekday">{label}</span>)}
@@ -86,7 +89,7 @@ export function EventCalendar({ events, calendar, secondary, today, month, onMon
                     data-day={day}
                     tabIndex={isSelected || (!selected && day === today) ? 0 : -1}
                     className={`evcal-day${outside ? ' is-outside' : ''}${day === today ? ' is-today' : ''}${day < today ? ' is-past' : ''}${isSelected ? ' is-selected' : ''}`}
-                    aria-label={`${formatDateKey(day, calendar, 'long')}${list.length ? `, ${list.length} ${list.length === 1 ? 'event' : 'events'}` : ''}${day === today ? ', today' : ''}`}
+                    aria-label={`${formatDateKey(day, calendar, 'long')}${list.length ? tr(list.length === 1 ? ', {count} event' : ', {count} events', { count: list.length }) : ''}${day === today ? tr(', today') : ''}`}
                     onClick={() => { onSelect(day); if (outside) onMonth(day); }}
                   >
                     <span className="evcal-num">{calendarParts(day, calendar).day}</span>

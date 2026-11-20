@@ -7,15 +7,16 @@ import {
   formatDateTime, plural, localDateKey, money, orderStatusTone, orderTypeLabel, paymentLabel, ORDER_PAYMENT_METHODS, ORDER_STATUS_LABELS
 } from '../ui';
 import { CustomerPicker } from './CustomerClub';
+import { tr } from '../i18n';
 
 /* --------------------------------------------------------------- Menu */
 
 export const CATEGORY_ICONS: Record<string, { icon: React.ReactNode; label: string }> = {
-  Coffee: { icon: <Coffee />, label: 'Coffee / espresso' },
-  Leaf: { icon: <Leaf />, label: 'Tea' },
-  GlassWater: { icon: <GlassWater />, label: 'Cold drinks' },
-  Cake: { icon: <Cake />, label: 'Bakery & pastries' },
-  Utensils: { icon: <Utensils />, label: 'Brunch & food' }
+  Coffee: { icon: <Coffee />, get label() { return tr('Coffee / espresso'); } },
+  Leaf: { icon: <Leaf />, get label() { return tr('Tea'); } },
+  GlassWater: { icon: <GlassWater />, get label() { return tr('Cold drinks'); } },
+  Cake: { icon: <Cake />, get label() { return tr('Bakery & pastries'); } },
+  Utensils: { icon: <Utensils />, get label() { return tr('Brunch & food'); } }
 };
 
 /**
@@ -38,7 +39,7 @@ export function MenuPicker({ categories, menuItems, query = '', open, onOpenChan
   const known = new Set(categories.map(c => c.id));
   const groups = [
     ...categories.map(c => ({ id: c.id, name: c.name, icon: CATEGORY_ICONS[c.icon || '']?.icon || <Coffee />, items: menuItems.filter(i => i.categoryId === c.id) })),
-    { id: 'other', name: 'Other', icon: <Utensils />, items: menuItems.filter(i => !known.has(i.categoryId)) }
+    { id: 'other', name: tr('Other'), icon: <Utensils />, items: menuItems.filter(i => !known.has(i.categoryId)) }
   ].filter(g => g.items.length > 0);
 
   const row = (item: MenuItemSelect) => {
@@ -47,9 +48,9 @@ export function MenuPicker({ categories, menuItems, query = '', open, onOpenChan
     return (
       <li key={item.id} className="ws-picker-item" data-sold-out={!item.isInStock || undefined}>
         <button type="button" className="ws-picker-add" disabled={!addable} onClick={() => onAdd(item)}
-          aria-label={addable ? `Add ${item.name}, ${fmt(item.basePrice)}${qty ? `. ${qty} in order` : ''}` : `${item.name} is sold out`}>
+          aria-label={addable ? tr(qty ? 'Add {name}, {price}. {count} in order' : 'Add {name}, {price}', { name: item.name, price: fmt(item.basePrice), count: qty }) : tr('{name} is sold out', { name: item.name })}>
           <span className="ws-picker-item-name">{item.name}</span>
-          <span className="ws-picker-price">{addable ? fmt(item.basePrice) : 'Sold out'}</span>
+          <span className="ws-picker-price">{addable ? fmt(item.basePrice) : tr('Sold out')}</span>
           {qty > 0 ? <span className="ws-picker-qty" aria-hidden="true">{qty}</span> : <span className="ws-picker-plus" aria-hidden="true"><Plus /></span>}
         </button>
         {itemActions && <div className="ws-picker-actions">{itemActions(item)}</div>}
@@ -60,8 +61,8 @@ export function MenuPicker({ categories, menuItems, query = '', open, onOpenChan
   const q = query.trim().toLowerCase();
   if (q) {
     const matches = menuItems.filter(i => i.name.toLowerCase().includes(q));
-    if (!matches.length) return <div className="ws-picker-group"><EmptyState title="Nothing matches" description="Try another search term." /></div>;
-    return <div className="ws-picker-group"><ul className="ws-picker-items" aria-label="Search results">{matches.map(row)}</ul></div>;
+    if (!matches.length) return <div className="ws-picker-group"><EmptyState title={tr('Nothing matches')} description={tr('Try another search term.')} /></div>;
+    return <div className="ws-picker-group"><ul className="ws-picker-items" aria-label={tr('Search results')}>{matches.map(row)}</ul></div>;
   }
 
   return (
@@ -75,7 +76,7 @@ export function MenuPicker({ categories, menuItems, query = '', open, onOpenChan
               onClick={() => onOpenChange(isOpen ? open.filter(id => id !== group.id) : [...open, group.id])}>
               <span className="ws-picker-icon" aria-hidden="true">{group.icon}</span>
               <span className="ws-picker-name">{group.name}</span>
-              {inOrder > 0 && <span className="ws-picker-qty" aria-label={`${inOrder} in order`}>{inOrder}</span>}
+              {inOrder > 0 && <span className="ws-picker-qty" aria-label={tr('{inOrder} in order', { inOrder })}>{inOrder}</span>}
               <span className="ws-picker-meta">{plural(group.items.length, 'item')}</span>
               <ChevronDown className="ws-picker-chevron" aria-hidden="true" />
             </button>
@@ -94,7 +95,7 @@ export const TASK_CATEGORY_ICONS: Record<string, React.ReactNode> = {
   Opening: <Sun />, Closing: <Moon />, Inventory: <Boxes />, Cleaning: <Sparkles />, Maintenance: <Wrench />
 };
 export type TaskStatus = 'pending' | 'in_progress' | 'completed';
-export const TASK_STATUS_LABELS: Record<TaskStatus, string> = { pending: 'To do', in_progress: 'In progress', completed: 'Done' };
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = { get pending() { return tr('To do'); }, get in_progress() { return tr('In progress'); }, get completed() { return tr('Done'); } };
 export const nextTaskStatus = (status: string): TaskStatus => status === 'pending' ? 'in_progress' : status === 'in_progress' ? 'completed' : 'pending';
 
 const STATUS_ICON = { pending: Circle, in_progress: PlayCircle, completed: CheckCircle2 };
@@ -108,18 +109,18 @@ export function TaskRow({ task, staffName, onCycle, onDelete }: { task: TaskSele
   return (
     <ListItem
       onClick={onCycle}
-      label={`${task.title}: ${TASK_STATUS_LABELS[status]}. Activate to mark ${TASK_STATUS_LABELS[nextTaskStatus(status)]}.`}
+      label={tr('{title}: {value}. Activate to mark {value2}.', { title: task.title, value: TASK_STATUS_LABELS[status], value2: TASK_STATUS_LABELS[nextTaskStatus(status)] })}
       lead={<Icon style={{ width: 24, height: 24, color: STATUS_COLOR[status] }} aria-hidden="true" />}
       title={<>
         <span className="ws-truncate" style={done ? { textDecoration: 'line-through', color: 'var(--ws-muted)' } : undefined}>{task.title}</span>
-        {task.priority === 'high' && !done && <Badge tone="danger">High</Badge>}
+        {task.priority === 'high' && !done && <Badge tone="danger">{tr('High')}</Badge>}
       </>}
       subtitle={<>
         <span>{TASK_CATEGORY_ICONS[task.category]}{task.category}</span>
         {staffName && <span><User />{staffName}</span>}
-        {status === 'in_progress' && <Badge tone="accent">In progress</Badge>}
+        {status === 'in_progress' && <Badge tone="accent">{tr('In progress')}</Badge>}
       </>}
-      actions={onDelete && <IconButton label={`Delete ${task.title}`} variant="danger-ghost" onClick={onDelete}><Trash2 /></IconButton>}
+      actions={onDelete && <IconButton label={tr('Delete {title}', { title: task.title })} variant="danger-ghost" onClick={onDelete}><Trash2 /></IconButton>}
     />
   );
 }
@@ -144,24 +145,24 @@ export function TaskFormDialog({ open, onClose, staffList, onCreated }: { open: 
   };
 
   return (
-    <FormDialog open={open} onClose={onClose} title="New task" description="Added to today's checklist." submitLabel="Add task" submitDisabled={!title.trim()} onSubmit={submit}>
-      <Field label="What needs doing?">{id => <Input id={id} autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Purge the steam wands" required maxLength={200} />}</Field>
+    <FormDialog open={open} onClose={onClose} title={tr('New task')} description={tr('Added to today\'s checklist.')} submitLabel={tr('Add task')} submitDisabled={!title.trim()} onSubmit={submit}>
+      <Field label={tr('What needs doing?')}>{id => <Input id={id} autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder={tr('e.g. Purge the steam wands')} required maxLength={200} />}</Field>
       <div className="ws-form-row cols-2">
-        <Field label="Category">{id => (
+        <Field label={tr('Category')}>{id => (
           <Select id={id} value={category} onChange={e => setCategory(e.target.value)}>
-            {TASK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            {TASK_CATEGORIES.map(c => <option key={c} value={c}>{tr(c)}</option>)}
           </Select>
         )}</Field>
-        <Field label="Priority">{id => (
+        <Field label={tr('Priority')}>{id => (
           <Select id={id} value={priority} onChange={e => setPriority(e.target.value as typeof priority)}>
-            <option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
+            <option value="high">{tr('High')}</option><option value="medium">{tr('Medium')}</option><option value="low">{tr('Low')}</option>
           </Select>
         )}</Field>
       </div>
       {staffList && (
-        <Field label="Assign to" optional>{id => (
+        <Field label={tr('Assign to')} optional>{id => (
           <Select id={id} value={staffId} onChange={e => setStaffId(e.target.value)}>
-            <option value="">Anyone on shift</option>
+            <option value="">{tr('Anyone on shift')}</option>
             {staffList.map(s => <option key={s.id} value={s.id}>{s.name} · {s.role}</option>)}
           </Select>
         )}</Field>
@@ -218,7 +219,7 @@ export function OrderLinesEditor({ lines, onChange, currency, editablePrice, flu
   const changeQty = (key: string, delta: number) =>
     onChange(prev => prev.flatMap(l => l.key !== key ? [l] : l.quantity + delta > 0 ? [{ ...l, quantity: l.quantity + delta }] : []));
   return (
-    <ul className="ws-list" style={flush ? { margin: '0 calc(var(--ws-pad) * -1)' } : undefined} aria-label="Order lines">
+    <ul className="ws-list" style={flush ? { margin: '0 calc(var(--ws-pad) * -1)' } : undefined} aria-label={tr('Order lines')}>
       {lines.map(line => {
         const gross = line.unitPrice * line.quantity;
         const off = lineDiscount(line);
@@ -229,31 +230,31 @@ export function OrderLinesEditor({ lines, onChange, currency, editablePrice, flu
               <div className="ws-list-title"><span className="ws-truncate">{line.itemName}</span></div>
               {(line.variantLabel || !editablePrice) && <div className="ws-list-sub">
                 {line.variantLabel && <span>{line.variantLabel}</span>}
-                {!editablePrice && <span className="tabular">{fmt(line.unitPrice)} each</span>}
+                {!editablePrice && <span className="tabular">{tr('{unitPrice} each', { unitPrice: fmt(line.unitPrice) })}</span>}
               </div>}
             </div>
-            <Stepper label={`${line.itemName} quantity`} value={line.quantity} onDecrement={() => changeQty(line.key, -1)} onIncrement={() => changeQty(line.key, 1)} />
+            <Stepper label={tr('{itemName} quantity', { itemName: line.itemName })} value={line.quantity} onDecrement={() => changeQty(line.key, -1)} onIncrement={() => changeQty(line.key, 1)} />
             {editablePrice && (
               <div style={{ width: 104 }}>
-                <AffixInput affix={currency} aria-label={`${line.itemName} unit price`} type="number" inputMode="decimal" step="any" min="0" value={line.unitPrice}
-                  onChange={e => update(line.key, { unitPrice: Math.max(0, parseFloat(e.target.value) || 0) })} style={{ minHeight: 36, paddingRight: 6 }} />
+                <AffixInput affix={currency} aria-label={tr('{itemName} unit price', { itemName: line.itemName })} type="number" inputMode="decimal" step="any" min="0" value={line.unitPrice}
+                  onChange={e => update(line.key, { unitPrice: Math.max(0, parseFloat(e.target.value) || 0) })} style={{ minHeight: 36, paddingInlineEnd: 6 }} />
               </div>
             )}
-            <IconButton label={showDiscount ? `Remove discount on ${line.itemName}` : `Discount ${line.itemName}`} variant={showDiscount ? 'secondary' : 'ghost'} aria-pressed={showDiscount}
+            <IconButton label={showDiscount ? tr('Remove discount on {itemName}', { itemName: line.itemName }) : tr('Discount {itemName}', { itemName: line.itemName })} variant={showDiscount ? 'secondary' : 'ghost'} aria-pressed={showDiscount}
               onClick={() => {
                 if (showDiscount) { update(line.key, { discount: '' }); setDiscountOpen(open => open.filter(k => k !== line.key)); }
                 else setDiscountOpen(open => [...open, line.key]);
               }}><Percent /></IconButton>
-            <span style={{ marginLeft: 'auto', textAlign: 'right' }}>
+            <span style={{ marginInlineStart: 'auto', textAlign: 'end' }}>
               <span className="ws-amount" style={{ display: 'block' }}>{fmt(gross - off)}</span>
               {off > 0 && <span className="ws-hint tabular" style={{ textDecoration: 'line-through' }}>{fmt(gross)}</span>}
             </span>
-            <IconButton label={`Remove ${line.itemName}`} variant="danger-ghost" onClick={() => onChange(prev => prev.filter(l => l.key !== line.key))}><Trash2 /></IconButton>
+            <IconButton label={tr('Remove {itemName}', { itemName: line.itemName })} variant="danger-ghost" onClick={() => onChange(prev => prev.filter(l => l.key !== line.key))}><Trash2 /></IconButton>
             {showDiscount && (
               <div style={{ flexBasis: '100%', display: 'flex', gap: 8, alignItems: 'center' }}>
-                <Input aria-label={`Discount on ${line.itemName}`} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" autoFocus={line.discount === ''}
+                <Input aria-label={tr('Discount on {itemName}', { itemName: line.itemName })} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" autoFocus={line.discount === ''}
                   value={line.discount} onChange={e => update(line.key, { discount: e.target.value })} style={{ minHeight: 36, flex: 1 }} />
-                <Segmented label={`Discount type for ${line.itemName}`} value={line.discountType} onChange={discountType => update(line.key, { discountType })}
+                <Segmented label={tr('Discount type for {itemName}', { itemName: line.itemName })} value={line.discountType} onChange={discountType => update(line.key, { discountType })}
                   options={[{ value: 'percent', label: '%' }, { value: 'fixed', label: currency }]} />
                 {off > 0 && <span className="ws-amount" data-tone="positive">−{fmt(off)}</span>}
               </div>
@@ -323,7 +324,7 @@ export function OrderEditDialog({ order, items, settings, categories, menuItems,
       onSaved?.(saved);
       onClose();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'The order could not be saved.');
+      setError(reason instanceof Error ? reason.message : tr('The order could not be saved.'));
     } finally {
       setSaving(false);
     }
@@ -335,42 +336,42 @@ export function OrderEditDialog({ order, items, settings, categories, menuItems,
       onClose={onClose}
       busy={saving}
       size="lg"
-      title={order ? <>Edit <span className="mono">{order.orderNumber}</span></> : ''}
-      description={order ? `${ORDER_STATUS_LABELS[order.status] || order.status} · ${formatDateTime(order.createdAt)}. Ingredients are taken from or returned to stock to match.` : undefined}
-      submitLabel={`Save · ${fmt(amounts.totalAmount)}`}
+      title={order ? <>{tr('Edit')}{' '}<span className="mono">{order.orderNumber}</span></> : ''}
+      description={order ? tr('{value} · {createdAt}. Ingredients are taken from or returned to stock to match.', { value: ORDER_STATUS_LABELS[order.status] || order.status, createdAt: formatDateTime(order.createdAt) }) : undefined}
+      submitLabel={tr('Save · {totalAmount}', { totalAmount: fmt(amounts.totalAmount) })}
       submitDisabled={!lines.length}
       onSubmit={submit}
     >
       {error && <Notice tone="danger">{error}</Notice>}
-      {lines.length === 0 ? <div className="ws-lane-empty">An order needs at least one item. Add one below, or cancel the order instead.</div>
+      {lines.length === 0 ? <div className="ws-lane-empty">{tr('An order needs at least one item. Add one below, or cancel the order instead.')}</div>
         : <div className="ws-panel" style={{ padding: 'var(--chth-space-4) var(--chth-space-12)' }}><OrderLinesEditor lines={lines} onChange={setLines} currency={currency} /></div>}
       <div className="ws-field">
-        <span className="ws-label">Add items</span>
+        <span className="ws-label">{tr('Add items')}</span>
         <div className="ws-toolbar-stack">
-          <SearchInput value={search} onChange={setSearch} placeholder="Find a drink or dish" label="Search menu" />
+          <SearchInput value={search} onChange={setSearch} placeholder={tr('Find a drink or dish')} label={tr('Search menu')} />
           <MenuPicker categories={categories} menuItems={menuItems} query={search} open={openCategories} onOpenChange={setOpenCategories}
             quantities={lineQuantities(lines)} onAdd={item => setLines(prev => addMenuItem(prev, item))} fmt={fmt} />
         </div>
       </div>
-      <Segmented block label="Order type" value={orderType} onChange={setOrderType} options={[{ value: 'dine_in', label: 'Dine-in' }, { value: 'takeout', label: 'Takeout' }, { value: 'pickup', label: 'Pickup' }]} />
+      <Segmented block label={tr('Order type')} value={orderType} onChange={setOrderType} options={[{ value: 'dine_in', label: tr('Dine-in') }, { value: 'takeout', label: tr('Takeout') }, { value: 'pickup', label: tr('Pickup') }]} />
       <CustomerPicker customers={store.getCustomers()} orders={store.getOrders()} text={customer} onTextChange={setCustomer} member={member} onMemberChange={setMember} allowSignUp={false} />
       <div className="ws-form-row cols-2">
-        <Field label="Payment">{id => (
+        <Field label={tr('Payment')}>{id => (
           <Select id={id} value={payment} onChange={e => setPayment(e.target.value)}>
             {payments.map(m => <option key={m} value={m}>{paymentLabel(m)}</option>)}
           </Select>
         )}</Field>
-        <Field label="Order discount" hint="On top of any item discounts" aside={
-          <Segmented label="Order discount type" value={discountType} onChange={setDiscountType} options={[{ value: 'percent', label: '%' }, { value: 'fixed', label: currency }]} />
+        <Field label={tr('Order discount')} hint={tr('On top of any item discounts')} aside={
+          <Segmented label={tr('Order discount type')} value={discountType} onChange={setDiscountType} options={[{ value: 'percent', label: '%' }, { value: 'fixed', label: currency }]} />
         }>{id => <Input id={id} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" value={discount} onChange={e => setDiscount(e.target.value)} />}</Field>
       </div>
       <KeyValue
         items={[
-          { label: `Subtotal · ${plural(lines.reduce((sum, l) => sum + l.quantity, 0), 'item')}`, value: fmt(amounts.subtotal) },
-          ...(amounts.discountAmount > 0 ? [{ label: 'Discounts', value: `−${fmt(amounts.discountAmount)}`, tone: 'positive' as const }] : []),
-          { label: `Tax (${settings.taxRate}%)`, value: fmt(amounts.taxAmount) }
+          { label: tr('Subtotal · {plural}', { plural: plural(lines.reduce((sum, l) => sum + l.quantity, 0), 'item') }), value: fmt(amounts.subtotal) },
+          ...(amounts.discountAmount > 0 ? [{ label: tr('Discounts'), value: `−${fmt(amounts.discountAmount)}`, tone: 'positive' as const }] : []),
+          { label: tr('Tax ({taxRate}%)', { taxRate: settings.taxRate }), value: fmt(amounts.taxAmount) }
         ]}
-        total={{ label: 'Total', value: fmt(amounts.totalAmount) }}
+        total={{ label: tr('Total'), value: fmt(amounts.totalAmount) }}
       />
     </FormDialog>
   );
@@ -386,7 +387,7 @@ export function OrderDetailsDialog({ order, items, currency, taxRate, onClose, a
       onClose={onClose}
       title={order ? <span className="mono">{order.orderNumber}</span> : ''}
       description={order ? `${order.customerName || 'Walk-in'} · ${formatDateTime(order.createdAt)}` : undefined}
-      footer={<>{actions}<Button variant="primary" onClick={onClose}>Done</Button></>}
+      footer={<>{actions}<Button variant="primary" onClick={onClose}>{tr('Done')}</Button></>}
     >
       {order && (
         <div className="ws-form">
@@ -396,15 +397,15 @@ export function OrderDetailsDialog({ order, items, currency, taxRate, onClose, a
             <Badge>{paymentLabel(order.paymentMethod)}</Badge>
           </div>
           {items.length === 0 ? (
-            <p className="ws-hint">No line items were recorded for this order.</p>
+            <p className="ws-hint">{tr('No line items were recorded for this order.')}</p>
           ) : (
             <ul className="ws-ticket-lines" style={{ fontSize: 14 }}>
               {items.map(item => (
                 <li key={item.id}>
                   <span><strong className="tabular">{item.quantity}×</strong> {item.itemName}</span>
-                  <span className="tabular" style={{ textAlign: 'right' }}>
+                  <span className="tabular" style={{ textAlign: 'end' }}>
                     {money(item.quantity * item.unitPrice - (item.discountAmount || 0), currency)}
-                    {item.discountAmount > 0 && <span className="ws-hint" style={{ display: 'block' }}>−{money(item.discountAmount, currency)} off</span>}
+                    {item.discountAmount > 0 && <span className="ws-hint" style={{ display: 'block' }}>{tr('−{discountAmount} off', { discountAmount: money(item.discountAmount, currency) })}</span>}
                   </span>
                 </li>
               ))}
@@ -412,11 +413,11 @@ export function OrderDetailsDialog({ order, items, currency, taxRate, onClose, a
           )}
           <KeyValue
             items={[
-              { label: 'Subtotal', value: money(order.subtotal, currency) },
-              ...(order.discountAmount > 0 ? [{ label: 'Discount', value: `−${money(order.discountAmount, currency)}`, tone: 'positive' as const }] : []),
-              { label: `Tax (${taxRate}%)`, value: money(order.taxAmount, currency) }
+              { label: tr('Subtotal'), value: money(order.subtotal, currency) },
+              ...(order.discountAmount > 0 ? [{ label: tr('Discount'), value: `−${money(order.discountAmount, currency)}`, tone: 'positive' as const }] : []),
+              { label: tr('Tax ({taxRate}%)', { taxRate }), value: money(order.taxAmount, currency) }
             ]}
-            total={{ label: 'Total', value: money(order.totalAmount, currency) }}
+            total={{ label: tr('Total'), value: money(order.totalAmount, currency) }}
           />
         </div>
       )}

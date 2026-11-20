@@ -8,6 +8,7 @@ import {
   Notice, Page, PageHeader, SearchInput, Segmented, Stat, StatGrid, Textarea, formatDate, money, orderStatusTone, plural, ORDER_STATUS_LABELS
 } from '../ui';
 import { OrderDetailsDialog } from './shared';
+import { tr } from '../i18n';
 
 export interface CustomerStats { visits: number; spend: number; lastVisit: string | null }
 const NO_VISITS: CustomerStats = { visits: 0, spend: 0, lastVisit: null };
@@ -67,7 +68,7 @@ export function CustomerFormDialog({ open, onClose, customer, initialQuery = '',
       onSaved?.(saved);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'The member could not be saved.');
+      setError(err instanceof Error ? err.message : tr('The member could not be saved.'));
     } finally {
       setSaving(false);
     }
@@ -78,16 +79,16 @@ export function CustomerFormDialog({ open, onClose, customer, initialQuery = '',
       open={open}
       onClose={onClose}
       busy={saving}
-      title={customer ? `Edit ${customer.name}` : 'New club member'}
-      description={customer ? undefined : 'Members are found by phone number at the till.'}
-      submitLabel={customer ? 'Save changes' : 'Add member'}
+      title={customer ? tr('Edit {name}', { name: customer.name }) : tr('New club member')}
+      description={customer ? undefined : tr('Members are found by phone number at the till.')}
+      submitLabel={customer ? tr('Save changes') : tr('Add member')}
       submitDisabled={!name.trim() || normalizePhone(phone).replace('+', '').length < 5}
       onSubmit={submit}
     >
       {error && <Notice tone="danger" role="alert">{error}</Notice>}
-      <Field label="Name">{id => <Input id={id} autoFocus={!name} value={name} onChange={e => setName(e.target.value)} required maxLength={100} autoComplete="off" />}</Field>
-      <Field label="Phone" hint="Spaces and dashes are ignored.">{id => <Input id={id} autoFocus={!!name && !phone} type="tel" inputMode="tel" value={phone} onChange={e => setPhone(e.target.value)} required maxLength={30} autoComplete="off" />}</Field>
-      <Field label="Notes" optional>{id => <Textarea id={id} rows={3} value={notes} onChange={e => setNotes(e.target.value)} maxLength={1000} placeholder="Usual order, allergies, birthday…" />}</Field>
+      <Field label={tr('Name')}>{id => <Input id={id} autoFocus={!name} value={name} onChange={e => setName(e.target.value)} required maxLength={100} autoComplete="off" />}</Field>
+      <Field label={tr('Phone')} hint={tr('Spaces and dashes are ignored.')}>{id => <Input id={id} autoFocus={!!name && !phone} type="tel" inputMode="tel" value={phone} onChange={e => setPhone(e.target.value)} required maxLength={30} autoComplete="off" />}</Field>
+      <Field label={tr('Notes')} optional>{id => <Textarea id={id} rows={3} value={notes} onChange={e => setNotes(e.target.value)} maxLength={1000} placeholder={tr('Usual order, allergies, birthday…')} />}</Field>
     </FormDialog>
   );
 }
@@ -114,33 +115,33 @@ export function CustomerPicker({ customers, orders, text, onTextChange, member, 
   if (member) {
     const s = stats.get(member.id) || NO_VISITS;
     return (
-      <Field label="Customer">{() => (
+      <Field label={tr('Customer')}>{() => (
         <div className="ws-member-chip">
           <Avatar name={member.name} />
           <div className="ws-list-main">
-            <div className="ws-list-title">{member.name} <Badge tone="positive">Member</Badge></div>
+            <div className="ws-list-title">{member.name} <Badge tone="positive">{tr('Member')}</Badge></div>
             <div className="ws-list-sub"><span className="tabular">{member.phone}</span><span>{visitsLabel(s)}</span></div>
           </div>
-          <IconButton label={`Unlink ${member.name}`} onClick={() => onMemberChange(null)}><X /></IconButton>
+          <IconButton label={tr('Unlink {name}', { name: member.name })} onClick={() => onMemberChange(null)}><X /></IconButton>
         </div>
       )}</Field>
     );
   }
   return (
     <>
-      <Field label="Customer or table" optional hint={query.length >= 2 && !matches.length ? 'No club member matches.' : 'Type a name or phone to find a club member.'}>{id => (
-        <Input id={id} value={text} onChange={e => onTextChange(e.target.value)} placeholder="Walk-in" autoComplete="off" />
+      <Field label={tr('Customer or table')} optional hint={query.length >= 2 && !matches.length ? tr('No club member matches.') : tr('Type a name or phone to find a club member.')}>{id => (
+        <Input id={id} value={text} onChange={e => onTextChange(e.target.value)} placeholder={tr('Walk-in')} autoComplete="off" />
       )}</Field>
       {query.length >= 2 && (matches.length > 0 || allowSignUp) && (
         <div className="ws-member-matches">
           {matches.length > 0 && (
-            <List label="Matching club members">
+            <List label={tr('Matching club members')}>
               {matches.map(c => (
-                <ListItem key={c.id} lead={<Avatar name={c.name} />} title={c.name} subtitle={<><span className="tabular">{c.phone}</span><span>{visitsLabel(stats.get(c.id) || NO_VISITS)}</span></>} onClick={() => pick(c)} label={`Link order to ${c.name}`} />
+                <ListItem key={c.id} lead={<Avatar name={c.name} />} title={c.name} subtitle={<><span className="tabular">{c.phone}</span><span>{visitsLabel(stats.get(c.id) || NO_VISITS)}</span></>} onClick={() => pick(c)} label={tr('Link order to {name}', { name: c.name })} />
               ))}
             </List>
           )}
-          {allowSignUp && <Button variant="ghost" size="sm" icon={<UserPlus />} onClick={() => setSignUpOpen(true)}>Add “{query}” to the club</Button>}
+          {allowSignUp && <Button variant="ghost" size="sm" icon={<UserPlus />} onClick={() => setSignUpOpen(true)}>{tr('Add “{query}” to the club', { query })}</Button>}
         </div>
       )}
       {allowSignUp && <CustomerFormDialog open={signUpOpen} onClose={() => setSignUpOpen(false)} initialQuery={query} onSaved={pick} />}
@@ -185,32 +186,32 @@ export function CustomerClub({ settings, customers, orders, orderItems, canDelet
   return (
     <Page>
       <PageHeader
-        title="Customer club"
-        description="Members are linked to orders at the till by name or phone. Visits and spend count completed orders."
-        actions={<Button variant="primary" icon={<UserPlus />} onClick={() => openForm(null)}>New member</Button>}
+        title={tr('Customer club')}
+        description={tr('Members are linked to orders at the till by name or phone. Visits and spend count completed orders.')}
+        actions={<Button variant="primary" icon={<UserPlus />} onClick={() => openForm(null)}>{tr('New member')}</Button>}
       />
       <StatGrid>
-        <Stat label="Members" value={customers.length} />
-        <Stat label="Joined this month" value={newThisMonth} tone={newThisMonth ? 'positive' : 'neutral'} />
-        <Stat label="Returning" value={returning} hint="2 or more visits" />
-        <Stat label="Member spend" value={fmt(clubSpend)} />
+        <Stat label={tr('Members')} value={customers.length} />
+        <Stat label={tr('Joined this month')} value={newThisMonth} tone={newThisMonth ? 'positive' : 'neutral'} />
+        <Stat label={tr('Returning')} value={returning} hint={tr('2 or more visits')} />
+        <Stat label={tr('Member spend')} value={fmt(clubSpend)} />
       </StatGrid>
 
-      <Card flush title="Members" description={search.trim() ? `${visible.length} of ${customers.length}` : plural(customers.length, 'member')}>
+      <Card flush title={tr('Members')} description={search.trim() ? tr('{length} of {length2}', { length: visible.length, length2: customers.length }) : plural(customers.length, 'member')}>
         {customers.length > 0 && (
           <div className="ws-toolbar" style={{ padding: '0 var(--ws-pad) var(--chth-space-12)' }}>
-            <SearchInput className="ws-grow" value={search} onChange={setSearch} placeholder="Search name or phone" label="Search members" />
-            <Segmented label="Sort members" value={sort} onChange={setSort} options={[
-              { value: 'name', label: 'A–Z' }, { value: 'visits', label: 'Top' }, { value: 'recent', label: 'Recent' }
+            <SearchInput className="ws-grow" value={search} onChange={setSearch} placeholder={tr('Search name or phone')} label={tr('Search members')} />
+            <Segmented label={tr('Sort members')} value={sort} onChange={setSort} options={[
+              { value: 'name', label: 'A–Z' }, { value: 'visits', label: tr('Top') }, { value: 'recent', label: tr('Recent') }
             ]} />
           </div>
         )}
         {customers.length === 0 ? (
-          <EmptyState icon={<Contact />} title="No club members yet" description="Add members here, or from the New order screen while taking an order." action={<Button variant="primary" icon={<UserPlus />} onClick={() => openForm(null)}>Add the first member</Button>} />
+          <EmptyState icon={<Contact />} title={tr('No club members yet')} description={tr('Add members here, or from the New order screen while taking an order.')} action={<Button variant="primary" icon={<UserPlus />} onClick={() => openForm(null)}>{tr('Add the first member')}</Button>} />
         ) : visible.length === 0 ? (
-          <EmptyState icon={<Contact />} title="No members match" description={`Nothing found for “${search.trim()}”.`} />
+          <EmptyState icon={<Contact />} title={tr('No members match')} description={tr('Nothing found for “{search}”.', { search: search.trim() })} />
         ) : (
-          <List label="Club members">
+          <List label={tr('Club members')}>
             {visible.map(c => {
               const s = statsOf(c.id);
               return (
@@ -234,24 +235,24 @@ export function CustomerClub({ settings, customers, orders, orderItems, canDelet
         open={!!viewing && !formOpen && !viewOrder}
         onClose={() => setViewingId(null)}
         title={viewing?.name || ''}
-        description={viewing ? `Member since ${formatDate(viewing.createdAt, { dateStyle: 'medium' })}` : undefined}
+        description={viewing ? tr('Member since {createdAt}', { createdAt: formatDate(viewing.createdAt, { dateStyle: 'medium' }) }) : undefined}
         footer={viewing && <>
-          {canDelete && <span className="ws-spacer"><Button variant="danger-ghost" icon={<Trash2 />} onClick={() => { setDeleteTarget(viewing); setViewingId(null); }}>Delete</Button></span>}
-          <Button icon={<Pencil />} onClick={() => openForm(viewing)}>Edit</Button>
-          <Button variant="primary" onClick={() => setViewingId(null)}>Done</Button>
+          {canDelete && <span className="ws-spacer"><Button variant="danger-ghost" icon={<Trash2 />} onClick={() => { setDeleteTarget(viewing); setViewingId(null); }}>{tr('Delete')}</Button></span>}
+          <Button icon={<Pencil />} onClick={() => openForm(viewing)}>{tr('Edit')}</Button>
+          <Button variant="primary" onClick={() => setViewingId(null)}>{tr('Done')}</Button>
         </>}
       >
         {viewing && (
           <div className="ws-form">
             <a className="ws-member-phone tabular" href={`tel:${viewing.phone}`}><Phone aria-hidden="true" />{viewing.phone}</a>
             <KeyValue items={[
-              { label: 'Visits', value: statsOf(viewing.id).visits },
-              { label: 'Last visit', value: statsOf(viewing.id).lastVisit ? formatDate(statsOf(viewing.id).lastVisit!, { dateStyle: 'medium' }) : '—' },
-              { label: 'Average order', value: statsOf(viewing.id).visits ? fmt(statsOf(viewing.id).spend / statsOf(viewing.id).visits) : '—' }
-            ]} total={{ label: 'Total spend', value: fmt(statsOf(viewing.id).spend) }} />
+              { label: tr('Visits'), value: statsOf(viewing.id).visits },
+              { label: tr('Last visit'), value: statsOf(viewing.id).lastVisit ? formatDate(statsOf(viewing.id).lastVisit!, { dateStyle: 'medium' }) : '—' },
+              { label: tr('Average order'), value: statsOf(viewing.id).visits ? fmt(statsOf(viewing.id).spend / statsOf(viewing.id).visits) : '—' }
+            ]} total={{ label: tr('Total spend'), value: fmt(statsOf(viewing.id).spend) }} />
             {viewing.notes && <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{viewing.notes}</p>}
-            {memberOrders.length === 0 ? <p className="ws-hint">No orders linked yet.</p> : (
-              <List label={`Orders for ${viewing.name}`} maxHeight={280}>
+            {memberOrders.length === 0 ? <p className="ws-hint">{tr('No orders linked yet.')}</p> : (
+              <List label={tr('Orders for {name}', { name: viewing.name })} maxHeight={280}>
                 {memberOrders.slice(0, 50).map(o => (
                   <ListItem
                     key={o.id}
@@ -273,8 +274,8 @@ export function CustomerClub({ settings, customers, orders, orderItems, canDelet
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => { if (deleteTarget) { store.deleteCustomer(deleteTarget.id); onChanged(); } }}
-        title={`Delete ${deleteTarget?.name || 'member'}?`}
-        description="They leave the club. Their past orders stay in your sales under the same name, but no longer count as member visits."
+        title={tr('Delete {value}?', { value: deleteTarget?.name || 'member' })}
+        description={tr('They leave the club. Their past orders stay in your sales under the same name, but no longer count as member visits.')}
       />
     </Page>
   );

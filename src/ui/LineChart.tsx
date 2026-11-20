@@ -1,5 +1,6 @@
 import React, { useId, useMemo, useRef, useState } from 'react';
 import { Legend } from './primitives';
+import { tr } from '../i18n';
 
 export interface LineSeries { key: string; label: string; color: string; dashed?: boolean }
 export interface LinePoint { label: string; values: Record<string, number> }
@@ -52,7 +53,7 @@ export function LineChart({ series, points, format, height = 220 }: {
         <svg
           viewBox={`0 0 ${W} ${H}`}
           role="img"
-          aria-label={`Line chart of ${series.map(s => s.label).join(', ')}. Values are listed in the table below.`}
+          aria-label={tr('Line chart of {value}. Values are listed in the table below.', { value: series.map(s => s.label).join(', ') })}
           aria-describedby={tableId}
           onPointerMove={onMove}
           onPointerLeave={() => setHover(null)}
@@ -93,8 +94,8 @@ export function LineChart({ series, points, format, height = 220 }: {
         )}
       </div>
       <table id={tableId} className="sr-only">
-        <caption>Chart data</caption>
-        <thead><tr><th scope="col">Period</th>{series.map(s => <th key={s.key} scope="col">{s.label}</th>)}</tr></thead>
+        <caption>{tr('Chart data')}</caption>
+        <thead><tr><th scope="col">{tr('Period')}</th>{series.map(s => <th key={s.key} scope="col">{s.label}</th>)}</tr></thead>
         <tbody>{points.map((p, i) => <tr key={i}><th scope="row">{p.label}</th>{series.map(s => <td key={s.key}>{format(p.values[s.key] || 0)}</td>)}</tr>)}</tbody>
       </table>
     </div>

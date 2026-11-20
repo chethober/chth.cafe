@@ -37,7 +37,7 @@ Built with React, TypeScript and Tailwind CSS, served by Hono on Cloudflare Work
 | 👥 **Staff and shifts** | Team rates, clocked shifts and wages |
 | 🤖 **Telegram bot** | Sales, shift, checklist and low-stock alerts, plus commands to run the café from the chat |
 | ☁️ **One-click deploys** | CHTH Café Cloud deploys and updates a café in the owner's own Cloudflare account |
-| 🌍 **Five languages** | The customer side in English, Persian, Arabic, Russian and Spanish, right-to-left where needed |
+| 🌍 **Five languages** | Menu, admin and panel in English, Persian, Arabic, Russian and Spanish, right-to-left where needed |
 | 🧩 **Part of CHTH** | The shared CHTH brand kit and "Part of CHTH" footer |
 
 ## Screenshots
@@ -181,13 +181,20 @@ The cron runs hourly. After midnight café time it sends yesterday's report, and
 
 ## Languages
 
-What customers see (the menu, ordering, order tracking, events and opening hours) and the
-chth.cafe landing page come in English, Persian, Arabic, Russian and Spanish, with right-to-left
-layout for Persian and Arabic. Guests pick a language from the menu's language picker or the
-footer; otherwise it follows `?lang=`, the `chth_lang` cookie shared by CHTH sites, or the
-browser. Customer strings live in `src/i18n/public.ts` (keyed by the English text, so a missing
-translation shows English); the landing page's are in `control-plane/src/i18n.ts`. Menu items
-are shown as the café wrote them. The admin and panel apps are English for now.
+The whole café comes in English, Persian, Arabic, Russian and Spanish, with right-to-left layout
+for Persian and Arabic: what customers see (the menu, ordering, order tracking, events and opening
+hours), the admin and daily panel, and the chth.cafe landing page. Guests pick a language from the
+menu's language picker or the footer, staff from the sidebar or the sign-in screen; otherwise it
+follows `?lang=`, the `chth_lang` cookie shared by CHTH sites, or the browser.
+
+Strings are keyed by their English text, so a missing translation shows English:
+`src/i18n/public.ts` for customers, `src/i18n/staff.ts` for the admin and panel (loaded only when a
+workspace opens, so customers never download it), and `control-plane/src/i18n.ts` for the landing
+page. In code, wrap text in `tr('Saved {count} items', { count })` from `src/i18n`; dates and times
+follow the chosen language. Layout uses logical CSS properties (`margin-inline-start`, `inset-inline-end`,
+`text-align: start`), so new styles mirror on their own. Menu items, names and other text the café
+enters are shown as written, laid out in their own direction. The Telegram bot and server error
+messages are English.
 
 ## CHTH kit and hub
 
@@ -214,7 +221,7 @@ them nothing is sent and `/internal/stats` refuses every call. Self-hosted café
 │   ├── components/      Public menu, panel and admin screens
 │   ├── chth-kit/        Generated CHTH brand kit (do not edit)
 │   ├── db/              Drizzle schema, offline store and seed
-│   ├── i18n/            Customer-facing translations
+│   ├── i18n/            Translations (customers, staff)
 │   ├── services/        API clients
 │   ├── App.tsx          Menu, admin and panel shell
 │   └── server.ts        Hono Worker: API, auth, Telegram, cron
