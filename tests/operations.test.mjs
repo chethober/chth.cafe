@@ -304,4 +304,9 @@ for (const body of ['', '<html>Frontend page</html>', 'null']) {
 }
 await assert.rejects(readAPIResponse(new Response(JSON.stringify({ message: 'Incorrect password.' }), { status: 401 })), /Incorrect password/); checks++;
 check(await readAPIResponse(new Response(JSON.stringify({success:true}))),{success:true});
+const moneyBundle = await build({entryPoints:['src/utils/money.ts'],bundle:true,format:'esm',write:false});
+const { formatMoney } = await import(`data:text/javascript;base64,${Buffer.from(moneyBundle.outputFiles[0].text).toString('base64')}`);
+check(formatMoney(1284.5,'₹'),'₹1,284.50'); check(formatMoney(-3,'$'),'−$3.00'); check(formatMoney(120,'€',{trimZeros:true}),'€120');
+check(formatMoney(120000,'تومان'),'120,000 تومان'); check(formatMoney(85000.6,'تومان'),'85,001 تومان'); check(formatMoney(-0.4,'تومان'),'0 تومان');
+check(formatMoney(-2500,'تومان'),'−2,500 تومان'); check(formatMoney(1500,'ریال'),'1,500 ریال');
 console.log(`Passed ${checks} assertions, including empty/non-JSON login responses.`);

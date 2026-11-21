@@ -1,11 +1,10 @@
 /** Shared formatting and date helpers for the admin and daily panel. */
 
 import { intlTag, isolateNumber, tr } from '../i18n/translate';
+import { formatMoney } from '../utils/money';
 
 export function money(value: number, currency: string): string {
-  const sign = value < 0 ? '-' : '';
-  const abs = Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return isolateNumber(`${sign}${currency}${abs}`);
+  return isolateNumber(formatMoney(value, currency));
 }
 
 const PAYMENT_LABELS: Record<string, string> = {

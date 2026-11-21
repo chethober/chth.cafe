@@ -6,6 +6,7 @@ import { store } from '../db/store';
 import { AppearanceEditor } from './AppearanceEditor';
 import { PasswordSettings } from './PasswordSettings';
 import { MenuQRCard } from './MenuQR';
+import { COMMON_CURRENCIES } from '../utils/money';
 import { OpeningHoursEditor, openingHoursErrors, parseOpeningHours } from './OpeningHoursEditor';
 import { AppearanceSettings, parseAppearance } from '../utils/appearance';
 import { Button, Card, ConfirmDialog, Field, IconButton, Input, Notice, Page, PageHeader, Segmented, Select, ToggleRow, localDateKey } from '../ui';
@@ -170,9 +171,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
                 <Card title={tr('Money and time')} description={tr('Used for prices, tax, opening hours, and closing the day.')}>
                   <div className="ws-form">
                     <Field label={tr('Currency symbol')} aside={
-                      <Segmented label={tr('Common currencies')} value={['₹', '$', '€', '£'].includes(formData.currency) ? formData.currency : ''} onChange={currency => edit({ currency })}
-                        options={['₹', '$', '€', '£'].map(c => ({ value: c, label: c }))} />
-                    }>{id => <Input id={id} className="mono" required maxLength={4} value={formData.currency} onChange={e => edit({ currency: e.target.value })} style={{ maxWidth: 120 }} />}</Field>
+                      <Segmented label={tr('Common currencies')} value={(COMMON_CURRENCIES as readonly string[]).includes(formData.currency) ? formData.currency : ''} onChange={currency => edit({ currency })}
+                        options={COMMON_CURRENCIES.map(c => ({ value: c, label: c === 'تومان' ? tr('Toman') : c }))} />
+                    }>{id => <Input id={id} className="mono" required maxLength={8} value={formData.currency} onChange={e => edit({ currency: e.target.value })} style={{ maxWidth: 120 }} />}</Field>
                     <div className="ws-form-row cols-2">
                       <Field label={tr('Tax rate (%)')}>{id => <Input id={id} type="number" inputMode="decimal" step="0.1" min="0" value={formData.taxRate} onChange={e => edit({ taxRate: parseFloat(e.target.value) || 0 })} />}</Field>
                       <Field label={tr('Time zone')} hint={tr('IANA name, e.g. Asia/Tehran')}>{(id, hint) => <Input id={id} aria-describedby={hint} value={formData.timeZone || 'Asia/Tehran'} onChange={e => edit({ timeZone: e.target.value })} placeholder={tr('Asia/Tehran')} />}</Field>
