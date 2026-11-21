@@ -811,3 +811,11 @@ html[data-motion='reduced'] .ws *, html[data-motion='reduced'] .ws *::before, ht
 .ws-translation { display: grid; gap: var(--chth-space-10); padding: var(--chth-space-12) var(--chth-space-14); }
 .ws-translation + .ws-translation { border-top: 1px dashed var(--ws-rule); }
 .ws-translation :is(input, textarea):is(:lang(fa), :lang(ar)) { font-family: var(--chth-font-rtl); }
+
+/* ------------------------------------------------------- Menu QR code */
+.menu-qr { display: flex; align-items: center; gap: var(--chth-space-20); flex-wrap: wrap; }
+.menu-qr-code { width: 168px; flex-shrink: 0; padding: var(--chth-space-4); border-radius: var(--ws-radius); background: #fff; border: 1px solid var(--ws-rule); }
+.menu-qr-code svg { display: block; width: 100%; height: auto; }
+.menu-qr-side { display: grid; gap: var(--chth-space-12); min-width: 0; flex: 1 1 220px; }
+.menu-qr-side > a { color: var(--ws-ink); font-weight: 600; overflow-wrap: anywhere; }
+.menu-qr-side > .ws-hint { margin: 0; }

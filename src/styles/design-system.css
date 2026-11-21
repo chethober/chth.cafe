@@ -164,12 +164,3 @@ html .menu-modal-backdrop.menu-modal-backdrop { background: #191410a6 !important
 .order-steps > li[data-done] { border-top-color: var(--accent-emerald); color: var(--menu-ink); }
 .order-steps > li[aria-current='step'] { font-weight: 700; }
 
-
-/* The menu's QR code in the footer: a light tile in both themes so every camera reads it. */
-.menu-qr { display: flex; align-items: center; gap: var(--chth-space-14); margin: 0; text-align: start; }
-.menu-qr-code { display: block; flex-shrink: 0; width: 104px; padding: var(--chth-space-6); border-radius: var(--chth-radius-lg); background: #fff; box-shadow: 0 10px 24px -16px rgb(0 0 0 / .6); }
-.menu-qr-code svg { display: block; width: 100%; height: auto; }
-.menu-qr-code:focus-visible { outline: 2px solid var(--menu-accent); outline-offset: 3px; }
-.menu-qr figcaption { display: grid; gap: var(--chth-space-4); font-size: var(--chth-text-13); color: var(--menu-muted); }
-.menu-qr figcaption strong { font-size: var(--chth-text-14); font-weight: 600; color: var(--menu-ink); }
-@media print { .menu-qr-code { box-shadow: none; } }

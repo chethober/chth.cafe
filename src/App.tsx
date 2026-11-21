@@ -22,7 +22,6 @@ import { api } from './services/api';
 import { applyAppearance } from './utils/appearance';
 import { applyFavicon, brandTitle } from './utils/branding';
 import { PublicMenu } from './components/PublicMenu';
-import { MenuQR } from './components/MenuQR';
 import { SETTINGS_SECTIONS, SettingsPanel } from './components/SettingsPanel';
 import { TimeTracker } from './components/TimeTracker';
 import { FinancialTracker } from './components/FinancialTracker';
@@ -364,11 +363,8 @@ export const App: React.FC = () => {
       </main>
 
       <footer className="bg-zinc-950 border-t border-zinc-900 py-5 text-center text-xs text-zinc-500 mt-8">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-5">
-          <div className="flex flex-col items-center sm:items-start gap-3">
-            <CafeFooterText cafeName={settings.cafeName} />
-          </div>
-          <MenuQR />
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <CafeFooterText cafeName={settings.cafeName} />
         </div>
       </footer>
     </div>

@@ -1,10 +1,11 @@
 import { ImageUpload } from './ImageUpload';
 import React, { useEffect, useRef, useState } from 'react';
-import { Bot, Boxes, CalendarClock, CalendarDays, CheckSquare, Clock, Database, Download, Eye, EyeOff, KeyRound, Link2Off, Palette, RefreshCw, Send, ShoppingCart, Store, UserCheck } from 'lucide-react';
+import { QrCode, Bot, Boxes, CalendarClock, CalendarDays, CheckSquare, Clock, Database, Download, Eye, EyeOff, KeyRound, Link2Off, Palette, RefreshCw, Send, ShoppingCart, Store, UserCheck } from 'lucide-react';
 import { SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { AppearanceEditor } from './AppearanceEditor';
 import { PasswordSettings } from './PasswordSettings';
+import { MenuQRCard } from './MenuQR';
 import { OpeningHoursEditor, openingHoursErrors, parseOpeningHours } from './OpeningHoursEditor';
 import { AppearanceSettings, parseAppearance } from '../utils/appearance';
 import { Button, Card, ConfirmDialog, Field, IconButton, Input, Notice, Page, PageHeader, Segmented, Select, ToggleRow, localDateKey } from '../ui';
@@ -30,6 +31,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'hours', get label() { return tr('Opening hours'); }, icon: CalendarClock },
   { id: 'appearance', get label() { return tr('Appearance'); }, icon: Palette },
   { id: 'notifications', get label() { return tr('Notifications'); }, icon: Send },
+  { id: 'qr', get label() { return tr('Menu QR code'); }, icon: QrCode },
   { id: 'signin', get label() { return tr('Sign-in'); }, icon: KeyRound },
   { id: 'data', get label() { return tr('Data'); }, icon: Database }
 ];
@@ -288,6 +290,10 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
               </div>
             </div>
           </form>
+
+          <section id="settings-qr" className="ws-section" aria-label={tr('Menu QR code')}>
+            <MenuQRCard cafeName={settings.cafeName} />
+          </section>
 
           <section id="settings-signin" className="ws-section" aria-label={tr('Sign-in')}>
             <PasswordSettings />
