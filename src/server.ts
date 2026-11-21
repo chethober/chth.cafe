@@ -54,6 +54,8 @@ function mapRow(row: Record<string, unknown>): Record<string, unknown> {
   }
   // Convert D1 integer booleans to actual booleans where needed
   if ('isInStock' in mapped) mapped.isInStock = mapped.isInStock === 1 || mapped.isInStock === true;
+  if ('isPrivate' in mapped) mapped.isPrivate = mapped.isPrivate === 1 || mapped.isPrivate === true;
+  if (typeof mapped.translations === 'string') { try { mapped.translations = JSON.parse(mapped.translations); } catch { mapped.translations = {}; } }
   if ('notifySales' in mapped) mapped.notifySales = mapped.notifySales === 1 || mapped.notifySales === true;
   if ('notifyShifts' in mapped) mapped.notifyShifts = mapped.notifyShifts === 1 || mapped.notifyShifts === true;
   if ('notifyTasks' in mapped) mapped.notifyTasks = mapped.notifyTasks === 1 || mapped.notifyTasks === true;
@@ -142,16 +144,44 @@ function ensureMenuColumns(db: D1Database) {
     const alterStatements = [
       "ALTER TABLE menu_items ADD COLUMN allergens TEXT NOT NULL DEFAULT ''",
       "ALTER TABLE menu_items ADD COLUMN dietary_labels TEXT NOT NULL DEFAULT ''",
-      'ALTER TABLE menu_items ADD COLUMN profit_margin REAL NOT NULL DEFAULT 0.0'
+      'ALTER TABLE menu_items ADD COLUMN profit_margin REAL NOT NULL DEFAULT 0.0',
+      "ALTER TABLE menu_items ADD COLUMN translations TEXT NOT NULL DEFAULT '{}'",
+      'ALTER TABLE categories ADD COLUMN is_private INTEGER NOT NULL DEFAULT 0',
+      "ALTER TABLE categories ADD COLUMN translations TEXT NOT NULL DEFAULT '{}'"
     ];
-    const table = alterStatements[0].split(' ')[2];
-    const { results } = await db.prepare(`PRAGMA table_info(${table})`).all();
-    const columns = new Set(results.map(row => row.name));
+    const columns = new Map<string, Set<unknown>>();
     for (const stmt of alterStatements) {
-      if (!columns.has(stmt.split(' ')[5])) await db.prepare(stmt).run();
+      const table = stmt.split(' ')[2];
+      if (!columns.has(table)) columns.set(table, new Set((await db.prepare(`PRAGMA table_info(${table})`).all()).results.map(row => row.name)));
+      if (!columns.get(table)!.has(stmt.split(' ')[5])) await db.prepare(stmt).run();
     }
   });
 }
+
+const MENU_LANGUAGES = ['fa', 'ar', 'ru', 'es'] as const;
+/**
+ * A category's or item's names in other languages, as stored JSON, or null when the request leaves
+ * them unchanged. Only known languages and fields are kept, trimmed and capped; empty ones are dropped.
+ */
+function menuTranslations(value: unknown, fields: Record<'name' | 'description', number> | Record<'name', number>): string | null {
+  if (value === undefined || value === null) return null;
+  const clean: Record<string, Record<string, string>> = {};
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    for (const lang of MENU_LANGUAGES) {
+      const entry = (value as Record<string, unknown>)[lang];
+      if (!entry || typeof entry !== 'object') continue;
+      const kept: Record<string, string> = {};
+      for (const [field, max] of Object.entries(fields)) {
+        const text = (entry as Record<string, unknown>)[field];
+        if (typeof text === 'string' && text.trim()) kept[field] = text.trim().slice(0, max);
+      }
+      if (Object.keys(kept).length) clean[lang] = kept;
+    }
+  }
+  return JSON.stringify(clean);
+}
+const CATEGORY_TEXT = { name: 100 };
+const ITEM_TEXT = { name: 200, description: 1000 };
 
 function ensureLogsTable(db: D1Database) {
   return onceSchema('logs', async () => {
@@ -355,7 +385,9 @@ const getMenu = async (c: Context<Env>) => {
         const mappedItems = mapRows(items as Record<string, unknown>[]);
         const mappedVariants = mapRows(variants as Record<string, unknown>[]);
         if (c.req.path !== '/api/admin/menu') mappedItems.forEach(item => { delete item.profitMargin; });
-        const publicMenu = mappedCats.map((cat: any) => ({
+        // Private categories and their items are for the admin and panel only.
+        const visibleCats = c.get('authed') ? mappedCats : mappedCats.filter((cat: any) => !cat.isPrivate);
+        const publicMenu = visibleCats.map((cat: any) => ({
           ...cat,
           items: mappedItems
             .filter((item: any) => item.categoryId === cat.id)
@@ -376,7 +408,7 @@ const getMenu = async (c: Context<Env>) => {
   const items = store.getMenuItems();
   const variants = store.getMenuVariants();
 
-  const publicMenu = categories.map((cat) => ({
+  const publicMenu = categories.filter(cat => c.get('authed') || !cat.isPrivate).map((cat) => ({
     ...cat,
     items: items
       .filter((item) => item.categoryId === cat.id)
@@ -394,13 +426,15 @@ app.get('/api/admin/menu', getMenu);
 
 app.post('/api/menu/categories', async (c) => {
   const body = await c.req.json();
-  const newCat = store.createCategory(body.name, body.icon, body.id, body.displayOrder);
+  const translations = menuTranslations(body.translations, CATEGORY_TEXT) ?? '{}';
+  const newCat = store.createCategory(body.name, body.icon, body.id, body.displayOrder, { isPrivate: body.isPrivate === true, translations: JSON.parse(translations) });
 
   if (c.env?.DB) {
+    await ensureMenuColumns(c.env.DB);
     try {
       await c.env.DB.prepare(
-        `INSERT INTO categories (id, name, display_order, icon) VALUES (?, ?, ?, ?)`
-      ).bind(newCat.id, newCat.name, newCat.displayOrder, newCat.icon).run();
+        `INSERT INTO categories (id, name, display_order, icon, is_private, translations) VALUES (?, ?, ?, ?, ?, ?)`
+      ).bind(newCat.id, newCat.name, newCat.displayOrder, newCat.icon, newCat.isPrivate ? 1 : 0, translations).run();
     } catch (e) {
       console.warn('D1 Insert Error (category):', e);
       return c.json({ success: false, message: 'The change could not be saved. Please try again.' }, 503);
@@ -413,16 +447,21 @@ app.post('/api/menu/categories', async (c) => {
 app.put('/api/menu/categories/:id', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
-  const updated = store.updateCategory(id, body);
+  const translations = menuTranslations(body.translations, CATEGORY_TEXT);
+  const updated = store.updateCategory(id, { ...body, ...(translations !== null && { translations: JSON.parse(translations) }) });
 
   if (c.env?.DB) {
+    await ensureMenuColumns(c.env.DB);
     try {
       await c.env.DB.prepare(
-        `UPDATE categories SET name = COALESCE(?, name), display_order = COALESCE(?, display_order), icon = COALESCE(?, icon) WHERE id = ?`
+        `UPDATE categories SET name = COALESCE(?, name), display_order = COALESCE(?, display_order), icon = COALESCE(?, icon),
+           is_private = COALESCE(?, is_private), translations = COALESCE(?, translations) WHERE id = ?`
       ).bind(
         body.name ?? null,
         body.displayOrder ?? null,
         body.icon ?? null,
+        typeof body.isPrivate === 'boolean' ? (body.isPrivate ? 1 : 0) : null,
+        translations,
         id
       ).run();
     } catch (e) {
@@ -473,14 +512,15 @@ app.put('/api/menu/items/:id/stock', async (c) => {
 app.post('/api/menu/items', async (c) => {
   const body = await c.req.json();
   const itemInput = body.item || body;
-  const newItem = store.createMenuItem(itemInput, body.variants || []);
+  const translations = menuTranslations(itemInput.translations, ITEM_TEXT) ?? '{}';
+  const newItem = store.createMenuItem({ ...itemInput, translations: JSON.parse(translations) }, body.variants || []);
 
   if (c.env?.DB) {
     await ensureMenuColumns(c.env.DB);
     try {
       await c.env.DB.prepare(
-        `INSERT INTO menu_items (id, category_id, name, description, base_price, profit_margin, is_in_stock, image_url, badge, allergens, dietary_labels, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO menu_items (id, category_id, name, description, base_price, profit_margin, is_in_stock, image_url, badge, allergens, dietary_labels, translations, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         newItem.id,
         newItem.categoryId,
@@ -493,6 +533,7 @@ app.post('/api/menu/items', async (c) => {
         newItem.badge || '',
         newItem.allergens || '',
         newItem.dietaryLabels || '',
+        translations,
         newItem.createdAt
       ).run();
 
@@ -517,7 +558,8 @@ app.post('/api/menu/items', async (c) => {
 app.put('/api/menu/items/:id', async (c) => {
   const id = c.req.param('id');
   const body = await c.req.json();
-  const updated = store.updateMenuItem(id, body);
+  const translations = menuTranslations(body.translations, ITEM_TEXT);
+  const updated = store.updateMenuItem(id, { ...body, ...(translations !== null && { translations: JSON.parse(translations) }) });
 
   if (c.env?.DB) {
     await ensureMenuColumns(c.env.DB);
@@ -531,7 +573,8 @@ app.put('/api/menu/items/:id', async (c) => {
            profit_margin = COALESCE(?, profit_margin),
            is_in_stock = COALESCE(?, is_in_stock),
            image_url = COALESCE(?, image_url),
-           badge = COALESCE(?, badge), allergens = COALESCE(?, allergens), dietary_labels = COALESCE(?, dietary_labels)
+           badge = COALESCE(?, badge), allergens = COALESCE(?, allergens), dietary_labels = COALESCE(?, dietary_labels),
+           translations = COALESCE(?, translations)
          WHERE id = ?`
       ).bind(
         body.categoryId ?? null,
@@ -544,6 +587,7 @@ app.put('/api/menu/items/:id', async (c) => {
         body.badge ?? null,
         body.allergens ?? null,
         body.dietaryLabels ?? null,
+        translations,
         id
       ).run();
 
@@ -1120,6 +1164,7 @@ async function priceOrderItems(c: Context<Env>, items: any[], authed: boolean, e
     (item.discountAmount !== undefined && !Number.isFinite(item.discountAmount))
   )) return fail('Please check the items in your order.');
   if (items.length > 100) return fail('Invalid order details.');
+  await ensureMenuColumns(c.env.DB);
   for (const item of items) {
     if (item.quantity > 100) return fail('Maximum quantity is 100.');
     const row = await c.env.DB.prepare('SELECT * FROM menu_items WHERE id = ?').bind(item.menuItemId).first();
@@ -1128,6 +1173,8 @@ async function priceOrderItems(c: Context<Env>, items: any[], authed: boolean, e
       continue;
     }
     if (!row || (!row.is_in_stock && !existing.has(item.menuItemId))) return fail('An item is no longer available.', 409);
+    // Items in a private category are for staff orders only.
+    if (!authed && (await c.env.DB.prepare('SELECT is_private FROM categories WHERE id = ?').bind(row.category_id).first<{ is_private: number }>())?.is_private) return fail('An item is no longer available.', 409);
     const { results } = await c.env.DB.prepare('SELECT * FROM menu_variants WHERE menu_item_id = ?').bind(item.menuItemId).all();
     const groups = new Set<string>();
     const selected = [];

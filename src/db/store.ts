@@ -594,12 +594,14 @@ class CafeStore {
     return undefined;
   }
 
-  public createCategory(name: string, icon: string = 'Coffee', id?: string, displayOrder?: number): CategorySelect {
+  public createCategory(name: string, icon: string = 'Coffee', id?: string, displayOrder?: number, extra: Pick<CategorySelect, 'isPrivate' | 'translations'> = {}): CategorySelect {
     const newCat: CategorySelect = {
       id: id || `cat-${Date.now()}`,
       name,
       displayOrder: displayOrder ?? (this.state.categories.length + 1),
-      icon
+      icon,
+      isPrivate: extra.isPrivate === true,
+      translations: extra.translations || {}
     };
     this.state.categories.push(newCat);
     this.refreshKVCache();

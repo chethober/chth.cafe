@@ -53,7 +53,9 @@ CREATE TABLE IF NOT EXISTS categories (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   display_order INTEGER NOT NULL DEFAULT 0,
-  icon TEXT DEFAULT 'Coffee'
+  icon TEXT DEFAULT 'Coffee',
+  is_private INTEGER NOT NULL DEFAULT 0,
+  translations TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE TABLE IF NOT EXISTS menu_items (
@@ -68,6 +70,7 @@ CREATE TABLE IF NOT EXISTS menu_items (
   badge TEXT DEFAULT '',
   allergens TEXT NOT NULL DEFAULT '',
   dietary_labels TEXT NOT NULL DEFAULT '',
+  translations TEXT NOT NULL DEFAULT '{}',
   created_at TEXT NOT NULL
 );
 

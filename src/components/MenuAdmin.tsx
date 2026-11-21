@@ -1,12 +1,13 @@
 import { ImageUpload } from './ImageUpload';
 import React, { useMemo, useState } from 'react';
-import { Boxes, CheckCircle2, Coffee, Download, FolderPlus, Pencil, Percent, Plus, Trash2, UtensilsCrossed, XCircle } from 'lucide-react';
-import { CategorySelect, MenuItemSelect, MenuVariantSelect, SettingsSelect } from '../db/schema';
+import { Boxes, CheckCircle2, Coffee, Download, EyeOff, FolderPlus, Languages, Pencil, Percent, Plus, Trash2, UtensilsCrossed, XCircle } from 'lucide-react';
+import { CategorySelect, MenuItemSelect, MenuTranslations, MenuVariantSelect, SettingsSelect } from '../db/schema';
+import { LOCALES } from '../chth-kit/locales.js';
 import { store } from '../db/store';
 import { copyCSVToClipboard, downloadCSV, downloadJSON, downloadStyledExcel } from '../utils/exportUtils';
 import {
   AffixInput, Badge, Button, Card, Checkbox, Chips, ConfirmDialog, Dialog, EmptyState, ExportDialog, Field, FormDialog, IconButton, Input, KeyValue,
-  List, ListItem, Notice, Page, PageHeader, SearchInput, Segmented, Select, SortFilter, Stat, StatGrid, Switch, Textarea, localDateKey, money, plural, slug
+  List, ListItem, Notice, Page, PageHeader, SearchInput, Segmented, Select, SortFilter, Stat, StatGrid, Switch, Textarea, ToggleRow, localDateKey, money, plural, slug
 } from '../ui';
 import { CATEGORY_ICONS } from './shared';
 import { intlTag, tr } from '../i18n';
@@ -19,9 +20,47 @@ interface MenuAdminProps {
   onMenuUpdated: () => void;
 }
 
+/** Trims each translation and drops empty ones, so blank fields fall back to the café's own text. */
+function cleanTranslations(value: MenuTranslations): MenuTranslations {
+  const clean: MenuTranslations = {};
+  for (const [code, entry] of Object.entries(value) as [keyof MenuTranslations, { name?: string; description?: string }][]) {
+    const name = entry?.name?.trim(), description = entry?.description?.trim();
+    if (name || description) clean[code] = { ...(name && { name }), ...(description && { description }) };
+  }
+  return clean;
+}
+
 type SortField = 'price' | 'margin' | 'name' | 'category' | 'stock';
 const marginPct = (price: number, margin: number) => (price > 0 ? (margin / price) * 100 : 0);
-const EMPTY_ITEM = { name: '', categoryId: '', description: '', price: '', margin: '', badge: '', imageUrl: '', allergens: '', dietaryLabels: '' };
+const EMPTY_ITEM = { name: '', categoryId: '', description: '', price: '', margin: '', badge: '', imageUrl: '', allergens: '', dietaryLabels: '', translations: {} as MenuTranslations };
+
+/** Languages a name can be written in besides the café's own. */
+const OTHER_LANGUAGES = LOCALES.filter(l => l.code !== 'en');
+const translatedCount = (translations: MenuTranslations) => OTHER_LANGUAGES.filter(l => translations[l.code as keyof MenuTranslations]?.name?.trim()).length;
+
+/**
+ * The name (and description) in each other language, folded away until needed. Each field is
+ * written in its own language and direction; empty ones fall back to the café's own text.
+ */
+function TranslationFields({ value, onChange, withDescription }: { value: MenuTranslations; onChange: (next: MenuTranslations) => void; withDescription?: boolean }) {
+  const count = translatedCount(value);
+  const set = (code: keyof MenuTranslations, field: 'name' | 'description', text: string) => onChange({ ...value, [code]: { ...value[code], [field]: text } });
+  return (
+    <details className="ws-translations" open={count > 0 || undefined}>
+      <summary><Languages aria-hidden="true" /><span>{tr('Other languages')}</span><span className="ws-hint">{tr('{count} of {total} written', { count, total: OTHER_LANGUAGES.length })}</span></summary>
+      <p className="ws-hint">{withDescription ? tr('Guests see these in their language. Leave a language empty to show the name and description above.') : tr('Guests see these in their language. Leave a language empty to show the name above.')}</p>
+      {OTHER_LANGUAGES.map(({ code, native, dir }) => {
+        const key = code as keyof MenuTranslations;
+        return (
+          <div key={code} className="ws-translation">
+            <Field label={withDescription ? tr('{language} name', { language: native }) : native}>{id => <Input id={id} lang={code} dir={dir} maxLength={withDescription ? 200 : 100} value={value[key]?.name || ''} onChange={e => set(key, 'name', e.target.value)} />}</Field>
+            {withDescription && <Field label={tr('{language} description', { language: native })}>{id => <Textarea id={id} lang={code} dir={dir} rows={2} maxLength={1000} value={value[key]?.description || ''} onChange={e => set(key, 'description', e.target.value)} />}</Field>}
+          </div>
+        );
+      })}
+    </details>
+  );
+}
 
 export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menuItems, onMenuUpdated }) => {
   const currency = settings.currency;
@@ -37,12 +76,18 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menu
   const [editingCat, setEditingCat] = useState<CategorySelect | null>(null);
   const [catName, setCatName] = useState('');
   const [catIcon, setCatIcon] = useState('Coffee');
-  const openCategory = (cat?: CategorySelect) => { setEditingCat(cat || null); setCatName(cat?.name || ''); setCatIcon(cat?.icon || 'Coffee'); setCatOpen(true); };
+  const [catPrivate, setCatPrivate] = useState(false);
+  const [catTranslations, setCatTranslations] = useState<MenuTranslations>({});
+  const openCategory = (cat?: CategorySelect) => {
+    setEditingCat(cat || null); setCatName(cat?.name || ''); setCatIcon(cat?.icon || 'Coffee');
+    setCatPrivate(cat?.isPrivate === true); setCatTranslations(cat?.translations || {}); setCatOpen(true);
+  };
   const saveCategory = (e: React.FormEvent) => {
     e.preventDefault();
     if (!catName.trim()) return;
-    if (editingCat) store.updateCategory(editingCat.id, { name: catName.trim(), icon: catIcon });
-    else store.createCategory(catName.trim(), catIcon);
+    const extra = { isPrivate: catPrivate, translations: cleanTranslations(catTranslations) };
+    if (editingCat) store.updateCategory(editingCat.id, { name: catName.trim(), icon: catIcon, ...extra });
+    else store.createCategory(catName.trim(), catIcon, undefined, undefined, extra);
     setCatOpen(false);
     onMenuUpdated();
   };
@@ -57,7 +102,7 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menu
     setItem(existing ? {
       name: existing.name, categoryId: existing.categoryId, description: existing.description || '', price: String(existing.basePrice ?? 0),
       margin: String(existing.profitMargin ?? 0), badge: existing.badge || '', imageUrl: existing.imageUrl || '',
-      allergens: existing.allergens || '', dietaryLabels: existing.dietaryLabels || ''
+      allergens: existing.allergens || '', dietaryLabels: existing.dietaryLabels || '', translations: existing.translations || {}
     } : { ...EMPTY_ITEM, categoryId: categoryId || categories[0]?.id || '' });
     setItemError('');
     setItemOpen(true);
@@ -71,7 +116,8 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menu
     const data = {
       name: item.name.trim(), categoryId: item.categoryId, description: item.description.trim(),
       allergens: item.allergens.trim(), dietaryLabels: item.dietaryLabels.trim(),
-      basePrice: price, profitMargin: parseFloat(item.margin) || 0, badge: item.badge.trim(), imageUrl: item.imageUrl.trim()
+      basePrice: price, profitMargin: parseFloat(item.margin) || 0, badge: item.badge.trim(), imageUrl: item.imageUrl.trim(),
+      translations: cleanTranslations(item.translations)
     };
     if (editingItem) store.updateMenuItem(editingItem.id, data);
     else store.createMenuItem({ ...data, isInStock: true }, []);
@@ -211,7 +257,7 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menu
           <Card
             key={cat.id}
             flush
-            title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span className="muted" style={{ display: 'inline-flex', width: 18 }}>{CATEGORY_ICONS[cat.icon || '']?.icon || <Coffee />}</span>{cat.name}</span>}
+            title={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span className="muted" style={{ display: 'inline-flex', width: 18 }}>{CATEGORY_ICONS[cat.icon || '']?.icon || <Coffee />}</span>{cat.name}{cat.isPrivate && <Badge icon={<EyeOff />}>{tr('Private')}</Badge>}</span>}
             description={plural(all.length, 'item')}
             actions={<>
               <Button size="sm" variant="ghost" icon={<Plus />} onClick={() => openItem(undefined, cat.id)}>{tr('Item')}</Button>
@@ -262,6 +308,8 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menu
             {Object.entries(CATEGORY_ICONS).map(([value, { label }]) => <option key={value} value={value}>{label}</option>)}
           </Select>
         )}</Field>
+        <ToggleRow icon={<EyeOff />} title={tr('Private')} description={tr('Only staff see it, in the admin and panel. It and its items are hidden from the public menu and cannot be ordered there.')} checked={catPrivate} onChange={setCatPrivate} />
+        <TranslationFields value={catTranslations} onChange={setCatTranslations} />
       </FormDialog>
 
       <FormDialog open={itemOpen} onClose={() => setItemOpen(false)} title={editingItem ? tr('Edit {name}', { name: editingItem.name }) : tr('Add menu item')} submitLabel={editingItem ? tr('Save changes') : tr('Add item')} onSubmit={saveItem}
@@ -294,6 +342,7 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menu
           <Field label={tr('Dietary labels')} hint={tr('Comma separated')}>{(id, hint) => <Input id={id} aria-describedby={hint} maxLength={500} value={item.dietaryLabels} onChange={e => setItem({ ...item, dietaryLabels: e.target.value })} placeholder="vegan, decaf" />}</Field>
         </div>
         <ImageUpload label={tr('Photo')} value={item.imageUrl} onChange={imageUrl => setItem(prev => ({ ...prev, imageUrl }))} />
+        <TranslationFields withDescription value={item.translations} onChange={translations => setItem(prev => ({ ...prev, translations }))} />
       </FormDialog>
 
       <Dialog

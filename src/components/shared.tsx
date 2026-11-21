@@ -7,7 +7,7 @@ import {
   formatDateTime, plural, localDateKey, money, orderStatusTone, orderTypeLabel, paymentLabel, ORDER_PAYMENT_METHODS, ORDER_STATUS_LABELS
 } from '../ui';
 import { CustomerPicker } from './CustomerClub';
-import { tr } from '../i18n';
+import { localizeMenu, tr } from '../i18n';
 
 /* --------------------------------------------------------------- Menu */
 
@@ -23,7 +23,7 @@ export const CATEGORY_ICONS: Record<string, { icon: React.ReactNode; label: stri
  * The menu as a short list of categories: tap one to open its items, tap an item to add it.
  * Several can be open at once, so opening one never shifts the others. A search query lists matches flat.
  */
-export function MenuPicker({ categories, menuItems, query = '', open, onOpenChange, quantities, onAdd, fmt, allowSoldOut, itemActions }: {
+export function MenuPicker({ categories: baseCategories, menuItems: baseItems, query = '', open, onOpenChange, quantities, onAdd, fmt, allowSoldOut, itemActions }: {
   categories: CategorySelect[];
   menuItems: MenuItemSelect[];
   query?: string;
@@ -36,6 +36,10 @@ export function MenuPicker({ categories, menuItems, query = '', open, onOpenChan
   allowSoldOut?: boolean;
   itemActions?: (item: MenuItemSelect) => React.ReactNode;
 }) {
+  // Names in the staff member's language where the café wrote one; orders keep the café's own name.
+  const categories = baseCategories.map(c => localizeMenu(c));
+  const menuItems = baseItems.map(i => localizeMenu(i));
+  const baseNames = new Map(baseItems.map(i => [i.id, i.name.toLowerCase()]));
   const known = new Set(categories.map(c => c.id));
   const groups = [
     ...categories.map(c => ({ id: c.id, name: c.name, icon: CATEGORY_ICONS[c.icon || '']?.icon || <Coffee />, items: menuItems.filter(i => i.categoryId === c.id) })),
@@ -60,7 +64,7 @@ export function MenuPicker({ categories, menuItems, query = '', open, onOpenChan
 
   const q = query.trim().toLowerCase();
   if (q) {
-    const matches = menuItems.filter(i => i.name.toLowerCase().includes(q));
+    const matches = menuItems.filter(i => i.name.toLowerCase().includes(q) || baseNames.get(i.id)?.includes(q));
     if (!matches.length) return <div className="ws-picker-group"><EmptyState title={tr('Nothing matches')} description={tr('Try another search term.')} /></div>;
     return <div className="ws-picker-group"><ul className="ws-picker-items" aria-label={tr('Search results')}>{matches.map(row)}</ul></div>;
   }

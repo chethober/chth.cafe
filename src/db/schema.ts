@@ -37,12 +37,18 @@ export const settings = sqliteTable('settings', {
   updatedAt: text('updated_at').notNull()
 });
 
+/** The menu in other languages: the name (and an item's description) per language. Missing ones show the café's own text. */
+export type MenuTranslation = { name?: string; description?: string };
+export type MenuTranslations = Partial<Record<'fa' | 'ar' | 'ru' | 'es', MenuTranslation>>;
+
 // 2. Menu Categories
 export const categories = sqliteTable('categories', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   displayOrder: integer('display_order').notNull().default(0),
-  icon: text('icon').default('Coffee')
+  icon: text('icon').default('Coffee'),
+  isPrivate: integer('is_private', { mode: 'boolean' }).notNull().default(false), // Staff only: shown in the admin and panel, never on the public menu
+  translations: text('translations', { mode: 'json' }).$type<MenuTranslations>().notNull().default({})
 });
 
 // 3. Menu Items
@@ -58,6 +64,7 @@ export const menuItems = sqliteTable('menu_items', {
   allergens: text('allergens').notNull().default(''),
   dietaryLabels: text('dietary_labels').notNull().default(''),
   badge: text('badge').default(''), // e.g. "Popular", "New", "Organic"
+  translations: text('translations', { mode: 'json' }).$type<MenuTranslations>().notNull().default({}),
   createdAt: text('created_at').notNull()
 });
 
@@ -183,8 +190,8 @@ export const customers = sqliteTable('customers', {
 // Types exported for frontend & backend consumption
 export type SettingsSelect = Omit<typeof settings.$inferSelect, 'timeZone' | 'calendarSystem' | 'secondaryCalendar' | 'telegramEventsChatId' | 'notifyBookings' | 'stockCategories'>
   & { timeZone?: string; calendarSystem?: string; secondaryCalendar?: string; telegramEventsChatId?: string; notifyBookings?: boolean; stockCategories?: string | null };
-export type CategorySelect = typeof categories.$inferSelect;
-export type MenuItemSelect = Omit<typeof menuItems.$inferSelect, 'allergens' | 'dietaryLabels'> & { allergens?: string; dietaryLabels?: string };
+export type CategorySelect = Omit<typeof categories.$inferSelect, 'isPrivate' | 'translations'> & { isPrivate?: boolean; translations?: MenuTranslations };
+export type MenuItemSelect = Omit<typeof menuItems.$inferSelect, 'allergens' | 'dietaryLabels' | 'translations'> & { allergens?: string; dietaryLabels?: string; translations?: MenuTranslations };
 export type MenuVariantSelect = typeof menuVariants.$inferSelect;
 export type StaffSelect = typeof staff.$inferSelect;
 export type ShiftSelect = typeof shifts.$inferSelect;

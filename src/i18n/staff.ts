@@ -975,4 +975,12 @@ export const STAFF_STRINGS: Record<string, Row> = {
   'Pending': { fa: 'در انتظار', ar: 'قيد الانتظار', ru: 'Ожидает', es: 'Pendiente' },
   '{hours} h': { fa: '{hours} ساعت', ar: '{hours} س', ru: '{hours} ч', es: '{hours} h' },
   'now': { fa: 'اکنون', ar: 'الآن', ru: 'сейчас', es: 'ahora' },
+  'Other languages': { fa: 'زبان‌های دیگر', ar: 'لغات أخرى', ru: 'Другие языки', es: 'Otros idiomas' },
+  '{count} of {total} written': { fa: '{count} از {total} نوشته شده', ar: '{count} من {total} مكتوبة', ru: 'Заполнено {count} из {total}', es: '{count} de {total} escritos' },
+  'Guests see these in their language. Leave a language empty to show the name and description above.': { fa: 'مهمان‌ها این‌ها را به زبان خودشان می‌بینند. اگر زبانی را خالی بگذارید، نام و توضیحات بالا نمایش داده می‌شود.', ar: 'يرى الضيوف هذه بلغتهم. اترك أي لغة فارغة لعرض الاسم والوصف أعلاه.', ru: 'Гости видят это на своём языке. Оставьте язык пустым, чтобы показывать название и описание выше.', es: 'Los clientes lo ven en su idioma. Deja un idioma vacío para mostrar el nombre y la descripción de arriba.' },
+  'Guests see these in their language. Leave a language empty to show the name above.': { fa: 'مهمان‌ها این‌ها را به زبان خودشان می‌بینند. اگر زبانی را خالی بگذارید، نام بالا نمایش داده می‌شود.', ar: 'يرى الضيوف هذه بلغتهم. اترك أي لغة فارغة لعرض الاسم أعلاه.', ru: 'Гости видят это на своём языке. Оставьте язык пустым, чтобы показывать название выше.', es: 'Los clientes lo ven en su idioma. Deja un idioma vacío para mostrar el nombre de arriba.' },
+  '{language} name': { fa: 'نام به {language}', ar: 'الاسم بـ{language}', ru: 'Название ({language})', es: 'Nombre en {language}' },
+  '{language} description': { fa: 'توضیحات به {language}', ar: 'الوصف بـ{language}', ru: 'Описание ({language})', es: 'Descripción en {language}' },
+  'Private': { fa: 'خصوصی', ar: 'خاص', ru: 'Скрытая', es: 'Privada' },
+  'Only staff see it, in the admin and panel. It and its items are hidden from the public menu and cannot be ordered there.': { fa: 'فقط کارکنان آن را در مدیریت و پنل می‌بینند. این دسته و اقلامش در منوی عمومی پنهان‌اند و از آنجا سفارش داده نمی‌شوند.', ar: 'يراها الموظفون فقط، في الإدارة واللوحة. تُخفى هي وأصنافها من القائمة العامة ولا يمكن طلبها من هناك.', ru: 'Видна только сотрудникам — в админке и панели. Категория и её позиции скрыты из публичного меню и не заказываются там.', es: 'Solo la ve el personal, en la administración y el panel. Ella y sus productos no aparecen en el menú público ni se pueden pedir desde allí.' },
 };

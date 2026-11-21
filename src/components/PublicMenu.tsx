@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Coffee, GlassWater, Leaf, Cake, Utensils, Search, Plus, Minus, ShoppingBag, X, MapPin, Phone, ChevronRight, Heart, SlidersHorizontal, Sparkles, Shuffle, Globe, type LucideIcon } from 'lucide-react';
 import { CategorySelect, MenuItemSelect, MenuVariantSelect, SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
@@ -7,7 +7,7 @@ import { OrderTracking, OrderReceipt } from './OrderTracking';
 import { Modal } from './Modal';
 import { PublicEvents } from './PublicEvents';
 import { reducedMotion } from '../ui';
-import { applyDocumentLocale, detectLocale, isolateNumber, setLocale, useLocale, useT, type Locale } from '../i18n';
+import { applyDocumentLocale, detectLocale, isolateNumber, localizeMenu, setLocale, useLocale, useT, type Locale } from '../i18n';
 import { LOCALES } from '../chth-kit/locales.js';
 import { footerModel } from '../chth-kit/footer.js';
 import { themeToggleModel, toast } from '../chth-kit/shell.js';
@@ -122,9 +122,16 @@ function Confetti({ burst }: { burst: number }) {
   </div>;
 }
 
-export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, menuItems, menuVariants, onOrderCreated, theme }) => {
+export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: allCategories, menuItems: allItems, menuVariants, onOrderCreated, theme }) => {
   chooseLocale();
   const locale = useLocale();
+  // Guests never see private (staff-only) categories, even on a device signed in to the admin;
+  // names and descriptions come in the guest's language where the café wrote one.
+  const categories = useMemo(() => allCategories.filter(cat => !cat.isPrivate).map(cat => localizeMenu(cat, locale)), [allCategories, locale]);
+  const menuItems = useMemo(() => {
+    const visible = new Set(categories.map(cat => cat.id));
+    return allItems.filter(item => visible.has(item.categoryId)).map(item => localizeMenu(item, locale));
+  }, [allItems, categories, locale]);
   const toggle = themeToggleModel(locale);
   const t = useT();
   useLayoutEffect(() => applyDocumentLocale(locale), [locale]);
@@ -587,7 +594,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories, me
               {cart.map(line => {
                 const available = menuItems.find(item => item.id === line.item.id)?.isInStock;
                 return <li key={line.id} className="pm-checkout-line" data-unavailable={!available || undefined}>
-                  <div className="pm-checkout-line-text"><b className="pm-own">{line.item.name}</b>
+                  <div className="pm-checkout-line-text"><b className="pm-own">{menuItems.find(item => item.id === line.item.id)?.name ?? line.item.name}</b>
                     {!!line.variants.length && <small>{line.variants.map(variant => `${variant.groupName}: ${variant.name}`).join(', ')}</small>}
                     {!available && <small className="pm-checkout-warn">{t('Sold out · please remove this item')}</small>}
                     <span className="pm-price">{money(line.unitPrice * line.quantity)}</span>

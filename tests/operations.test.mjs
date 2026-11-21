@@ -115,6 +115,27 @@ try {
   check((await db.prepare('SELECT item_name FROM order_items WHERE order_id=?').bind(order.id).first()).item_name,'Espresso');
   const retry=await (await request('/api/orders',input)).json();check(retry.data.id,order.id);check(retry.data.orderNumber,order.orderNumber);
   const collision={...input,customerName:'someone else'}; check((await request('/api/orders',collision)).status,409);
+  // Menu names in other languages: only known languages and fields are kept, trimmed.
+  response=await request('/api/menu/categories',{id:'cat-staff',name:'Staff drinks',icon:'Coffee',isPrivate:true,translations:{fa:{name:' نوشیدنی کارکنان '},xx:{name:'nope'},ar:{name:''}}},true);check(response.status,200);
+  response=await request('/api/menu/items',{item:{id:'item-staff-tea',categoryId:'cat-staff',name:'Staff tea',description:'For the team',basePrice:10,isInStock:true,translations:{fa:{name:'چای کارکنان',description:'برای تیم',extra:'x'},ru:{description:'Для команды'}}},variants:[]},true);check(response.status,200);
+  const adminMenu=(await (await request('/api/admin/menu',undefined,true)).json()).data;
+  const staffCat=adminMenu.find(c=>c.id==='cat-staff');
+  check(staffCat.isPrivate,true);check(staffCat.translations,{fa:{name:'نوشیدنی کارکنان'}});
+  check(staffCat.items[0].translations,{fa:{name:'چای کارکنان',description:'برای تیم'},ru:{description:'Для команды'}});
+  // Private categories: staff see them, guests neither see nor order them.
+  check((await (await request('/api/menu')).json()).data.some(c=>c.id==='cat-staff'),false);
+  check((await (await request('/api/menu',undefined,true)).json()).data.some(c=>c.id==='cat-staff'),true);
+  const staffTea=()=>({...orderInput(),items:[{menuItemId:'item-staff-tea',itemName:'Staff tea',quantity:1,unitPrice:10,variants:[]}]});
+  check((await request('/api/orders',staffTea())).status,409);
+  const staffTeaOrder={...staffTea(),id:`ord-${crypto.randomUUID()}`,discountAmount:0};
+  check((await request('/api/orders',staffTeaOrder,true)).status,200);
+  await db.prepare('DELETE FROM order_items WHERE order_id=?').bind(staffTeaOrder.id).run();await db.prepare('DELETE FROM orders WHERE id=?').bind(staffTeaOrder.id).run();
+  // Making it public again shows it; leaving translations out keeps them, sending {} clears them.
+  check((await request('/api/menu/categories/cat-staff',{isPrivate:false},true,'PUT')).status,200);
+  check((await (await request('/api/menu')).json()).data.find(c=>c.id==='cat-staff').translations,{fa:{name:'نوشیدنی کارکنان'}});
+  check((await request('/api/menu/categories/cat-staff',{translations:{}},true,'PUT')).status,200);
+  check((await (await request('/api/menu')).json()).data.find(c=>c.id==='cat-staff').translations,{});
+  check((await request('/api/menu/categories/cat-staff',undefined,true,'DELETE')).status,200);
   // Staff orders link to a member and take their name; public orders cannot claim one.
   const member=(await (await request('/api/customers',undefined,true)).json()).data[0];
   check((await request('/api/customers',{name:'Reza',phone:'09121112233'},true)).status,409);

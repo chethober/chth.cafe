@@ -7,6 +7,7 @@
 
 import { dirOf, isLocale, LOCALE_KEY, localeCookie, localeFromCookie, pickLocale, type Locale } from '../chth-kit/locales.js';
 import { PUBLIC_STRINGS, type Row } from './public';
+import type { MenuTranslations } from '../db/schema';
 
 export type { Locale };
 export type Vars = Record<string, string | number | null | undefined>;
@@ -36,6 +37,16 @@ export const isolateNumber = (text: string, locale: Locale = current) => dirOf(l
 export function tr(key: string, vars?: Vars, locale: Locale = current): string {
   const text = locale === 'en' ? key : (staff?.[key] ?? PUBLIC_STRINGS[key])?.[locale] ?? key;
   return vars ? text.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? '')) : text;
+}
+
+/**
+ * A category or menu item with its name (and description) in the given language, where the café
+ * wrote one; otherwise the café's own text. The id and everything else stay the same.
+ */
+export function localizeMenu<T extends { name: string; description?: string | null; translations?: MenuTranslations }>(entity: T, locale: Locale = current): T {
+  const text = locale === 'en' ? undefined : entity.translations?.[locale];
+  if (!text?.name && !text?.description) return entity;
+  return { ...entity, name: text.name || entity.name, ...(text.description && { description: text.description }) };
 }
 
 /** Loads the admin and panel strings. Text shows in English until they arrive. */

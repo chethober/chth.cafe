@@ -33,7 +33,7 @@ Built with React, TypeScript and Tailwind CSS, served by Hono on Cloudflare Work
 | ☕ **Public menu** | Categories, search, filters, favourites, "Spin for me", ordering and order tracking, opening hours and events |
 | 📋 **Daily panel** | A live order board (waiting, preparing, ready), new orders at the till, the checklist, the customer club and clock in/out |
 | 📈 **Finances** | Revenue, expenses, wages and margin, payment mix, best sellers and closing the day |
-| 🍰 **Menu and stock** | Items with cost, margin and availability; raw materials with recipes, automatic deduction and low-stock alerts |
+| 🍰 **Menu and stock** | Items with cost, margin and availability, names in every language, and private categories only staff see; raw materials with recipes, automatic deduction and low-stock alerts |
 | 👥 **Staff and shifts** | Team rates, clocked shifts and wages |
 | 🤖 **Telegram bot** | Sales, shift, checklist and low-stock alerts, plus commands to run the café from the chat |
 | ☁️ **One-click deploys** | CHTH Café Cloud deploys and updates a café in the owner's own Cloudflare account |
@@ -192,8 +192,10 @@ Strings are keyed by their English text, so a missing translation shows English:
 workspace opens, so customers never download it), and `control-plane/src/i18n.ts` for the landing
 page. In code, wrap text in `tr('Saved {count} items', { count })` from `src/i18n`; dates and times
 follow the chosen language. Layout uses logical CSS properties (`margin-inline-start`, `inset-inline-end`,
-`text-align: start`), so new styles mirror on their own. Menu items, names and other text the café
-enters are shown as written, laid out in their own direction. The Telegram bot and server error
+`text-align: start`), so new styles mirror on their own. Categories and menu items can carry their own name
+(and an item its description) in each language, under **Other languages** in the menu editor;
+guests see them in their language and the café's own text otherwise, and orders keep the café's
+name. Other text the café enters is shown as written, laid out in its own direction. The Telegram bot and server error
 messages are English.
 
 ## CHTH kit and hub
