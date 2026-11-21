@@ -5,6 +5,7 @@ import { store } from '../db/store';
 import { getOpeningStatus } from '../utils/openingHours';
 import { OrderTracking, OrderReceipt } from './OrderTracking';
 import { Modal } from './Modal';
+import { formatMoney } from '../utils/money';
 import { PublicEvents } from './PublicEvents';
 import { reducedMotion } from '../ui';
 import { applyDocumentLocale, detectLocale, isolateNumber, localizeMenu, setLocale, useLocale, useT, type Locale } from '../i18n';
@@ -207,7 +208,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: al
 
   const opening = getOpeningStatus(settings.openHours, now, settings.timeZone || 'Asia/Tehran');
   const greeting = t(greetingFor(now, settings.timeZone || 'Asia/Tehran'));
-  const money = (amount: number) => isolateNumber(`${settings.currency}${amount.toFixed(2).replace(/\.00$/, '')}`);
+  const money = (amount: number) => isolateNumber(formatMoney(amount, settings.currency, { trimZeros: true }));
   const query = searchQuery.trim().toLocaleLowerCase();
   const matchingItems = menuItems.filter(item =>
     (!dietaryFilter || item.dietaryLabels?.split(',').some(label => label.trim().toLowerCase() === dietaryFilter)) &&

@@ -1,3 +1,4 @@
+import { formatMoney } from '../utils/money';
 import { calendarOf, describeOccurrence, describeRecurrence, type CafeEvent, type EventBooking } from '../utils/events';
 
 export type TelegramNotificationType = 'sales' | 'shifts' | 'tasks' | 'dailyReport' | 'lowStock' | 'bookings';
@@ -172,7 +173,7 @@ export async function sendTelegramNotification(
 
 // --- Shared formatting helpers ---
 
-export const money = (ctx: FormatContext, amount: number) => `${ctx.currency}${Number(amount || 0).toFixed(2)}`;
+export const money = (ctx: FormatContext, amount: number) => formatMoney(amount, ctx.currency);
 
 export const cafeTime = (ctx: FormatContext, date: Date | string = new Date()) => {
   try {

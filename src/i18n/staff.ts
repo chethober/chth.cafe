@@ -990,4 +990,5 @@ export const STAFF_STRINGS: Record<string, Row> = {
   'Download SVG': { fa: 'دانلود SVG', ar: 'تنزيل SVG', ru: 'Скачать SVG', es: 'Descargar SVG' },
   'The card prints on A5 with the café name. The SVG stays sharp at any size, for your own designs.': { fa: 'کارت روی A5 با نام کافه چاپ می‌شود. SVG در هر اندازه‌ای واضح می‌ماند، برای طراحی‌های خودتان.', ar: 'تُطبع البطاقة بحجم A5 مع اسم المقهى. يبقى ملف SVG واضحًا بأي حجم، لتصاميمك الخاصة.', ru: 'Карточка печатается на A5 с названием кафе. SVG остаётся чётким в любом размере — для ваших макетов.', es: 'La tarjeta se imprime en A5 con el nombre del café. El SVG se ve nítido a cualquier tamaño, para tus propios diseños.' },
   'Scan to see our menu and order': { fa: 'برای دیدن منو و سفارش اسکن کنید', ar: 'امسح لرؤية قائمتنا والطلب', ru: 'Отсканируйте, чтобы открыть меню и заказать', es: 'Escanea para ver nuestro menú y pedir' },
+  'Toman': { fa: 'تومان', ar: 'تومان', ru: 'Томан', es: 'Tomán' },
 };

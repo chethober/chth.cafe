@@ -1,3 +1,4 @@
+import { currencyDecimals, formatMoney, withCurrency } from '../../utils/money';
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { BarChart3, Table2 } from 'lucide-react';
 import { isolateNumber, tr } from '../../i18n';
@@ -23,18 +24,17 @@ const cents = new Intl.NumberFormat('en', { minimumFractionDigits: 2, maximumFra
 const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
 /** Full money value, e.g. ₹1,284.50 or −₹320.00. */
-export const money = (currency: string, value: number) =>
-  isolateNumber(`${value < 0 ? '−' : ''}${currency}${cents.format(Math.abs(value))}`);
+export const money = (currency: string, value: number) => isolateNumber(formatMoney(value, currency));
 
 /** Stat-tile money: exact under 10K, then auto-compact (12.9K, 4.2M). */
 export const moneyShort = (currency: string, value: number) => {
   const abs = Math.abs(value);
-  const body = abs >= 10_000 ? compact.format(abs) : abs >= 1_000 ? grouped.format(abs) : cents.format(abs);
-  return isolateNumber(`${value < 0 ? '−' : ''}${currency}${body}`);
+  const small = currencyDecimals(currency) === 0 ? grouped : cents;
+  const body = abs >= 10_000 ? compact.format(abs) : abs >= 1_000 ? grouped.format(abs) : small.format(abs);
+  return isolateNumber(withCurrency(body, currency, value < 0));
 };
 
-export const tickLabel = (currency: string, value: number) =>
-  `${value < 0 ? '−' : ''}${currency}${compact.format(Math.abs(value))}`;
+export const tickLabel = (currency: string, value: number) => withCurrency(compact.format(Math.abs(value)), currency, value < 0);
 
 export const count = (value: number) => grouped.format(value);
 
