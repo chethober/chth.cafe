@@ -42,7 +42,7 @@
 .evcal-day.is-past .evcal-num { color: var(--evcal-muted); }
 .evcal-day.is-today .evcal-num { display: grid; place-items: center; min-width: 26px; height: 26px; margin-top: calc(-1 * var(--chth-space-2)); border-radius: var(--chth-radius-full); background: var(--evcal-ink); color: var(--evcal-paper); }
 .evcal-day.is-selected { background: var(--evcal-soft); box-shadow: inset 0 0 0 2px var(--evcal-accent); }
-.evcal-marks { position: absolute; left: 0; right: 0; bottom: 6px; display: flex; justify-content: center; align-items: center; gap: var(--chth-space-2); }
+.evcal-marks { position: absolute; inset-inline-start: 0; inset-inline-end: 0; bottom: 6px; display: flex; justify-content: center; align-items: center; gap: var(--chth-space-2); }
 .evcal-marks i { width: 6px; height: 6px; border-radius: var(--chth-radius-full); background: var(--evcal-accent); }
 .evcal-marks i.is-internal { background: var(--evcal-internal); }
 .evcal-marks i.is-draft { background: transparent; box-shadow: inset 0 0 0 1.5px var(--evcal-muted); }
@@ -70,7 +70,7 @@
   .pm-events-strip { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); margin: 0; padding: 0; overflow: visible; }
 }
 .pm-ev-card {
-  display: grid; width: 100%; overflow: hidden; text-align: left; color: var(--menu-ink);
+  display: grid; width: 100%; overflow: hidden; text-align: start; color: var(--menu-ink);
   border-radius: var(--chth-radius-xl); border: 1px solid color-mix(in srgb, var(--menu-rule) 55%, transparent); background: var(--menu-sheet);
   transition: transform var(--chth-dur-150) var(--ease-out), box-shadow var(--chth-dur-200) ease;
 }
@@ -120,9 +120,9 @@
 .pm-ev-field textarea { min-height: 72px; resize: vertical; }
 .pm-ev-field :is(input, select, textarea):focus-visible { outline: 2px solid var(--menu-accent); outline-offset: 2px; }
 /* Off-screen rather than display:none, which some bots skip. */
-.pm-ev-trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.pm-ev-trap { position: absolute; inset-inline-start: -10000px; width: 1px; height: 1px; overflow: hidden; }
 .pm-ev-seats { display: flex; align-items: center; justify-content: space-between; gap: var(--chth-space-12); font-weight: 600; }
-.menu-paper-dialog .pm-ev-sheet .pm-stepper { margin-left: 0; animation: none; }
+.menu-paper-dialog .pm-ev-sheet .pm-stepper { margin-inline-start: 0; animation: none; }
 .menu-paper-dialog .pm-ev-sheet .pm-stepper button { width: 44px; border-radius: var(--chth-radius-full); }
 .menu-paper-dialog .pm-ev-sheet .pm-ev-submit { width: 100%; min-height: 50px; border-radius: var(--chth-radius-full); }
 .menu-paper-dialog .pm-ev-sheet .pm-ev-card { border-radius: var(--chth-radius-16); }

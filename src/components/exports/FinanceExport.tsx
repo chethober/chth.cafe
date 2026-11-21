@@ -6,6 +6,7 @@ import {
   dateRangeBounds, formatDate, inRange, localDateKey, money, orderTypeLabel, paymentLabel
 } from '../../ui';
 import { EXPENSE_CATEGORIES } from '../ManualLogModal';
+import { intlTag, tr } from '../../i18n';
 
 interface Row { id: string; type: 'Order' | 'Expense'; refNumber: string; name: string; description: string; amount: number; paymentMethod: string; date: string }
 type SortField = 'date' | 'amount' | 'type' | 'name';
@@ -30,7 +31,7 @@ export function FinanceExportDialog({ open, onClose, orders, expenses, currency 
       if (!inRange(o.createdAt, bounds)) return;
       if (payment !== 'all' && o.paymentMethod !== payment) return;
       if (category && o.orderType !== category) return;
-      rows.push({ id: o.id, type: 'Order', refNumber: o.orderNumber, name: o.customerName || 'Walk-in', description: `${orderTypeLabel(o.orderType)} sale · ${o.status}`, amount: o.totalAmount, paymentMethod: o.paymentMethod, date: o.createdAt });
+      rows.push({ id: o.id, type: 'Order', refNumber: o.orderNumber, name: o.customerName || 'Walk-in', description: tr('{orderType} sale · {status}', { orderType: orderTypeLabel(o.orderType), status: o.status }), amount: o.totalAmount, paymentMethod: o.paymentMethod, date: o.createdAt });
     });
     if (scope !== 'orders') expenses.forEach(e => {
       const date = e.date ? `${e.date}T12:00:00` : e.createdAt;
@@ -57,12 +58,12 @@ export function FinanceExportDialog({ open, onClose, orders, expenses, currency 
   const build = () => {
     const headers = ['Type', 'ID / Ref', 'Name / Category', 'Description', `Amount (${currency})`];
     const columnAlignments: ('left' | 'center' | 'right')[] = ['center', 'left', 'left', 'left', 'right'];
-    if (includePayment) { headers.push('Payment Method'); columnAlignments.push('center'); }
-    headers.push('Date & Time'); columnAlignments.push('center');
+    if (includePayment) { headers.push(tr('Payment Method')); columnAlignments.push('center'); }
+    headers.push(tr('Date & Time')); columnAlignments.push('center');
     const rows = records.map(r => {
       const row: (string | number)[] = [r.type, r.refNumber, r.name, r.description, Number((r.type === 'Order' ? r.amount : -r.amount).toFixed(2))];
       if (includePayment) row.push(paymentLabel(r.paymentMethod));
-      row.push(new Date(r.date).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }));
+      row.push(new Date(r.date).toLocaleString(intlTag(), { dateStyle: 'short', timeStyle: 'short' }));
       return row;
     });
     return { headers, rows, columnAlignments };
@@ -74,22 +75,22 @@ export function FinanceExportDialog({ open, onClose, orders, expenses, currency 
     <ExportDialog
       open={open}
       onClose={onClose}
-      title="Export finances"
-      description="Sales and expenses as a ledger with profit and loss totals."
+      title={tr('Export finances')}
+      description={tr('Sales and expenses as a ledger with profit and loss totals.')}
       records={records}
       rowKey={r => `${r.type}-${r.id}`}
       summary={[
-        { label: 'Revenue', value: money(revenue, currency), tone: 'positive' },
-        { label: 'Expenses', value: money(costs, currency), tone: 'danger' },
-        { label: 'Net', value: money(net, currency), tone: net >= 0 ? 'positive' : 'danger' },
-        { label: 'Entries', value: records.length }
+        { label: tr('Revenue'), value: money(revenue, currency), tone: 'positive' },
+        { label: tr('Expenses'), value: money(costs, currency), tone: 'danger' },
+        { label: tr('Net'), value: money(net, currency), tone: net >= 0 ? 'positive' : 'danger' },
+        { label: tr('Entries'), value: records.length }
       ]}
       previewColumns={[
-        { key: 'type', header: 'Type', render: r => <Badge tone={r.type === 'Order' ? 'positive' : 'danger'}>{r.type}</Badge> },
-        { key: 'name', header: 'Name', render: r => r.name },
-        { key: 'method', header: 'Payment', render: r => paymentLabel(r.paymentMethod) },
-        { key: 'date', header: 'Date', render: r => formatDate(r.date) },
-        { key: 'amount', header: 'Amount', align: 'right', render: r => `${r.type === 'Order' ? '+' : '−'}${money(r.amount, currency)}` }
+        { key: 'type', header: tr('Type'), render: r => <Badge tone={r.type === 'Order' ? 'positive' : 'danger'}>{r.type}</Badge> },
+        { key: 'name', header: tr('Name'), render: r => r.name },
+        { key: 'method', header: tr('Payment'), render: r => paymentLabel(r.paymentMethod) },
+        { key: 'date', header: tr('Date'), render: r => formatDate(r.date) },
+        { key: 'amount', header: tr('Amount'), align: 'right', render: r => `${r.type === 'Order' ? '+' : '−'}${money(r.amount, currency)}` }
       ]}
       onReset={reset}
       onCopy={() => { const d = build(); return copyCSVToClipboard(d.headers, d.rows); }}
@@ -105,8 +106,8 @@ export function FinanceExportDialog({ open, onClose, orders, expenses, currency 
         totalsRow.push(net >= 0 ? 'NET PROFIT' : 'NET DEFICIT');
         downloadStyledExcel({
           filename: `${fileBase}.xls`,
-          title: 'CHTH Cafe — Financial Ledger & P&L Statement',
-          subtitle: `Generated: ${new Date().toLocaleDateString()} | Scope: ${scope.toUpperCase()} | Period: ${preset.replace('_', ' ').toUpperCase()}`,
+          title: tr('CHTH Cafe — Financial Ledger & P&L Statement'),
+          subtitle: tr('Generated: {value} | Scope: {scope} | Period: {value2}', { value: new Date().toLocaleDateString(intlTag()), scope: scope.toUpperCase(), value2: preset.replace('_', ' ').toUpperCase() }),
           themeColor: net >= 0 ? 'emerald' : 'amber',
           metadata: {
             'Ledger Scope': scope === 'all' ? 'Sales & expenses' : scope === 'orders' ? 'Sales only' : 'Expenses only',
@@ -116,10 +117,10 @@ export function FinanceExportDialog({ open, onClose, orders, expenses, currency 
             'Store Currency': currency
           },
           summaryCards: [
-            { label: 'Total Revenue', value: money(revenue, currency) },
-            { label: 'Operating Expenses', value: money(costs, currency) },
-            { label: 'Net Profit / Loss', value: money(net, currency) },
-            { label: 'Total Records', value: records.length }
+            { label: tr('Total Revenue'), value: money(revenue, currency) },
+            { label: tr('Operating Expenses'), value: money(costs, currency) },
+            { label: tr('Net Profit / Loss'), value: money(net, currency) },
+            { label: tr('Total Records'), value: records.length }
           ],
           ...d,
           totalsRow
@@ -127,35 +128,35 @@ export function FinanceExportDialog({ open, onClose, orders, expenses, currency 
       }}
       filters={<>
         <div className="ws-field">
-          <span className="ws-label">Include</span>
-          <Segmented block label="Records to include" value={scope} onChange={setScope} options={[
-            { value: 'all', label: 'Everything' }, { value: 'orders', label: 'Sales' }, { value: 'expenses', label: 'Expenses' }
+          <span className="ws-label">{tr('Include')}</span>
+          <Segmented block label={tr('Records to include')} value={scope} onChange={setScope} options={[
+            { value: 'all', label: tr('Everything') }, { value: 'orders', label: tr('Sales') }, { value: 'expenses', label: tr('Expenses') }
           ]} />
         </div>
         <DateRangeFilter preset={preset} onPreset={setPreset} start={start} end={end} onStart={setStart} onEnd={setEnd} />
         <div className="ws-form-row cols-2">
-          <Field label="Payment method">{id => (
+          <Field label={tr('Payment method')}>{id => (
             <Select id={id} value={payment} onChange={e => setPayment(e.target.value)}>
-              <option value="all">All methods</option>
+              <option value="all">{tr('All methods')}</option>
               {['cash', 'card', 'google_pay', 'online', 'bank_transfer'].map(m => <option key={m} value={m}>{paymentLabel(m)}</option>)}
             </Select>
           )}</Field>
-          <Field label="Category">{id => (
+          <Field label={tr('Category')}>{id => (
             <Select id={id} value={category} onChange={e => setCategory(e.target.value)}>
-              <option value="">All categories</option>
-              <optgroup label="Sales by order type">
+              <option value="">{tr('All categories')}</option>
+              <optgroup label={tr('Sales by order type')}>
                 {['dine_in', 'takeout', 'pickup'].map(t => <option key={t} value={t}>{orderTypeLabel(t)}</option>)}
               </optgroup>
-              <optgroup label="Expense category">
+              <optgroup label={tr('Expense category')}>
                 {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </optgroup>
             </Select>
           )}</Field>
         </div>
         <SortFilter value={sortBy} onChange={setSortBy} order={order} onOrder={setOrder} options={[
-          { value: 'date', label: 'Date' }, { value: 'amount', label: 'Amount' }, { value: 'type', label: 'Type' }, { value: 'name', label: 'Customer / category' }
+          { value: 'date', label: tr('Date') }, { value: 'amount', label: tr('Amount') }, { value: 'type', label: tr('Type') }, { value: 'name', label: tr('Customer / category') }
         ]} />
-        <Checkbox checked={includePayment} onChange={setIncludePayment}>Include payment method column</Checkbox>
+        <Checkbox checked={includePayment} onChange={setIncludePayment}>{tr('Include payment method column')}</Checkbox>
       </>}
     />
   );

@@ -16,6 +16,13 @@ export function currentWorkspace(): Workspace | null {
 /** True when the workspace comes from the path, so the admin and panel share one origin. */
 export const pathWorkspace = () => typeof window !== 'undefined' && currentWorkspace() !== null && !/^(admin|panel)\./.test(window.location.hostname);
 
+/** The public menu's address: the same origin on path workspaces, the main domain from admin. and panel. subdomains. */
+export function publicMenuUrl(): string {
+  if (typeof window === 'undefined') return '/';
+  const { protocol, host } = window.location;
+  return `${protocol}//${host.replace(/^(admin|panel)\./, '')}/`;
+}
+
 /** Where the workspace starts, used after signing out. */
 export const workspaceHome = () => pathWorkspace() ? `/${currentWorkspace()}` : '/';
 

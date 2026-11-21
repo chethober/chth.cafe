@@ -2,6 +2,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, X } from 'lucide-react';
 import { Button, IconButton } from './primitives';
+import { tr } from '../i18n';
 
 interface DialogProps {
   open: boolean;
@@ -149,7 +150,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
             <h2 id={titleId}>{content.title}</h2>
             {content.description && <p id={descId}>{content.description}</p>}
           </div>
-          <IconButton label="Close" onClick={onClose} disabled={busy}><X /></IconButton>
+          <IconButton label={tr('Close')} onClick={onClose} disabled={busy}><X /></IconButton>
         </div>
         {content.children !== undefined && <div className="ws-dialog-body">{content.children}</div>}
         {content.footer && <div className="ws-dialog-foot">{content.footer}</div>}
@@ -180,7 +181,7 @@ export function FormDialog({ open, onClose, title, description, size, busy, subm
       footer={
         <>
           {secondaryAction && <span className="ws-spacer">{secondaryAction}</span>}
-          <Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>{tr('Cancel')}</Button>
           <Button type="submit" form={formId} variant={destructive ? 'danger' : 'primary'} loading={busy} disabled={submitDisabled}>{submitLabel}</Button>
         </>
       }
@@ -205,7 +206,7 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, description, co
       title={title}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>{tr('Cancel')}</Button>
           <Button variant={tone === 'danger' ? 'danger' : 'primary'} onClick={() => { onConfirm(); onClose(); }} data-autofocus>{confirmLabel}</Button>
         </>
       }

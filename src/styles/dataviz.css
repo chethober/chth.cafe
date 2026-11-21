@@ -89,16 +89,16 @@ html.light .viz {
 .viz-barlist li[data-active] { background: var(--menu-paper); }
 .viz-barlist-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--chth-text-13); color: var(--viz-ink); }
 .viz-barlist-track { position: relative; display: flex; align-items: center; gap: var(--chth-space-8); min-width: 0; }
-.viz-bar { display: block; height: 14px; min-width: 2px; max-width: calc(100% - 64px); border-radius: 0 var(--chth-radius-4) var(--chth-radius-4) 0; flex-shrink: 0; }
+.viz-bar { display: block; height: 14px; min-width: 2px; max-width: calc(100% - 64px); border-start-start-radius: 0; border-start-end-radius: var(--chth-radius-4); border-end-end-radius: var(--chth-radius-4); border-end-start-radius: 0; flex-shrink: 0; }
 .viz-barlist-value { font-size: var(--chth-text-12); color: var(--viz-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.viz-barlist .viz-tooltip { top: calc(100% + 4px); left: 0; }
+.viz-barlist .viz-tooltip { top: calc(100% + 4px); inset-inline-start: 0; }
 
 /* Part-to-whole bar with 2px surface gaps. */
 .viz-share { display: flex; flex-direction: column; gap: var(--chth-space-14); }
 .viz-sharebar { display: flex; gap: var(--chth-space-2); height: 16px; }
 .viz-share-seg { min-width: 3px; flex-basis: 0; transition: opacity var(--chth-dur-150) ease; }
-.viz-share-seg:first-child { border-radius: var(--chth-radius-4) 0 0 var(--chth-radius-4); }
-.viz-share-seg:last-child { border-radius: 0 var(--chth-radius-4) var(--chth-radius-4) 0; }
+.viz-share-seg:first-child { border-start-start-radius: var(--chth-radius-4); border-start-end-radius: 0; border-end-end-radius: 0; border-end-start-radius: var(--chth-radius-4); }
+.viz-share-seg:last-child { border-start-start-radius: 0; border-start-end-radius: var(--chth-radius-4); border-end-end-radius: var(--chth-radius-4); border-end-start-radius: 0; }
 .viz-share-seg:only-child { border-radius: var(--chth-radius-4); }
 .viz-share-seg[data-dim] { opacity: 0.35; }
 .viz-share-legend { display: flex; flex-direction: column; gap: var(--chth-space-2); }
@@ -107,13 +107,13 @@ html.light .viz {
 .viz-share-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .viz-share-note { font-size: var(--chth-text-11); color: var(--viz-muted); white-space: nowrap; }
 .viz-share-legend strong { font-weight: 600; font-variant-numeric: tabular-nums; }
-.viz-share-pct { min-width: 44px; text-align: right; font-size: var(--chth-text-12); color: var(--viz-muted); font-variant-numeric: tabular-nums; }
+.viz-share-pct { min-width: 44px; text-align: end; font-size: var(--chth-text-12); color: var(--viz-muted); font-variant-numeric: tabular-nums; }
 
 /* Table view: the accessible twin of every chart. */
 .viz-table-wrap { max-height: 360px; overflow: auto; }
 .viz-table { width: 100%; font-size: var(--chth-text-12); color: var(--viz-ink); }
-.viz-table th, .viz-table td { padding: var(--chth-space-8) var(--chth-space-10); text-align: right; border-bottom: 1px solid var(--viz-grid); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.viz-table :is(thead th, tbody th) { text-align: left; }
+.viz-table th, .viz-table td { padding: var(--chth-space-8) var(--chth-space-10); text-align: end; border-bottom: 1px solid var(--viz-grid); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.viz-table :is(thead th, tbody th) { text-align: start; }
 .viz-table thead th { position: sticky; top: 0; background: var(--menu-sheet); color: var(--viz-muted); font-weight: 600; }
 .viz-table tbody th { font-weight: 500; }
 

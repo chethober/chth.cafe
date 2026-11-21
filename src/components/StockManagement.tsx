@@ -9,6 +9,7 @@ import {
   Notice, Page, PageHeader, Progress, SearchInput, Segmented, Select, SortFilter, Stat, StatGrid, Stepper, localDateKey, money, plural, slug
 } from '../ui';
 import { MAX_STOCK_CATEGORY_LENGTH } from '../utils/stockCategories';
+import { intlTag, tr } from '../i18n';
 
 interface StockManagementProps {
   settings: SettingsSelect;
@@ -23,7 +24,7 @@ type SortField = 'quantity' | 'unitCost' | 'totalValuation' | 'name' | 'category
 
 export const stockLevel = (item: StockItemSelect): Level => item.quantity <= 0 ? 'out_of_stock' : item.quantity <= item.minThreshold ? 'low_stock' : 'in_stock';
 const LEVEL_BADGE: Record<Level, { tone: 'positive' | 'warning' | 'danger'; label: string }> = {
-  in_stock: { tone: 'positive', label: 'In stock' }, low_stock: { tone: 'warning', label: 'Low' }, out_of_stock: { tone: 'danger', label: 'Out' }
+  in_stock: { tone: 'positive', get label() { return tr('In stock'); } }, low_stock: { tone: 'warning', get label() { return tr('Low'); } }, out_of_stock: { tone: 'danger', get label() { return tr('Out'); } }
 };
 const step = (unit: string) => (unit === 'g' || unit === 'ml' ? 100 : 1);
 
@@ -56,12 +57,12 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
     const quantity = parseFloat(form.quantity);
     const unitCost = parseFloat(form.unitCost);
     const minThreshold = parseFloat(form.minThreshold);
-    if (!form.name.trim()) return setFormError('Give the material a name.');
-    if (Number.isNaN(quantity) || quantity < 0) return setFormError('Quantity must be zero or more.');
-    if (Number.isNaN(unitCost) || unitCost < 0) return setFormError('Unit cost must be zero or more.');
-    if (Number.isNaN(minThreshold) || minThreshold < 0) return setFormError('Low-stock level must be zero or more.');
+    if (!form.name.trim()) return setFormError(tr('Give the material a name.'));
+    if (Number.isNaN(quantity) || quantity < 0) return setFormError(tr('Quantity must be zero or more.'));
+    if (Number.isNaN(unitCost) || unitCost < 0) return setFormError(tr('Unit cost must be zero or more.'));
+    if (Number.isNaN(minThreshold) || minThreshold < 0) return setFormError(tr('Low-stock level must be zero or more.'));
     const typed = form.newCategory.trim().replace(/\s+/g, ' ');
-    if (form.category === NEW_CATEGORY && !typed) return setFormError('Name the new category.');
+    if (form.category === NEW_CATEGORY && !typed) return setFormError(tr('Name the new category.'));
     // A typed name that matches an existing category, in any case, files the material there.
     const materialCategory = form.category !== NEW_CATEGORY ? form.category
       : stockCategories.find(c => c.toLowerCase() === typed.toLowerCase()) || typed;
@@ -113,14 +114,14 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
   const build = () => {
     const headers = ['Material ID', 'Material Name', 'Category', 'Quantity Available', 'Unit'];
     const columnAlignments: ('left' | 'center' | 'right')[] = ['left', 'left', 'left', 'right', 'center'];
-    if (xCost) { headers.push(`Unit Cost (${currency})`); columnAlignments.push('right'); }
-    headers.push(`Total Valuation (${currency})`); columnAlignments.push('right');
-    if (xThreshold) { headers.push('Min Threshold', 'Stock Status'); columnAlignments.push('right', 'center'); }
+    if (xCost) { headers.push(tr('Unit Cost ({currency})', { currency })); columnAlignments.push('right'); }
+    headers.push(tr('Total Valuation ({currency})', { currency })); columnAlignments.push('right');
+    if (xThreshold) { headers.push(tr('Min Threshold'), tr('Stock Status')); columnAlignments.push('right', 'center'); }
     const rows = records.map(i => {
       const row: (string | number)[] = [i.id, i.name, i.category, Number(i.quantity.toFixed(3)), i.unit];
       if (xCost) row.push(Number(i.unitCost.toFixed(2)));
       row.push(Number((i.quantity * i.unitCost).toFixed(2)));
-      if (xThreshold) row.push(Number(i.minThreshold.toFixed(2)), stockLevel(i) === 'out_of_stock' ? 'OUT OF STOCK' : stockLevel(i) === 'low_stock' ? 'LOW STOCK ALERT' : 'Normal');
+      if (xThreshold) row.push(Number(i.minThreshold.toFixed(2)), stockLevel(i) === 'out_of_stock' ? 'OUT OF STOCK' : stockLevel(i) === 'low_stock' ? 'LOW STOCK ALERT' : tr('Normal'));
       return row;
     });
     return { headers, rows, columnAlignments };
@@ -129,45 +130,45 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
   return (
     <Page>
       <PageHeader
-        title="Stock"
-        description="Raw materials, what they're worth, and what needs reordering. Orders deduct recipes automatically."
+        title={tr('Stock')}
+        description={tr('Raw materials, what they\'re worth, and what needs reordering. Orders deduct recipes automatically.')}
         actions={<>
-          <Button icon={<Download />} onClick={() => setExportOpen(true)}>Export</Button>
-          <Button icon={<Tags />} onClick={() => setCategoriesOpen(true)}>Categories</Button>
-          <Button variant="primary" icon={<Plus />} onClick={() => openForm()}>Add material</Button>
+          <Button icon={<Download />} onClick={() => setExportOpen(true)}>{tr('Export')}</Button>
+          <Button icon={<Tags />} onClick={() => setCategoriesOpen(true)}>{tr('Categories')}</Button>
+          <Button variant="primary" icon={<Plus />} onClick={() => openForm()}>{tr('Add material')}</Button>
         </>}
       />
 
       <StatGrid>
-        <Stat label="Stock value" icon={<Wallet />} value={fmt(totalValue)} hint="Quantity × unit cost" />
-        <Stat label="Materials" icon={<Package />} value={stockItems.length} onClick={() => setLevel('all')} active={level === 'all'} />
-        <Stat label="Running low" icon={<AlertTriangle />} value={levelCount('low_stock')} tone={levelCount('low_stock') ? 'warning' : 'neutral'} onClick={() => setLevel('low_stock')} active={level === 'low_stock'} />
-        <Stat label="Out of stock" icon={<XCircle />} value={levelCount('out_of_stock')} tone={levelCount('out_of_stock') ? 'danger' : 'neutral'} onClick={() => setLevel('out_of_stock')} active={level === 'out_of_stock'} />
+        <Stat label={tr('Stock value')} icon={<Wallet />} value={fmt(totalValue)} hint={tr('Quantity × unit cost')} />
+        <Stat label={tr('Materials')} icon={<Package />} value={stockItems.length} onClick={() => setLevel('all')} active={level === 'all'} />
+        <Stat label={tr('Running low')} icon={<AlertTriangle />} value={levelCount('low_stock')} tone={levelCount('low_stock') ? 'warning' : 'neutral'} onClick={() => setLevel('low_stock')} active={level === 'low_stock'} />
+        <Stat label={tr('Out of stock')} icon={<XCircle />} value={levelCount('out_of_stock')} tone={levelCount('out_of_stock') ? 'danger' : 'neutral'} onClick={() => setLevel('out_of_stock')} active={level === 'out_of_stock'} />
       </StatGrid>
 
       <div className="ws-toolbar-stack">
         <div className="ws-toolbar">
-          <SearchInput className="ws-grow" value={search} onChange={setSearch} placeholder="Search materials" label="Search materials" />
-          <Segmented label="Stock level" value={level} onChange={setLevel} options={[
-            { value: 'all', label: 'All' },
-            { value: 'in_stock', label: 'In stock', count: levelCount('in_stock') },
-            { value: 'low_stock', label: 'Low', count: levelCount('low_stock') },
-            { value: 'out_of_stock', label: 'Out', count: levelCount('out_of_stock') }
+          <SearchInput className="ws-grow" value={search} onChange={setSearch} placeholder={tr('Search materials')} label={tr('Search materials')} />
+          <Segmented label={tr('Stock level')} value={level} onChange={setLevel} options={[
+            { value: 'all', label: tr('All') },
+            { value: 'in_stock', label: tr('In stock'), count: levelCount('in_stock') },
+            { value: 'low_stock', label: tr('Low'), count: levelCount('low_stock') },
+            { value: 'out_of_stock', label: tr('Out'), count: levelCount('out_of_stock') }
           ]} />
         </div>
-        <Chips label="Material category" value={category} onChange={setCategory} options={[
-          { value: 'all', label: 'All categories' },
+        <Chips label={tr('Material category')} value={category} onChange={setCategory} options={[
+          { value: 'all', label: tr('All categories') },
           ...stockCategories.map(c => ({ value: c, label: c, count: stockItems.filter(i => i.category === c).length }))
         ]} />
       </div>
 
-      <Card flush title="Materials" description={`${visible.length} of ${stockItems.length} shown`}>
+      <Card flush title={tr('Materials')} description={tr('{length} of {length2} shown', { length: visible.length, length2: stockItems.length })}>
         {visible.length === 0 ? (
-          <EmptyState icon={<Boxes />} title={stockItems.length ? 'Nothing matches' : 'No materials yet'}
-            description={stockItems.length ? 'Try a different search or filter.' : 'Add the ingredients and supplies you buy, so recipes can track them.'}
-            action={!stockItems.length && <Button variant="primary" icon={<Plus />} onClick={() => openForm()}>Add material</Button>} />
+          <EmptyState icon={<Boxes />} title={stockItems.length ? tr('Nothing matches') : tr('No materials yet')}
+            description={stockItems.length ? tr('Try a different search or filter.') : tr('Add the ingredients and supplies you buy, so recipes can track them.')}
+            action={!stockItems.length && <Button variant="primary" icon={<Plus />} onClick={() => openForm()}>{tr('Add material')}</Button>} />
         ) : (
-          <List label="Materials">
+          <List label={tr('Materials')}>
             {visible.map(item => {
               const l = stockLevel(item);
               const badge = LEVEL_BADGE[l];
@@ -179,19 +180,19 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
                   subtitle={<>
                     <span>{item.category}</span>
                     <span className="tabular">{fmt(item.unitCost)} / {item.unit}</span>
-                    <span className="tabular">Worth {fmt(item.quantity * item.unitCost)}</span>
+                    <span className="tabular">{tr('Worth {amount}', { amount: fmt(item.quantity * item.unitCost) })}</span>
                   </>}
                   trail={<div style={{ width: 140 }}>
                     <div className="tabular" style={{ fontWeight: 600, marginBottom: 6 }}>{Number(item.quantity.toFixed(3))} {item.unit}</div>
-                    <Progress value={fill} tone={badge.tone} label={`${item.name} stock level`} />
-                    <div className="ws-hint tabular" style={{ marginTop: 4 }}>Reorder at {item.minThreshold} {item.unit}</div>
+                    <Progress value={fill} tone={badge.tone} label={tr('{name} stock level', { name: item.name })} />
+                    <div className="ws-hint tabular" style={{ marginTop: 4 }}>{tr('Reorder at {minThreshold} {unit}', { minThreshold: item.minThreshold, unit: item.unit })}</div>
                   </div>}
                   actions={<>
-                    <Stepper label={`${item.name} by ${step(item.unit)} ${item.unit}`} value={<span className="ws-hint">±{step(item.unit)}</span>}
+                    <Stepper label={tr('{name} by {unit} {unit2}', { name: item.name, unit: step(item.unit), unit2: item.unit })} value={<span className="ws-hint">±{step(item.unit)}</span>}
                       onDecrement={() => { store.adjustStockQuantity(item.id, -step(item.unit)); onStockUpdated(); }}
                       onIncrement={() => { store.adjustStockQuantity(item.id, step(item.unit)); onStockUpdated(); }} />
-                    <IconButton label={`Edit ${item.name}`} onClick={() => openForm(item)}><Pencil /></IconButton>
-                    <IconButton label={`Delete ${item.name}`} variant="danger-ghost" onClick={() => setDeleteTarget(item)}><Trash2 /></IconButton>
+                    <IconButton label={tr('Edit {name}', { name: item.name })} onClick={() => openForm(item)}><Pencil /></IconButton>
+                    <IconButton label={tr('Delete {name}', { name: item.name })} variant="danger-ghost" onClick={() => setDeleteTarget(item)}><Trash2 /></IconButton>
                   </>}
                 />
               );
@@ -202,32 +203,32 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
 
       <InventoryMovements items={stockItems} />
 
-      <FormDialog open={formOpen} onClose={() => setFormOpen(false)} title={editing ? `Edit ${editing.name}` : 'Add material'} submitLabel={editing ? 'Save changes' : 'Add material'} onSubmit={saveForm}>
+      <FormDialog open={formOpen} onClose={() => setFormOpen(false)} title={editing ? tr('Edit {name}', { name: editing.name }) : tr('Add material')} submitLabel={editing ? tr('Save changes') : tr('Add material')} onSubmit={saveForm}>
         {formError && <Notice tone="danger">{formError}</Notice>}
-        <Field label="Name">{id => <Input id={id} autoFocus required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Ceremonial matcha powder" />}</Field>
+        <Field label={tr('Name')}>{id => <Input id={id} autoFocus required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder={tr('e.g. Ceremonial matcha powder')} />}</Field>
         <div className="ws-form-row cols-2">
-          <Field label="Category">{id => (
+          <Field label={tr('Category')}>{id => (
             <Select id={id} value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
               {stockCategories.map(c => <option key={c} value={c}>{c}</option>)}
-              <option value={NEW_CATEGORY}>New category…</option>
+              <option value={NEW_CATEGORY}>{tr('New category…')}</option>
             </Select>
           )}</Field>
-          <Field label="Unit">{id => (
+          <Field label={tr('Unit')}>{id => (
             <Select id={id} value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })}>
               {MEASUREMENT_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
             </Select>
           )}</Field>
         </div>
         {form.category === NEW_CATEGORY && (
-          <Field label="New category name">{id => <Input id={id} autoFocus required maxLength={MAX_STOCK_CATEGORY_LENGTH} value={form.newCategory} onChange={e => setForm({ ...form, newCategory: e.target.value })} placeholder="e.g. Cleaning supplies" />}</Field>
+          <Field label={tr('New category name')}>{id => <Input id={id} autoFocus required maxLength={MAX_STOCK_CATEGORY_LENGTH} value={form.newCategory} onChange={e => setForm({ ...form, newCategory: e.target.value })} placeholder={tr('e.g. Cleaning supplies')} />}</Field>
         )}
         <div className="ws-form-row cols-3">
-          <Field label="On hand">{id => <Input id={id} type="number" inputMode="decimal" step="any" min="0" required value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} placeholder="0" />}</Field>
-          <Field label="Cost per unit">{id => <AffixInput id={id} affix={currency} type="number" inputMode="decimal" step="any" min="0" required value={form.unitCost} onChange={e => setForm({ ...form, unitCost: e.target.value })} placeholder="0.00" />}</Field>
-          <Field label="Reorder at">{id => <Input id={id} type="number" inputMode="decimal" step="any" min="0" required value={form.minThreshold} onChange={e => setForm({ ...form, minThreshold: e.target.value })} />}</Field>
+          <Field label={tr('On hand')}>{id => <Input id={id} type="number" inputMode="decimal" step="any" min="0" required value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} placeholder="0" />}</Field>
+          <Field label={tr('Cost per unit')}>{id => <AffixInput id={id} affix={currency} type="number" inputMode="decimal" step="any" min="0" required value={form.unitCost} onChange={e => setForm({ ...form, unitCost: e.target.value })} placeholder="0.00" />}</Field>
+          <Field label={tr('Reorder at')}>{id => <Input id={id} type="number" inputMode="decimal" step="any" min="0" required value={form.minThreshold} onChange={e => setForm({ ...form, minThreshold: e.target.value })} />}</Field>
         </div>
         <div className="ws-panel" style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span className="ws-hint">Stock value</span>
+          <span className="ws-hint">{tr('Stock value')}</span>
           <strong className="tabular">{fmt((parseFloat(form.quantity) || 0) * (parseFloat(form.unitCost) || 0))}</strong>
         </div>
       </FormDialog>
@@ -244,29 +245,29 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => { if (deleteTarget) { store.deleteStockItem(deleteTarget.id); onStockUpdated(); } }}
-        title={`Delete ${deleteTarget?.name || 'material'}?`}
-        description="It's removed from stock, and any recipes that use it are updated. This cannot be undone."
+        title={tr('Delete {value}?', { value: deleteTarget?.name || 'material' })}
+        description={tr('It\'s removed from stock, and any recipes that use it are updated. This cannot be undone.')}
       />
 
       <ExportDialog
         open={exportOpen}
         onClose={() => setExportOpen(false)}
-        title="Export stock"
-        description="Stock levels, valuation, and low-stock warnings."
+        title={tr('Export stock')}
+        description={tr('Stock levels, valuation, and low-stock warnings.')}
         records={records}
         rowKey={i => i.id}
         summary={[
-          { label: 'Value', value: fmt(xValue) },
-          { label: 'Materials', value: records.length },
-          { label: 'Low', value: xLow, tone: 'warning' },
-          { label: 'Out', value: xOut, tone: 'danger' }
+          { label: tr('Value'), value: fmt(xValue) },
+          { label: tr('Materials'), value: records.length },
+          { label: tr('Low'), value: xLow, tone: 'warning' },
+          { label: tr('Out'), value: xOut, tone: 'danger' }
         ]}
         previewColumns={[
-          { key: 'name', header: 'Material', render: i => i.name },
-          { key: 'cat', header: 'Category', render: i => i.category },
-          { key: 'qty', header: 'On hand', align: 'right', render: i => `${i.quantity} ${i.unit}` },
-          { key: 'value', header: 'Value', align: 'right', render: i => fmt(i.quantity * i.unitCost) },
-          { key: 'level', header: 'Level', render: i => <Badge tone={LEVEL_BADGE[stockLevel(i)].tone}>{LEVEL_BADGE[stockLevel(i)].label}</Badge> }
+          { key: 'name', header: tr('Material'), render: i => i.name },
+          { key: 'cat', header: tr('Category'), render: i => i.category },
+          { key: 'qty', header: tr('On hand'), align: 'right', render: i => `${i.quantity} ${i.unit}` },
+          { key: 'value', header: tr('Value'), align: 'right', render: i => fmt(i.quantity * i.unitCost) },
+          { key: 'level', header: tr('Level'), render: i => <Badge tone={LEVEL_BADGE[stockLevel(i)].tone}>{LEVEL_BADGE[stockLevel(i)].label}</Badge> }
         ]}
         onReset={() => { setXCategory('all'); setXLevel('all'); setXSort('totalValuation'); setXOrder('desc'); setXCost(true); setXThreshold(true); }}
         onCopy={() => { const d = build(); return copyCSVToClipboard(d.headers, d.rows); }}
@@ -280,16 +281,16 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
           const totalsRow: (string | number)[] = ['TOTAL VALUATION', `${records.length} Raw Materials`, '', '', ''];
           if (xCost) totalsRow.push('');
           totalsRow.push(Number(xValue.toFixed(2)));
-          if (xThreshold) totalsRow.push('', `${xLow} Low / ${xOut} Out`);
+          if (xThreshold) totalsRow.push('', tr('{xLow} Low / {xOut} Out', { xLow, xOut }));
           downloadStyledExcel({
             filename: `${fileBase}.xls`,
-            title: 'CHTH Cafe — Stock & Raw Material Inventory Report',
-            subtitle: `Export Date: ${new Date().toLocaleDateString()} | Category: ${xCategory.toUpperCase()} | Total Asset Value: ${fmt(xValue)}`,
+            title: tr('CHTH Cafe — Stock & Raw Material Inventory Report'),
+            subtitle: tr('Export Date: {value} | Category: {xCategory} | Total Asset Value: {xValue}', { value: new Date().toLocaleDateString(intlTag()), xCategory: xCategory.toUpperCase(), xValue: fmt(xValue) }),
             themeColor: xLow > 0 ? 'amber' : 'emerald',
             metadata: { 'Category Filter': xCategory.toUpperCase(), 'Stock Alert Filter': xLevel.toUpperCase(), 'Sort Order': `${xSort.toUpperCase()} (${xOrder.toUpperCase()})`, 'Store Currency': currency },
             summaryCards: [
-              { label: 'Total Valuation', value: fmt(xValue) }, { label: 'Total Materials', value: records.length },
-              { label: 'Low Stock Alerts', value: xLow }, { label: 'Out of Stock', value: xOut }
+              { label: tr('Total Valuation'), value: fmt(xValue) }, { label: tr('Total Materials'), value: records.length },
+              { label: tr('Low Stock Alerts'), value: xLow }, { label: tr('Out of Stock'), value: xOut }
             ],
             ...d,
             totalsRow
@@ -297,23 +298,23 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
         }}
         filters={<>
           <div className="ws-form-row cols-2">
-            <Field label="Category">{id => (
+            <Field label={tr('Category')}>{id => (
               <Select id={id} value={xCategory} onChange={e => setXCategory(e.target.value)}>
-                <option value="all">All categories</option>
+                <option value="all">{tr('All categories')}</option>
                 {stockCategories.map(c => <option key={c} value={c}>{c}</option>)}
               </Select>
             )}</Field>
-            <Field label="Stock level">{id => (
+            <Field label={tr('Stock level')}>{id => (
               <Select id={id} value={xLevel} onChange={e => setXLevel(e.target.value as typeof xLevel)}>
-                <option value="all">All levels</option><option value="in_stock">In stock</option><option value="low_stock">Low</option><option value="out_of_stock">Out of stock</option>
+                <option value="all">{tr('All levels')}</option><option value="in_stock">{tr('In stock')}</option><option value="low_stock">{tr('Low')}</option><option value="out_of_stock">{tr('Out of stock')}</option>
               </Select>
             )}</Field>
           </div>
           <SortFilter value={xSort} onChange={setXSort} order={xOrder} onOrder={setXOrder} options={[
-            { value: 'totalValuation', label: 'Value' }, { value: 'quantity', label: 'Quantity' }, { value: 'unitCost', label: 'Unit cost' }, { value: 'name', label: 'Name' }, { value: 'category', label: 'Category' }
+            { value: 'totalValuation', label: tr('Value') }, { value: 'quantity', label: tr('Quantity') }, { value: 'unitCost', label: tr('Unit cost') }, { value: 'name', label: tr('Name') }, { value: 'category', label: tr('Category') }
           ]} />
-          <Checkbox checked={xCost} onChange={setXCost}>Include unit cost</Checkbox>
-          <Checkbox checked={xThreshold} onChange={setXThreshold}>Include reorder level and status</Checkbox>
+          <Checkbox checked={xCost} onChange={setXCost}>{tr('Include unit cost')}</Checkbox>
+          <Checkbox checked={xThreshold} onChange={setXThreshold}>{tr('Include reorder level and status')}</Checkbox>
         </>}
       />
     </Page>
@@ -336,14 +337,14 @@ function StockCategoriesDialog({ open, onClose, categories, stockItems, onChange
   const run = async (action: () => Promise<unknown>) => {
     setBusy(true); setError('');
     try { await action(); return true; }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'The categories could not be saved.'); return false; }
+    catch (reason) { setError(reason instanceof Error ? reason.message : tr('The categories could not be saved.')); return false; }
     finally { setBusy(false); }
   };
   const add = async (e: React.FormEvent) => {
     e.preventDefault();
     const name = newName.trim();
     if (!name) return;
-    if (categories.some(c => c.toLowerCase() === name.toLowerCase())) return setError(`“${name}” is already a category.`);
+    if (categories.some(c => c.toLowerCase() === name.toLowerCase())) return setError(tr('“{name}” is already a category.', { name }));
     if (await run(() => store.saveStockCategories([...categories, name]))) setNewName('');
   };
   const rename = async (e: React.FormEvent) => {
@@ -359,21 +360,21 @@ function StockCategoriesDialog({ open, onClose, categories, stockItems, onChange
   };
 
   return (
-    <Dialog open={open} onClose={() => { setRenaming(null); setError(''); onClose(); }} busy={busy} title="Material categories"
-      description="Rename a category to move its materials along. Renaming onto an existing category merges the two."
-      footer={<Button variant="primary" onClick={() => { setRenaming(null); setError(''); onClose(); }}>Done</Button>}>
+    <Dialog open={open} onClose={() => { setRenaming(null); setError(''); onClose(); }} busy={busy} title={tr('Material categories')}
+      description={tr('Rename a category to move its materials along. Renaming onto an existing category merges the two.')}
+      footer={<Button variant="primary" onClick={() => { setRenaming(null); setError(''); onClose(); }}>{tr('Done')}</Button>}>
       <div className="ws-form">
         {error && <Notice tone="danger">{error}</Notice>}
-        <ul className="ws-list" style={{ margin: '0 calc(-1 * var(--chth-space-24))' }} aria-label="Categories">
+        <ul className="ws-list" style={{ margin: '0 calc(-1 * var(--chth-space-24))' }} aria-label={tr('Categories')}>
           {categories.map(name => {
             const count = countOf(name);
             if (renaming?.from === name) return (
               <li key={name} className="ws-list-item">
                 <form style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }} onSubmit={rename}>
-                  <Input aria-label={`New name for ${name}`} autoFocus required maxLength={MAX_STOCK_CATEGORY_LENGTH} value={renaming.to} disabled={busy}
+                  <Input aria-label={tr('New name for {name}', { name })} autoFocus required maxLength={MAX_STOCK_CATEGORY_LENGTH} value={renaming.to} disabled={busy}
                     onChange={e => setRenaming({ from: name, to: e.target.value })} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setRenaming(null); } }} />
-                  <IconButton type="submit" label={`Save ${name}`} disabled={busy}><Check /></IconButton>
-                  <IconButton label="Cancel rename" onClick={() => setRenaming(null)} disabled={busy}><X /></IconButton>
+                  <IconButton type="submit" label={tr('Save {name}', { name })} disabled={busy}><Check /></IconButton>
+                  <IconButton label={tr('Cancel rename')} onClick={() => setRenaming(null)} disabled={busy}><X /></IconButton>
                 </form>
               </li>
             );
@@ -381,20 +382,20 @@ function StockCategoriesDialog({ open, onClose, categories, stockItems, onChange
               <ListItem
                 key={name}
                 title={<span className="ws-truncate">{name}</span>}
-                subtitle={<span>{count ? plural(count, 'material') : 'No materials'}</span>}
+                subtitle={<span>{count ? plural(count, 'material') : tr('No materials')}</span>}
                 actions={<>
-                  <IconButton label={`Rename ${name}`} disabled={busy} onClick={() => { setError(''); setRenaming({ from: name, to: name }); }}><Pencil /></IconButton>
-                  <IconButton label={count ? `${name} has materials. Move them before removing it` : `Remove ${name}`} variant="danger-ghost" disabled={busy || count > 0} onClick={() => remove(name)}><Trash2 /></IconButton>
+                  <IconButton label={tr('Rename {name}', { name })} disabled={busy} onClick={() => { setError(''); setRenaming({ from: name, to: name }); }}><Pencil /></IconButton>
+                  <IconButton label={count ? tr('{name} has materials. Move them before removing it', { name }) : tr('Remove {name}', { name })} variant="danger-ghost" disabled={busy || count > 0} onClick={() => remove(name)}><Trash2 /></IconButton>
                 </>}
               />
             );
           })}
         </ul>
         <form style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }} onSubmit={add}>
-          <Field label="New category" className="ws-grow">{id => (
-            <Input id={id} maxLength={MAX_STOCK_CATEGORY_LENGTH} value={newName} disabled={busy} onChange={e => { setNewName(e.target.value); setError(''); }} placeholder="e.g. Cleaning supplies" />
+          <Field label={tr('New category')} className="ws-grow">{id => (
+            <Input id={id} maxLength={MAX_STOCK_CATEGORY_LENGTH} value={newName} disabled={busy} onChange={e => { setNewName(e.target.value); setError(''); }} placeholder={tr('e.g. Cleaning supplies')} />
           )}</Field>
-          <Button type="submit" icon={<Plus />} disabled={busy || !newName.trim()}>Add</Button>
+          <Button type="submit" icon={<Plus />} disabled={busy || !newName.trim()}>{tr('Add')}</Button>
         </form>
       </div>
     </Dialog>

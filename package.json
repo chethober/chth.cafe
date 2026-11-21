@@ -1,6 +1,6 @@
 {
   "name": "chth-cafe-manager",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "start": "node scripts/start.mjs",
@@ -22,8 +22,9 @@
   "dependencies": {
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.3",
-    "hono": "^4.13.12",
+    "hono": "^4.13.16",
     "lucide-react": "^0.471.0",
+    "qrcode-generator": "^2.0.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "tailwind-merge": "^2.6.0"

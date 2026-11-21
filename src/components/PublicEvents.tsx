@@ -110,7 +110,7 @@ export function PublicEvents({ settings }: { settings: SettingsSelect }) {
         {upcoming.slice(0, STRIP_LIMIT).map(o => <li key={o.event.id + o.date}>
           <EventCard occurrence={o} calendar={calendar} seats={seats.get(seatKey(o.event.id, o.date))?.seats || 0} timeZone={timeZone} now={now} today={today} onOpen={() => openEvent(o)} />
         </li>)}
-        {upcoming.length > STRIP_LIMIT && <li><button type="button" className="pm-ev-more" onClick={() => setCalendarOpen(true)}>+{upcoming.length - STRIP_LIMIT} more<ChevronRight size={16} /></button></li>}
+        {upcoming.length > STRIP_LIMIT && <li><button type="button" className="pm-ev-more" onClick={() => setCalendarOpen(true)}>{t('+{count} more', { count: upcoming.length - STRIP_LIMIT })}<ChevronRight size={16} /></button></li>}
       </ul> : <p className="pm-events-none">{t('No events coming up right now. Check back soon.')}</p>}
 
       <Modal isOpen={calendarOpen && !active} onClose={() => setCalendarOpen(false)} maxWidth="max-w-lg" title={<span className="text-lg font-semibold flex items-center gap-2"><CalendarDays size={20} />{t('Café calendar')}</span>}>

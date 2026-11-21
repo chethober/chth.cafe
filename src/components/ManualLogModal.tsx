@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { AffixInput, Field, FormDialog, Input, Notice, Segmented, Select, localDateKey, timestampForDay } from '../ui';
+import { tr } from '../i18n';
 
 export const EXPENSE_CATEGORIES = [
   'Tea & Coffee Supplies',
@@ -78,7 +79,7 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({ isOpen, onClose,
           items: [{ menuItemId: manualIncomeItemId.current, itemName: `[${category}] ${title.trim()}`, quantity: 1, unitPrice: value, variants: [] }]
         });
       } catch (reason) {
-        setError(reason instanceof Error ? reason.message : 'Income could not be saved.');
+        setError(reason instanceof Error ? reason.message : tr('Income could not be saved.'));
         return;
       } finally {
         setSaving(false);
@@ -103,35 +104,35 @@ export const ManualLogModal: React.FC<ManualLogModalProps> = ({ isOpen, onClose,
       open={isOpen}
       onClose={onClose}
       busy={saving}
-      title="Log income or expense"
-      description="For money that didn't come through an order, or costs outside wages."
-      submitLabel={income ? 'Record income' : 'Record expense'}
+      title={tr('Log income or expense')}
+      description={tr('For money that didn\'t come through an order, or costs outside wages.')}
+      submitLabel={income ? tr('Record income') : tr('Record expense')}
       submitDisabled={!title.trim() || !amount}
       onSubmit={handleSubmit}
     >
-      <Segmented block label="Entry type" value={logType} onChange={applyType} options={[{ value: 'income', label: 'Income' }, { value: 'expense', label: 'Expense' }]} />
+      <Segmented block label={tr('Entry type')} value={logType} onChange={applyType} options={[{ value: 'income', label: tr('Income') }, { value: 'expense', label: tr('Expense') }]} />
       {error && <Notice tone="danger">{error}</Notice>}
-      <Field label={income ? 'What was it for?' : 'What was bought?'}>{id => (
-        <Input id={id} autoFocus required value={title} onChange={e => setTitle(e.target.value)} placeholder={income ? 'e.g. Corporate tea bar event' : 'e.g. Matcha powder restock'} />
+      <Field label={income ? tr('What was it for?') : tr('What was bought?')}>{id => (
+        <Input id={id} autoFocus required value={title} onChange={e => setTitle(e.target.value)} placeholder={income ? tr('e.g. Corporate tea bar event') : tr('e.g. Matcha powder restock')} />
       )}</Field>
       <div className="ws-form-row cols-2">
-        <Field label="Amount">{id => <AffixInput id={id} affix={settings.currency} type="number" inputMode="decimal" step="0.01" min="0.01" required value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />}</Field>
-        <Field label="Date">{id => <Input id={id} type="date" required value={date} onChange={e => setDate(e.target.value)} />}</Field>
+        <Field label={tr('Amount')}>{id => <AffixInput id={id} affix={settings.currency} type="number" inputMode="decimal" step="0.01" min="0.01" required value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" />}</Field>
+        <Field label={tr('Date')}>{id => <Input id={id} type="date" required value={date} onChange={e => setDate(e.target.value)} />}</Field>
       </div>
       <div className="ws-form-row cols-2">
-        <Field label="Category">{id => (
+        <Field label={tr('Category')}>{id => (
           <Select id={id} value={category} onChange={e => setCategory(e.target.value)}>
             {(income ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map(c => <option key={c} value={c}>{c}</option>)}
           </Select>
         )}</Field>
-        <Field label={income ? 'Received by' : 'Paid with'}>{id => (
+        <Field label={income ? tr('Received by') : tr('Paid with')}>{id => (
           <Select id={id} value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
             {(income ? INCOME_METHODS : EXPENSE_METHODS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </Select>
         )}</Field>
       </div>
-      <Field label={income ? 'Paid by' : 'Paid to'} optional>{id => (
-        <Input id={id} value={party} onChange={e => setParty(e.target.value)} placeholder={income ? 'e.g. Acme Corp' : 'e.g. Local dairy supplier'} />
+      <Field label={income ? tr('Paid by') : tr('Paid to')} optional>{id => (
+        <Input id={id} value={party} onChange={e => setParty(e.target.value)} placeholder={income ? tr('e.g. Acme Corp') : tr('e.g. Local dairy supplier')} />
       )}</Field>
     </FormDialog>
   );

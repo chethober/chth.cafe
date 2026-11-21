@@ -1,6 +1,7 @@
 import React, { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { tr } from '../i18n';
 
 interface ModalProps {
   isOpen: boolean;
@@ -88,9 +89,9 @@ export const Modal: React.FC<ModalProps> = ({
             type="button"
             onClick={onClose}
             disabled={closeDisabled}
-            aria-label="Close dialog"
+            aria-label={tr('Close dialog')}
             className={appearance === 'paper' ? 'menu-dialog-close' : 'min-h-11 min-w-11 flex items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-zinc-100 border border-zinc-800 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-500'}
-            title="Close (Esc)"
+            title={tr('Close (Esc)')}
           >
             <X className="w-4 h-4" />
           </button>

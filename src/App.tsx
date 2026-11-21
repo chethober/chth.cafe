@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect } from 'react';
 import { setTheme as setShellTheme } from './chth-kit/shell.js';
 import { flushSync } from 'react-dom';
 import {
@@ -31,9 +31,19 @@ import { PanelManager, PanelSection } from './components/PanelManager';
 import { StockManagement } from './components/StockManagement';
 import { CustomerClub } from './components/CustomerClub';
 import { EventManager } from './components/EventManager';
-import { Button, Field, Input, Notice, NavItem, WorkspaceShell } from './ui';
+import { Button, Field, Input, LanguageSelect, Notice, NavItem, WorkspaceShell } from './ui';
 import { currentWorkspace, workspaceHome } from './utils/workspace';
-import { useT } from './i18n';
+import { applyDocumentLocale, detectLocale, getLocale, loadStaffStrings, setLocale, tr, useLocale, useStrings, useT } from './i18n';
+
+// The admin and panel pick their language once, before their first render.
+let workspaceLocaleChosen = false;
+function chooseWorkspaceLocale() {
+  if (workspaceLocaleChosen || typeof window === 'undefined') return;
+  workspaceLocaleChosen = true;
+  setLocale(detectLocale(), new URLSearchParams(window.location.search).has('lang'));
+  // Before the first render, so controls that measure themselves see the final direction.
+  applyDocumentLocale(getLocale());
+}
 
 /** The page footer's text, in the menu's language. */
 function CafeFooterText({ cafeName }: { cafeName: string }) {
@@ -76,6 +86,12 @@ export const App: React.FC = () => {
   const isAdminView = workspace === 'admin';
   const isPanelView = workspace === 'panel';
   const isWorkspace = isAdminView || isPanelView;
+  if (isWorkspace) chooseWorkspaceLocale();
+  // Every screen re-renders in the new language, and once the staff strings arrive.
+  const locale = useLocale();
+  useStrings();
+  useEffect(() => { if (isWorkspace) void loadStaffStrings(); }, [isWorkspace]);
+  useLayoutEffect(() => { if (isWorkspace) applyDocumentLocale(locale); }, [isWorkspace, locale]);
 
   const [adminTab, setAdminTab] = usePersistentState<AdminTab>('chth_admin_last_tab', ADMIN_TABS, 'financials');
   const [panelSection, setPanelSection] = usePersistentState<PanelSection>('chth_panel_last_tab', PANEL_SECTIONS, 'orders');
@@ -153,28 +169,28 @@ export const App: React.FC = () => {
     e.preventDefault(); setAuthLoading(true); setAuthError(null);
     try {
       const result = await api<{ success?: boolean }>('/api/auth/login', { password: passwordInput });
-      if (result.success !== true) throw new Error('The sign-in response was invalid. Check the café API.');
+      if (result.success !== true) throw new Error(tr('The sign-in response was invalid. Check the café API.'));
       setIsAdminAuthed(true); rememberSignIn(true); setPasswordInput(''); await store.syncFromAPI();
-    } catch (error) { setAuthError(error instanceof Error ? error.message : 'Sign-in failed.'); }
+    } catch (error) { setAuthError(error instanceof Error ? error.message : tr('Sign-in failed.')); }
     finally { setAuthLoading(false); }
   };
   const handleSetup = async (e: React.FormEvent) => {
     e.preventDefault(); setAuthLoading(true); setAuthError(null);
     try {
       const result = await api<{ success?: boolean }>('/api/auth/setup', setupForm);
-      if (result.success !== true) throw new Error('The setup response was invalid. Check the café API.');
+      if (result.success !== true) throw new Error(tr('The setup response was invalid. Check the café API.'));
       setSetupRequired(false); setIsAdminAuthed(true); rememberSignIn(true);
       setSetupForm({ token: '', cafeName: '', adminPassword: '', panelPassword: '' });
       await store.syncFromAPI();
-    } catch (error) { setAuthError(error instanceof Error ? error.message : 'Setup failed.'); }
+    } catch (error) { setAuthError(error instanceof Error ? error.message : tr('Setup failed.')); }
     finally { setAuthLoading(false); }
   };
   const handleAdminLogout = async () => {
     try {
       const response = await fetch('/api/auth/logout', { method: 'POST' });
-      if (!response.ok) throw new Error('Sign-out failed. Please try again.');
+      if (!response.ok) throw new Error(tr('Sign-out failed. Please try again.'));
       setIsAdminAuthed(false); rememberSignIn(false); store.clearPrivateData(); window.history.replaceState({}, '', workspaceHome());
-    } catch (error) { setAuthError(error instanceof Error ? error.message : 'Sign-out failed.'); }
+    } catch (error) { setAuthError(error instanceof Error ? error.message : tr('Sign-out failed.')); }
   };
 
   const settings = store.getSettings();
@@ -213,23 +229,23 @@ export const App: React.FC = () => {
           <form className="ws-auth-card" aria-busy={authLoading} onSubmit={handleSetup}>
             <div>
               <span className="ws-brand-mark" style={{ width: 48, height: 48, marginBottom: 20 }}><Lock width={22} height={22} /></span>
-              <h1>Set up your café</h1>
-              <p>Choose the passwords for the admin and the daily panel. Staff use the panel password on the café's devices.</p>
+              <h1>{tr('Set up your café')}</h1>
+              <p>{tr('Choose the passwords for the admin and the daily panel. Staff use the panel password on the café\'s devices.')}</p>
             </div>
             {authError && <Notice tone="danger">{authError}</Notice>}
-            <Field label="Setup code" hint="From your deploy link, or the SETUP_TOKEN secret you set on the Worker.">{(id, hint) => (
+            <Field label={tr('Setup code')} hint={tr('From your deploy link, or the SETUP_TOKEN secret you set on the Worker.')}>{(id, hint) => (
               <Input id={id} aria-describedby={hint} autoComplete="off" required value={setupForm.token} onChange={updateSetup('token')} />
             )}</Field>
-            <Field label="Café name" optional>{id => (
+            <Field label={tr('Café name')} optional>{id => (
               <Input id={id} autoComplete="organization" maxLength={100} value={setupForm.cafeName} onChange={updateSetup('cafeName')} />
             )}</Field>
-            <Field label="Admin password" hint="At least 10 characters.">{(id, hint) => (
+            <Field label={tr('Admin password')} hint={tr('At least 10 characters.')}>{(id, hint) => (
               <Input id={id} aria-describedby={hint} type="password" autoComplete="new-password" required minLength={10} value={setupForm.adminPassword} onChange={updateSetup('adminPassword')} />
             )}</Field>
-            <Field label="Panel password" hint="At least 10 characters, different from the admin password.">{(id, hint) => (
+            <Field label={tr('Panel password')} hint={tr('At least 10 characters, different from the admin password.')}>{(id, hint) => (
               <Input id={id} aria-describedby={hint} type="password" autoComplete="new-password" required minLength={10} value={setupForm.panelPassword} onChange={updateSetup('panelPassword')} />
             )}</Field>
-            <Button type="submit" variant="primary" size="lg" block loading={authLoading}>{authLoading ? 'Setting up…' : 'Finish setup'}</Button>
+            <Button type="submit" variant="primary" size="lg" block loading={authLoading}>{authLoading ? tr('Setting up…') : tr('Finish setup')}</Button>
           </form>
         </div>
       );
@@ -240,16 +256,19 @@ export const App: React.FC = () => {
           <form className="ws-auth-card" aria-busy={authLoading} onSubmit={handleAdminLogin}>
             <div>
               <span className="ws-brand-mark" style={{ width: 48, height: 48, marginBottom: 20 }}><Lock width={22} height={22} /></span>
-              <h1>{settings.cafeName} {isPanelView ? 'daily panel' : 'admin'}</h1>
-              <p>{isPanelView ? 'Sign in to take orders, run the checklist, and clock the team in.' : 'Sign in to manage finances, menu, stock, staff, and settings.'}</p>
+              <h1>{tr(isPanelView ? '{cafeName} daily panel' : '{cafeName} admin', { cafeName: settings.cafeName })}</h1>
+              <p>{isPanelView ? tr('Sign in to take orders, run the checklist, and clock the team in.') : tr('Sign in to manage finances, menu, stock, staff, and settings.')}</p>
             </div>
             {authError && <Notice tone="danger">{authError}</Notice>}
-            {setupRequired && isPanelView && <Notice tone="info">This café is not set up yet. Open the admin to choose the passwords first.</Notice>}
-            <Field label={isPanelView ? 'Panel password' : 'Admin password'}>{id => (
+            {setupRequired && isPanelView && <Notice tone="info">{tr('This café is not set up yet. Open the admin to choose the passwords first.')}</Notice>}
+            <Field label={isPanelView ? tr('Panel password') : tr('Admin password')}>{id => (
               <Input id={id} type="password" autoComplete="current-password" autoFocus required value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} />
             )}</Field>
-            <Button type="submit" variant="primary" size="lg" block loading={authLoading}>{authLoading ? 'Checking…' : 'Sign in'}</Button>
-            <Button variant="ghost" size="sm" onClick={e => toggleTheme(e.currentTarget)} icon={theme === 'dark' ? <Sun /> : <Moon />}>{theme === 'dark' ? 'Light appearance' : 'Dark appearance'}</Button>
+            <Button type="submit" variant="primary" size="lg" block loading={authLoading}>{authLoading ? tr('Checking…') : tr('Sign in')}</Button>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 4 }}>
+              <Button variant="ghost" size="sm" onClick={e => toggleTheme(e.currentTarget)} icon={theme === 'dark' ? <Sun /> : <Moon />}>{theme === 'dark' ? tr('Light appearance') : tr('Dark appearance')}</Button>
+              <LanguageSelect variant="button" />
+            </div>
           </form>
         </div>
       );
@@ -274,12 +293,12 @@ export const App: React.FC = () => {
       const liveOrders = orders.filter(o => ['pending', 'preparing', 'ready'].includes(o.status)).length;
       const openTasks = tasksList.filter(t => t.status !== 'completed').length;
       const panelNav: NavItem<PanelSection>[] = [
-        { id: 'orders', label: 'Orders', icon: ShoppingBag, badge: liveOrders },
-        { id: 'pos', label: 'New order', icon: Plus },
-        { id: 'customers', label: 'Customer club', icon: Contact },
-        { id: 'events', label: 'Events', icon: CalendarDays },
-        { id: 'tasks', label: 'Checklist', icon: CheckSquare, badge: openTasks },
-        { id: 'shifts', label: 'Clock in / out', icon: Clock }
+        { id: 'orders', label: tr('Orders'), icon: ShoppingBag, badge: liveOrders },
+        { id: 'pos', label: tr('New order'), icon: Plus },
+        { id: 'customers', label: tr('Customer club'), icon: Contact },
+        { id: 'events', label: tr('Events'), icon: CalendarDays },
+        { id: 'tasks', label: tr('Checklist'), icon: CheckSquare, badge: openTasks },
+        { id: 'shifts', label: tr('Clock in / out'), icon: Clock }
       ];
       return (
         <WorkspaceShell kind="Panel" nav={panelNav} active={panelSection} onNavigate={setPanelSection} {...shellProps}>
@@ -304,14 +323,14 @@ export const App: React.FC = () => {
 
     const lowStock = stockItems.filter(i => i.quantity <= i.minThreshold).length;
     const adminNav: NavItem<AdminTab>[] = [
-      { id: 'financials', label: 'Finances', icon: TrendingUp, group: 'Business' },
-      { id: 'customers', label: 'Customer club', icon: Contact, group: 'Business' },
-      { id: 'events', label: 'Events', icon: CalendarDays, group: 'Business' },
-      { id: 'menu_admin', label: 'Menu', icon: UtensilsCrossed, group: 'Catalogue' },
-      { id: 'stock', label: 'Stock', icon: Boxes, group: 'Catalogue', badge: lowStock },
-      { id: 'staff', label: 'Staff & shifts', icon: Users, group: 'Team' },
-      { id: 'tasks', label: 'Checklist', icon: CheckSquare, group: 'Team' },
-      { id: 'settings', label: 'Settings', icon: Settings, group: 'Café', sections: SETTINGS_SECTIONS.map(({ id, label, icon }) => ({ anchor: `settings-${id}`, label, icon })) }
+      { id: 'financials', label: tr('Finances'), icon: TrendingUp, group: tr('Business') },
+      { id: 'customers', label: tr('Customer club'), icon: Contact, group: tr('Business') },
+      { id: 'events', label: tr('Events'), icon: CalendarDays, group: tr('Business') },
+      { id: 'menu_admin', label: tr('Menu'), icon: UtensilsCrossed, group: tr('Catalogue') },
+      { id: 'stock', label: tr('Stock'), icon: Boxes, group: tr('Catalogue'), badge: lowStock },
+      { id: 'staff', label: tr('Staff & shifts'), icon: Users, group: tr('Team') },
+      { id: 'tasks', label: tr('Checklist'), icon: CheckSquare, group: tr('Team') },
+      { id: 'settings', label: tr('Settings'), icon: Settings, group: tr('Café'), sections: SETTINGS_SECTIONS.map(({ id, label, icon }) => ({ anchor: `settings-${id}`, label, icon })) }
     ];
     return (
       <WorkspaceShell
@@ -338,8 +357,8 @@ export const App: React.FC = () => {
     <div className="app-shell app-menu min-h-dvh bg-zinc-950 text-zinc-100 flex flex-col justify-between selection:bg-amber-500 selection:text-zinc-950 font-sans antialiased">
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 w-full">
-        {store.pendingSaves > 0 && <p role="status" className="mb-4 rounded-xl border border-amber-500/30 p-3 text-amber-400">Saving {store.pendingSaves} change(s)…</p>}
-        {store.saveError && <div role="alert" className="mb-4 rounded-xl border border-rose-500/40 p-4 text-rose-300">{store.saveError}<button type="button" onClick={() => store.dismissSaveError()} className="ml-4 underline">Dismiss</button></div>}
+        {store.pendingSaves > 0 && <p role="status" className="mb-4 rounded-xl border border-amber-500/30 p-3 text-amber-400">{tr('Saving {pendingSaves} change(s)…', { pendingSaves: store.pendingSaves })}</p>}
+        {store.saveError && <div role="alert" className="mb-4 rounded-xl border border-rose-500/40 p-4 text-rose-300">{store.saveError}<button type="button" onClick={() => store.dismissSaveError()} className="ms-4 underline">{tr('Dismiss')}</button></div>}
         <PublicMenu settings={settings} categories={categories} menuItems={menuItems} menuVariants={menuVariants} onOrderCreated={refresh} theme={theme} />
       </main>
 

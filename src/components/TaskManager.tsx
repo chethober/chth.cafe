@@ -8,6 +8,7 @@ import {
   Stat, StatGrid, localDateKey, slug
 } from '../ui';
 import { TaskFormDialog, TaskRow, TASK_CATEGORIES, TASK_CATEGORY_ICONS, TASK_STATUS_LABELS, TaskStatus, nextTaskStatus } from './shared';
+import { intlTag, tr } from '../i18n';
 
 interface TaskManagerProps {
   tasks: TaskSelect[];
@@ -64,58 +65,58 @@ export const TaskManager: React.FC<TaskManagerProps> = ({ tasks, staffList, onTa
     headers: ['Task ID', 'Task Title', 'Category', 'Priority', 'Status', 'Assigned Staff', 'Due Date', 'Completed At'],
     columnAlignments: ['left', 'left', 'center', 'center', 'center', 'left', 'center', 'center'] as ('left' | 'center' | 'right')[],
     rows: records.map(t => [t.id, t.title, t.category, t.priority.toUpperCase(), TASK_STATUS_LABELS[t.status as TaskStatus] || t.status, staffName(t.assignedStaffId) || 'Unassigned', t.dueDate || 'N/A',
-      t.completedAt ? new Date(t.completedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Pending'])
+      t.completedAt ? new Date(t.completedAt).toLocaleString(intlTag(), { dateStyle: 'short', timeStyle: 'short' }) : tr('Pending')])
   });
 
   return (
     <Page>
       <PageHeader
-        title="Checklist"
-        description="Opening, closing, inventory, and cleaning duties for the team."
+        title={tr('Checklist')}
+        description={tr('Opening, closing, inventory, and cleaning duties for the team.')}
         actions={<>
-          <Button icon={<Download />} onClick={() => setExportOpen(true)}>Export</Button>
-          <Button variant="primary" icon={<Plus />} onClick={() => setFormOpen(true)}>New task</Button>
+          <Button icon={<Download />} onClick={() => setExportOpen(true)}>{tr('Export')}</Button>
+          <Button variant="primary" icon={<Plus />} onClick={() => setFormOpen(true)}>{tr('New task')}</Button>
         </>}
       />
 
       <StatGrid>
-        <Stat label="Completion" value={`${pct}%`} tone={pct === 100 && tasks.length ? 'positive' : 'neutral'} hint={`${counts.completed} of ${tasks.length} done`} />
-        <Stat label="To do" value={counts.pending} onClick={() => setStatus('pending')} active={status === 'pending'} />
-        <Stat label="In progress" value={counts.in_progress} tone={counts.in_progress ? 'accent' : 'neutral'} onClick={() => setStatus('in_progress')} active={status === 'in_progress'} />
-        <Stat label="High priority open" value={tasks.filter(t => t.priority === 'high' && t.status !== 'completed').length} tone="danger" />
+        <Stat label={tr('Completion')} value={`${pct}%`} tone={pct === 100 && tasks.length ? 'positive' : 'neutral'} hint={tr('{completed} of {length} done', { completed: counts.completed, length: tasks.length })} />
+        <Stat label={tr('To do')} value={counts.pending} onClick={() => setStatus('pending')} active={status === 'pending'} />
+        <Stat label={tr('In progress')} value={counts.in_progress} tone={counts.in_progress ? 'accent' : 'neutral'} onClick={() => setStatus('in_progress')} active={status === 'in_progress'} />
+        <Stat label={tr('High priority open')} value={tasks.filter(t => t.priority === 'high' && t.status !== 'completed').length} tone="danger" />
       </StatGrid>
 
-      <Meter size="lg" label={`${counts.completed} done, ${counts.in_progress} in progress, ${counts.pending} to do`} segments={[
-        { value: counts.completed, tone: 'positive', label: 'Done' },
-        { value: counts.in_progress, tone: 'accent', label: 'In progress' },
-        { value: counts.pending, tone: 'muted', label: 'To do' }
+      <Meter size="lg" label={tr('{completed} done, {in_progress} in progress, {pending} to do', { completed: counts.completed, in_progress: counts.in_progress, pending: counts.pending })} segments={[
+        { value: counts.completed, tone: 'positive', label: tr('Done') },
+        { value: counts.in_progress, tone: 'accent', label: tr('In progress') },
+        { value: counts.pending, tone: 'muted', label: tr('To do') }
       ]} />
 
       <div className="ws-toolbar-stack">
         <div className="ws-toolbar">
-          <Segmented label="Task status" value={status} onChange={setStatus} options={[
-            { value: 'all', label: 'All', count: tasks.length },
-            { value: 'pending', label: 'To do', count: counts.pending },
-            { value: 'in_progress', label: 'In progress', count: counts.in_progress },
-            { value: 'completed', label: 'Done', count: counts.completed }
+          <Segmented label={tr('Task status')} value={status} onChange={setStatus} options={[
+            { value: 'all', label: tr('All'), count: tasks.length },
+            { value: 'pending', label: tr('To do'), count: counts.pending },
+            { value: 'in_progress', label: tr('In progress'), count: counts.in_progress },
+            { value: 'completed', label: tr('Done'), count: counts.completed }
           ]} />
-          <Select aria-label="Assigned to" value={assignee} onChange={e => setAssignee(e.target.value)} style={{ width: 'auto' }}>
-            <option value="">Everyone</option>
+          <Select aria-label={tr('Assigned to')} value={assignee} onChange={e => setAssignee(e.target.value)} style={{ width: 'auto' }}>
+            <option value="">{tr('Everyone')}</option>
             {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select>
         </div>
-        <Chips label="Category" value={category} onChange={setCategory} options={[
-          { value: 'all', label: 'All categories' },
-          ...TASK_CATEGORIES.map(c => ({ value: c, label: c, icon: TASK_CATEGORY_ICONS[c], count: tasks.filter(t => t.category === c).length }))
+        <Chips label={tr('Category')} value={category} onChange={setCategory} options={[
+          { value: 'all', label: tr('All categories') },
+          ...TASK_CATEGORIES.map(c => ({ value: c, label: tr(c), icon: TASK_CATEGORY_ICONS[c], count: tasks.filter(t => t.category === c).length }))
         ]} />
       </div>
 
       <Card flush>
         {visible.length === 0 ? (
-          <EmptyState icon={<CheckSquare />} title={tasks.length ? 'No tasks match' : 'No tasks yet'} description={tasks.length ? 'Try a different filter.' : 'Create the first item on the checklist.'}
-            action={!tasks.length && <Button variant="primary" icon={<Plus />} onClick={() => setFormOpen(true)}>New task</Button>} />
+          <EmptyState icon={<CheckSquare />} title={tasks.length ? tr('No tasks match') : tr('No tasks yet')} description={tasks.length ? tr('Try a different filter.') : tr('Create the first item on the checklist.')}
+            action={!tasks.length && <Button variant="primary" icon={<Plus />} onClick={() => setFormOpen(true)}>{tr('New task')}</Button>} />
         ) : (
-          <List label="Tasks">
+          <List label={tr('Tasks')}>
             {visible.map(task => (
               <TaskRow key={task.id} task={task} staffName={staffName(task.assignedStaffId)}
                 onCycle={() => { store.updateTaskStatus(task.id, nextTaskStatus(task.status)); onTasksUpdated(); }}
@@ -130,29 +131,29 @@ export const TaskManager: React.FC<TaskManagerProps> = ({ tasks, staffList, onTa
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => { if (deleteTarget) { store.deleteTask(deleteTarget.id); onTasksUpdated(); } }}
-        title="Delete this task?"
-        description={<>“{deleteTarget?.title}” is removed from the checklist. This cannot be undone.</>}
+        title={tr('Delete this task?')}
+        description={<>{tr('“{title}” is removed from the checklist. This cannot be undone.', { title: deleteTarget?.title })}</>}
       />
 
       <ExportDialog
         open={exportOpen}
         onClose={() => setExportOpen(false)}
-        title="Export checklist"
-        description="Tasks with status, priority, and who they're assigned to."
+        title={tr('Export checklist')}
+        description={tr('Tasks with status, priority, and who they\'re assigned to.')}
         records={records}
         rowKey={t => t.id}
         summary={[
-          { label: 'Tasks', value: records.length },
-          { label: 'Done', value: `${xDone} (${xRate}%)`, tone: 'positive' },
-          { label: 'In progress', value: records.filter(t => t.status === 'in_progress').length },
-          { label: 'To do', value: records.filter(t => t.status === 'pending').length }
+          { label: tr('Tasks'), value: records.length },
+          { label: tr('Done'), value: `${xDone} (${xRate}%)`, tone: 'positive' },
+          { label: tr('In progress'), value: records.filter(t => t.status === 'in_progress').length },
+          { label: tr('To do'), value: records.filter(t => t.status === 'pending').length }
         ]}
         previewColumns={[
-          { key: 'title', header: 'Task', render: t => t.title },
-          { key: 'category', header: 'Category', render: t => t.category },
-          { key: 'priority', header: 'Priority', render: t => <Badge tone={t.priority === 'high' ? 'danger' : t.priority === 'medium' ? 'warning' : 'neutral'}>{t.priority}</Badge> },
-          { key: 'status', header: 'Status', render: t => TASK_STATUS_LABELS[t.status as TaskStatus] || t.status },
-          { key: 'who', header: 'Assignee', render: t => staffName(t.assignedStaffId) || 'Unassigned' }
+          { key: 'title', header: tr('Task'), render: t => t.title },
+          { key: 'category', header: tr('Category'), render: t => t.category },
+          { key: 'priority', header: tr('Priority'), render: t => <Badge tone={t.priority === 'high' ? 'danger' : t.priority === 'medium' ? 'warning' : 'neutral'}>{t.priority}</Badge> },
+          { key: 'status', header: tr('Status'), render: t => TASK_STATUS_LABELS[t.status as TaskStatus] || t.status },
+          { key: 'who', header: tr('Assignee'), render: t => staffName(t.assignedStaffId) || 'Unassigned' }
         ]}
         onReset={() => { setXStatus('all'); setXPriority('all'); setXCategory('all'); setXStaff(''); setXSort('priority'); setXOrder('desc'); }}
         onCopy={() => { const d = build(); return copyCSVToClipboard(d.headers, d.rows); }}
@@ -165,15 +166,15 @@ export const TaskManager: React.FC<TaskManagerProps> = ({ tasks, staffList, onTa
           const d = build();
           downloadStyledExcel({
             filename: `${fileBase}.xls`,
-            title: 'CHTH Cafe — Operations Checklist & Task Roster',
-            subtitle: `Export Date: ${new Date().toLocaleDateString()} | Assigned: ${xStaffObj?.name || 'ALL STAFF'} | Completion Rate: ${xRate}%`,
+            title: tr('CHTH Cafe — Operations Checklist & Task Roster'),
+            subtitle: tr('Export Date: {value} | Assigned: {value2} | Completion Rate: {xRate}%', { value: new Date().toLocaleDateString(intlTag()), value2: xStaffObj?.name || 'ALL STAFF', xRate }),
             themeColor: 'blue',
             metadata: { 'Status Filter': xStatus.toUpperCase(), 'Priority Filter': xPriority.toUpperCase(), 'Category Filter': xCategory.toUpperCase(), 'Staff Assignee': xStaffObj?.name || 'All Team Members', 'Sort Order': `${xSort.toUpperCase()} (${xOrder.toUpperCase()})` },
             summaryCards: [
-              { label: 'Total Tasks', value: records.length },
-              { label: 'Completed', value: `${xDone} (${xRate}%)` },
-              { label: 'In Progress', value: records.filter(t => t.status === 'in_progress').length },
-              { label: 'Pending Action', value: records.filter(t => t.status === 'pending').length }
+              { label: tr('Total Tasks'), value: records.length },
+              { label: tr('Completed'), value: `${xDone} (${xRate}%)` },
+              { label: tr('In Progress'), value: records.filter(t => t.status === 'in_progress').length },
+              { label: tr('Pending Action'), value: records.filter(t => t.status === 'pending').length }
             ],
             ...d,
             totalsRow: ['SUMMARY', `${records.length} Tasks Total`, '', '', `${xDone} Completed (${xRate}%)`, '', '', '']
@@ -181,32 +182,32 @@ export const TaskManager: React.FC<TaskManagerProps> = ({ tasks, staffList, onTa
         }}
         filters={<>
           <div className="ws-form-row cols-2">
-            <Field label="Status">{id => (
+            <Field label={tr('Status')}>{id => (
               <Select id={id} value={xStatus} onChange={e => setXStatus(e.target.value)}>
-                <option value="all">All statuses</option>
+                <option value="all">{tr('All statuses')}</option>
                 {(['pending', 'in_progress', 'completed'] as TaskStatus[]).map(s => <option key={s} value={s}>{TASK_STATUS_LABELS[s]}</option>)}
               </Select>
             )}</Field>
-            <Field label="Priority">{id => (
+            <Field label={tr('Priority')}>{id => (
               <Select id={id} value={xPriority} onChange={e => setXPriority(e.target.value)}>
-                <option value="all">All priorities</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option>
+                <option value="all">{tr('All priorities')}</option><option value="high">{tr('High')}</option><option value="medium">{tr('Medium')}</option><option value="low">{tr('Low')}</option>
               </Select>
             )}</Field>
-            <Field label="Category">{id => (
+            <Field label={tr('Category')}>{id => (
               <Select id={id} value={xCategory} onChange={e => setXCategory(e.target.value)}>
-                <option value="all">All categories</option>
-                {TASK_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value="all">{tr('All categories')}</option>
+                {TASK_CATEGORIES.map(c => <option key={c} value={c}>{tr(c)}</option>)}
               </Select>
             )}</Field>
-            <Field label="Assigned to">{id => (
+            <Field label={tr('Assigned to')}>{id => (
               <Select id={id} value={xStaff} onChange={e => setXStaff(e.target.value)}>
-                <option value="">Everyone</option>
+                <option value="">{tr('Everyone')}</option>
                 {staffList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </Select>
             )}</Field>
           </div>
           <SortFilter value={xSort} onChange={setXSort} order={xOrder} onOrder={setXOrder} options={[
-            { value: 'priority', label: 'Priority' }, { value: 'status', label: 'Status' }, { value: 'dueDate', label: 'Due date' }, { value: 'title', label: 'Title' }, { value: 'category', label: 'Category' }
+            { value: 'priority', label: tr('Priority') }, { value: 'status', label: tr('Status') }, { value: 'dueDate', label: tr('Due date') }, { value: 'title', label: tr('Title') }, { value: 'category', label: tr('Category') }
           ]} />
         </>}
       />

@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertCircle, ArrowUpRight, CheckCircle2, Coffee, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, RefreshCw, Sun, WifiOff, X } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, CheckCircle2, Coffee, Languages, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, RefreshCw, Sun, WifiOff, X } from 'lucide-react';
 import { IconButton, Notice, Button, PageContext } from './primitives';
+import { applyDocumentLocale, intlTag, setLocale, tr, useLocale, type Locale } from '../i18n';
+import { LOCALES } from '../chth-kit/locales.js';
 
 export interface NavSection {
   /** Element id on the page to scroll to. */
@@ -50,17 +52,17 @@ function Brand({ cafeName, logoUrl, kind }: { cafeName: string; logoUrl?: string
       <span className="ws-brand-mark">
         {logoUrl && failed !== logoUrl ? <img src={logoUrl} alt="" onError={() => setFailed(logoUrl)} /> : <Coffee width={18} height={18} />}
       </span>
-      <span className="ws-brand-text"><strong>{cafeName}</strong><span>{kind}</span></span>
+      <span className="ws-brand-text"><strong>{cafeName}</strong><span>{tr(kind)}</span></span>
     </div>
   );
 }
 
 function SyncStatus({ pendingSaves, saveError, offline, queuedChanges }: { pendingSaves: number; saveError: string; offline: boolean; queuedChanges: number }) {
-  if (saveError) return <span className="ws-sync" data-state="error"><AlertCircle width={14} height={14} />Not saved</span>;
-  if (offline) return <span className="ws-sync" data-state="offline" role="status"><WifiOff width={14} height={14} />{queuedChanges ? `Offline · ${queuedChanges} waiting` : 'Offline'}</span>;
-  if (queuedChanges > 0) return <span className="ws-sync" data-state="saving" role="status"><RefreshCw width={14} height={14} className="ws-spin" />Sending {queuedChanges}…</span>;
-  if (pendingSaves > 0) return <span className="ws-sync" data-state="saving" role="status"><RefreshCw width={14} height={14} className="ws-spin" />Saving {pendingSaves}…</span>;
-  return <span className="ws-sync" role="status"><CheckCircle2 width={14} height={14} />Saved</span>;
+  if (saveError) return <span className="ws-sync" data-state="error"><AlertCircle width={14} height={14} />{tr('Not saved')}</span>;
+  if (offline) return <span className="ws-sync" data-state="offline" role="status"><WifiOff width={14} height={14} />{queuedChanges ? tr('Offline · {queuedChanges} waiting', { queuedChanges }) : tr('Offline')}</span>;
+  if (queuedChanges > 0) return <span className="ws-sync" data-state="saving" role="status"><RefreshCw width={14} height={14} className="ws-spin" />{tr('Sending {queuedChanges}…', { queuedChanges })}</span>;
+  if (pendingSaves > 0) return <span className="ws-sync" data-state="saving" role="status"><RefreshCw width={14} height={14} className="ws-spin" />{tr('Saving {pendingSaves}…', { pendingSaves })}</span>;
+  return <span className="ws-sync" role="status"><CheckCircle2 width={14} height={14} />{tr('Saved')}</span>;
 }
 
 /** The one line CHTH Café Cloud shows at the top of cafés it deployed: an announcement or an advert. */
@@ -72,10 +74,29 @@ function PlatformNotice() {
     return () => { live = false; };
   }, []);
   if (!notice) return null;
-  const body = <><span className="ws-platform-tag">CHTH</span><span className="ws-platform-text">{notice.text}</span>{notice.url && <ArrowUpRight width={14} height={14} aria-hidden="true" />}</>;
+  const body = <><span className="ws-platform-tag">{tr('CHTH')}</span><span className="ws-platform-text">{notice.text}</span>{notice.url && <ArrowUpRight width={14} height={14} aria-hidden="true" />}</>;
   return notice.url
     ? <a className="ws-platform" href={notice.url} target="_blank" rel="noopener noreferrer">{body}</a>
     : <div className="ws-platform" role="note">{body}</div>;
+}
+
+/**
+ * The workspace's language: a sidebar row (or a small button on the sign-in screen) over a native
+ * select, so phones get their own picker. The choice is the same chth_lang every CHTH site reads.
+ */
+export function LanguageSelect({ variant = 'nav', collapsed }: { variant?: 'nav' | 'button'; collapsed?: boolean }) {
+  const locale = useLocale();
+  const current = LOCALES.find(l => l.code === locale);
+  const label = tr('Language');
+  return (
+    <label className={variant === 'nav' ? 'ws-nav-item ws-lang' : 'chth-btn chth-btn--ghost chth-btn--sm ws-lang'} title={collapsed ? label : undefined}>
+      {variant === 'nav' ? <Languages /> : <span className="chth-btn__icon" aria-hidden="true"><Languages /></span>}
+      <span className={variant === 'nav' ? 'ws-nav-text' : 'chth-btn__label'} lang={locale}>{current?.native}</span>
+      <select aria-label={label} value={locale} onChange={e => { const next = e.target.value as Locale; applyDocumentLocale(next); setLocale(next); }}>
+        {LOCALES.map(l => <option key={l.code} value={l.code} lang={l.code}>{l.native}</option>)}
+      </select>
+    </label>
+  );
 }
 
 const MOBILE = '(max-width: 1023px)';
@@ -149,16 +170,16 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
   // Admin pages are labelled by their nav group; the daily panel by the day it is running.
   const page = current && {
     icon: current.icon,
-    eyebrow: current.group || new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })
+    eyebrow: current.group || new Date().toLocaleDateString(intlTag(), { weekday: 'long', day: 'numeric', month: 'long' })
   };
 
   return (
     <div className="ws ws-shell" data-kind={kind.toLowerCase()} data-collapsed={collapsed || undefined} data-drawer={drawerOpen || undefined}>
       <div className="ws-scrim" aria-hidden="true" onClick={closeDrawer} />
-      <aside id="ws-sidebar" ref={sidebar} className="ws-sidebar" aria-label={`${kind} navigation`}>
+      <aside id="ws-sidebar" ref={sidebar} className="ws-sidebar" aria-label={tr(kind === 'Admin' ? 'Admin navigation' : 'Panel navigation')}>
         <div className="ws-sidebar-brand">
           <Brand cafeName={cafeName} logoUrl={logoUrl} kind={kind} />
-          <span className="ws-hide-desktop"><IconButton label="Close menu" onClick={closeDrawer}><X /></IconButton></span>
+          <span className="ws-hide-desktop"><IconButton label={tr('Close menu')} onClick={closeDrawer}><X /></IconButton></span>
         </div>
         <nav>
           {Object.entries(groups).map(([group, items]) => (
@@ -172,7 +193,7 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
                     {!!badge && <span className="ws-nav-count">{badge}</span>}
                   </button>
                   {active === id && sections && sections.length > 0 && (
-                    <div className="ws-nav-sub" role="group" aria-label={`${label} sections`}>
+                    <div className="ws-nav-sub" role="group" aria-label={tr('{label} sections', { label })}>
                       {sections.map(({ anchor, label: sectionLabel, icon: SectionIcon }) => (
                         <button key={anchor} type="button" className="ws-nav-subitem" onClick={() => go(id, anchor)}>
                           <SectionIcon />
@@ -187,26 +208,27 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
           ))}
         </nav>
         <div className="ws-sidebar-footer">
-          <span className="ws-live" title="Live · syncs every 15s"><span className="ws-live-dot" aria-hidden="true" /><span className="ws-nav-text">Live · syncs every 15s</span></span>
-          <button type="button" className="ws-nav-item" onClick={e => onToggleTheme(e.currentTarget)} title={collapsed ? (theme === 'dark' ? 'Light appearance' : 'Dark appearance') : undefined}><ThemeIcon /><span className="ws-nav-text">{theme === 'dark' ? 'Light appearance' : 'Dark appearance'}</span></button>
-          <button type="button" className="ws-nav-item" onClick={onSignOut} title={collapsed ? 'Sign out' : undefined}><LogOut /><span className="ws-nav-text">Sign out</span></button>
+          <span className="ws-live" title={tr('Live · syncs every 15s')}><span className="ws-live-dot" aria-hidden="true" /><span className="ws-nav-text">{tr('Live · syncs every 15s')}</span></span>
+          <button type="button" className="ws-nav-item" onClick={e => onToggleTheme(e.currentTarget)} title={collapsed ? (theme === 'dark' ? tr('Light appearance') : tr('Dark appearance')) : undefined}><ThemeIcon /><span className="ws-nav-text">{theme === 'dark' ? tr('Light appearance') : tr('Dark appearance')}</span></button>
+          <LanguageSelect collapsed={collapsed} />
+          <button type="button" className="ws-nav-item" onClick={onSignOut} title={collapsed ? tr('Sign out') : undefined}><LogOut /><span className="ws-nav-text">{tr('Sign out')}</span></button>
         </div>
       </aside>
 
       <div className="ws-main">
         <header className="ws-topbar">
           <span className="ws-hide-desktop">
-            <IconButton ref={menuButton} label="Menu" aria-expanded={drawerOpen} aria-controls="ws-sidebar" onClick={() => setDrawerOpen(true)}>
+            <IconButton ref={menuButton} label={tr('Menu')} aria-expanded={drawerOpen} aria-controls="ws-sidebar" onClick={() => setDrawerOpen(true)}>
               <Menu />
               {navBadge > 0 && <span className="ws-menu-dot" aria-hidden="true" />}
             </IconButton>
           </span>
           <span className="ws-hide-mobile">
-            <IconButton label={collapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar (Ctrl+B)'} aria-expanded={!collapsed} aria-controls="ws-sidebar" onClick={() => setCollapsed(c => !c)}><SidebarIcon /></IconButton>
+            <IconButton label={collapsed ? tr('Expand sidebar (Ctrl+B)') : tr('Collapse sidebar (Ctrl+B)')} aria-expanded={!collapsed} aria-controls="ws-sidebar" onClick={() => setCollapsed(c => !c)}><SidebarIcon /></IconButton>
           </span>
           <div className="ws-topbar-title">
             <strong>{current?.label}</strong>
-            <span>{cafeName} · {kind}</span>
+            <span>{cafeName} · {tr(kind)}</span>
           </div>
           <div className="ws-topbar-actions">
             <SyncStatus pendingSaves={pendingSaves} saveError={saveError} offline={offline} queuedChanges={queuedChanges} />
@@ -218,15 +240,15 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
           {offline && (
             <div style={{ marginBottom: 20 }}>
               <Notice tone="warning" role="status">
-                No connection. New orders and order status changes are kept on this device and sent when the connection is back; other changes need a connection.
+                {tr('No connection. New orders and order status changes are kept on this device and sent when the connection is back; other changes need a connection.')}
               </Notice>
             </div>
           )}
           {rejectedChanges.length > 0 && (
             <div style={{ marginBottom: 20 }}>
-              <Notice tone="danger" role="alert" action={<Button size="sm" variant="ghost" onClick={onDismissRejected}>Dismiss</Button>}>
-                {rejectedChanges.length === 1 ? 'A change made offline was refused when it was sent. Re-enter it if it is still needed:' : 'Changes made offline were refused when they were sent. Re-enter them if they are still needed:'}
-                <ul style={{ margin: 'var(--chth-space-6) 0 0', paddingLeft: 18 }}>
+              <Notice tone="danger" role="alert" action={<Button size="sm" variant="ghost" onClick={onDismissRejected}>{tr('Dismiss')}</Button>}>
+                {rejectedChanges.length === 1 ? tr('A change made offline was refused when it was sent. Re-enter it if it is still needed:') : tr('Changes made offline were refused when they were sent. Re-enter them if they are still needed:')}
+                <ul style={{ margin: 'var(--chth-space-6) 0 0', paddingInlineStart: 18 }}>
                   {rejectedChanges.map(change => <li key={change.seq}>{change.label}: {change.reason}</li>)}
                 </ul>
               </Notice>
@@ -234,7 +256,7 @@ export function WorkspaceShell<T extends string>(props: WorkspaceShellProps<T>) 
           )}
           {saveError && (
             <div style={{ marginBottom: 20 }}>
-              <Notice tone="danger" action={<Button size="sm" variant="ghost" onClick={onDismissError}>Dismiss</Button>}>{saveError}</Notice>
+              <Notice tone="danger" action={<Button size="sm" variant="ghost" onClick={onDismissError}>{tr('Dismiss')}</Button>}>{saveError}</Notice>
             </div>
           )}
           <PageContext.Provider value={page || null}>{children}</PageContext.Provider>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { EmptyChart, LegendKey, Tooltip, TooltipRow } from './ChartKit';
+import { tr } from '../../i18n';
 
 // Ranked horizontal bars: one series, one colour, value at the bar tip.
 export function BarList({
@@ -60,7 +61,7 @@ export function ShareBar({
 }) {
   const [active, setActive] = useState<number | null>(null);
   const total = parts.reduce((sum, p) => sum + p.value, 0);
-  if (total <= 0) return <EmptyChart>No completed sales in this range.</EmptyChart>;
+  if (total <= 0) return <EmptyChart>{tr('No completed sales in this range.')}</EmptyChart>;
   const share = (v: number) => `${((v / total) * 100).toFixed(v / total < 0.1 && v > 0 ? 1 : 0)}%`;
   const visible = parts.map((p, i) => ({ ...p, i })).filter((p) => p.value > 0);
   return (

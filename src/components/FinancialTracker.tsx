@@ -11,6 +11,7 @@ import { ManualLogModal } from './ManualLogModal';
 import { QuickPOSModal } from './QuickPOSModal';
 import { OrderDetailsDialog, OrderEditDialog } from './shared';
 import { FinanceExportDialog } from './exports/FinanceExport';
+import { intlTag, tr } from '../i18n';
 
 interface FinancialTrackerProps {
   settings: SettingsSelect;
@@ -65,18 +66,18 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
     if (trendRange === '7d') {
       for (let i = 6; i >= 0; i--) {
         const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
-        points.push({ label: d.toLocaleDateString([], { weekday: 'short' }), values: sumDays(d, 1) });
+        points.push({ label: d.toLocaleDateString(intlTag(), { weekday: 'short' }), values: sumDays(d, 1) });
       }
     } else if (trendRange === '30d') {
       for (let i = 4; i >= 0; i--) {
         const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (i + 1) * 6 + 1);
-        points.push({ label: start.toLocaleDateString([], { month: 'short', day: 'numeric' }), values: sumDays(start, 6) });
+        points.push({ label: start.toLocaleDateString(intlTag(), { month: 'short', day: 'numeric' }), values: sumDays(start, 6) });
       }
     } else {
       for (let i = 11; i >= 0; i--) {
         const start = new Date(today.getFullYear(), today.getMonth() - i, 1);
         const days = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
-        points.push({ label: start.toLocaleDateString([], { month: 'short' }), values: sumDays(start, days) });
+        points.push({ label: start.toLocaleDateString(intlTag(), { month: 'short' }), values: sumDays(start, days) });
       }
     }
     return points;
@@ -122,27 +123,27 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
   return (
     <Page>
       <PageHeader
-        title="Finances"
-        description="Sales, costs, and profit for the café. Revenue counts completed orders only."
+        title={tr('Finances')}
+        description={tr('Sales, costs, and profit for the café. Revenue counts completed orders only.')}
         actions={<>
-          <Button icon={<Download />} onClick={() => setExportOpen(true)}>Export</Button>
-          <Button icon={<PenLine />} onClick={() => setManualLogOpen(true)}>Log income or expense</Button>
-          <Button variant="primary" icon={<Plus />} onClick={() => setQuickSaleOpen(true)}>Record sale</Button>
+          <Button icon={<Download />} onClick={() => setExportOpen(true)}>{tr('Export')}</Button>
+          <Button icon={<PenLine />} onClick={() => setManualLogOpen(true)}>{tr('Log income or expense')}</Button>
+          <Button variant="primary" icon={<Plus />} onClick={() => setQuickSaleOpen(true)}>{tr('Record sale')}</Button>
         </>}
       />
 
       <StatGrid>
-        <Stat label="Revenue" icon={<ArrowUpRight />} value={fmt(analytics.totalSalesRevenue)} hint={plural(analytics.totalOrdersCount, 'completed sale')} />
-        <Stat label="Expenses" icon={<ArrowDownRight />} value={fmt(analytics.combinedExpenses)} hint={`Includes ${fmt(analytics.totalLaborWages)} in wages`} />
-        <Stat label="Net profit" icon={<Wallet />} value={fmt(analytics.netProfit)} tone={analytics.netProfit >= 0 ? 'positive' : 'danger'} hint="After costs and wages" />
-        <Stat label="Profit margin" icon={<Percent />} value={`${analytics.profitMargin}%`} hint={`Average sale ${fmt(analytics.averageOrderValue)}`} />
+        <Stat label={tr('Revenue')} icon={<ArrowUpRight />} value={fmt(analytics.totalSalesRevenue)} hint={plural(analytics.totalOrdersCount, 'completed sale')} />
+        <Stat label={tr('Expenses')} icon={<ArrowDownRight />} value={fmt(analytics.combinedExpenses)} hint={tr('Includes {totalLaborWages} in wages', { totalLaborWages: fmt(analytics.totalLaborWages) })} />
+        <Stat label={tr('Net profit')} icon={<Wallet />} value={fmt(analytics.netProfit)} tone={analytics.netProfit >= 0 ? 'positive' : 'danger'} hint={tr('After costs and wages')} />
+        <Stat label={tr('Profit margin')} icon={<Percent />} value={`${analytics.profitMargin}%`} hint={tr('Average sale {averageOrderValue}', { averageOrderValue: fmt(analytics.averageOrderValue) })} />
       </StatGrid>
 
       <div className="ws-grid ws-grid-main">
         <Card
-          title="Revenue and expenses"
-          description={trendRange === '7d' ? 'Last 7 days' : trendRange === '30d' ? 'Last 30 days, in 6-day periods' : 'Last 12 months'}
-          actions={<Segmented label="Trend range" value={trendRange} onChange={setTrendRange} options={[
+          title={tr('Revenue and expenses')}
+          description={trendRange === '7d' ? tr('Last 7 days') : trendRange === '30d' ? tr('Last 30 days, in 6-day periods') : tr('Last 12 months')}
+          actions={<Segmented label={tr('Trend range')} value={trendRange} onChange={setTrendRange} options={[
             { value: '7d', label: '7D' }, { value: '30d', label: '30D' }, { value: '12m', label: '12M' }
           ]} />}
         >
@@ -150,19 +151,19 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
             format={fmt}
             points={trend}
             series={[
-              { key: 'revenue', label: 'Revenue', color: 'var(--ws-series-1)' },
-              { key: 'expense', label: 'Expenses', color: 'var(--ws-series-2)' },
-              { key: 'profit', label: 'Profit', color: 'var(--ws-series-3)', dashed: true }
+              { key: 'revenue', label: tr('Revenue'), color: 'var(--ws-series-1)' },
+              { key: 'expense', label: tr('Expenses'), color: 'var(--ws-series-2)' },
+              { key: 'profit', label: tr('Profit'), color: 'var(--ws-series-3)', dashed: true }
             ]}
           />
         </Card>
 
-        <Card title="How customers pay" description="Share of completed sales">
+        <Card title={tr('How customers pay')} description={tr('Share of completed sales')}>
           {paymentMix.sum === 0 ? (
-            <EmptyState title="No completed sales yet" />
+            <EmptyState title={tr('No completed sales yet')} />
           ) : (
             <>
-              <div style={{ display: 'flex', gap: 2, height: 12, borderRadius: 6, overflow: 'hidden', marginBottom: 20 }} role="img" aria-label="Payment method share">
+              <div style={{ display: 'flex', gap: 2, height: 12, borderRadius: 6, overflow: 'hidden', marginBottom: 20 }} role="img" aria-label={tr('Payment method share')}>
                 {paymentMix.rows.filter(r => r.amount > 0).map(r => (
                   <span key={r.key} title={paymentLabel(r.key)} style={{ width: `${(r.amount / paymentMix.sum) * 100}%`, background: r.color, borderRadius: 4 }} />
                 ))}
@@ -172,7 +173,7 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
                   <li key={r.key} className="ws-list-item" style={{ padding: 'var(--chth-space-10) 0', minHeight: 0 }}>
                     <span className="ws-swatch" style={{ background: r.color }} aria-hidden="true" />
                     <span style={{ flex: 1 }}>{paymentLabel(r.key)}</span>
-                    <span className="ws-hint tabular" style={{ width: 44, textAlign: 'right' }}>{Math.round((r.amount / paymentMix.sum) * 100)}%</span>
+                    <span className="ws-hint tabular" style={{ width: 44, textAlign: 'end' }}>{Math.round((r.amount / paymentMix.sum) * 100)}%</span>
                     <Amount>{fmt(r.amount)}</Amount>
                   </li>
                 ))}
@@ -183,13 +184,13 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
       </div>
 
       <div className="ws-grid ws-grid-2">
-        <Card title="Best sellers" description="By revenue from completed orders">
+        <Card title={tr('Best sellers')} description={tr('By revenue from completed orders')}>
           {topProducts.length === 0 ? (
-            <EmptyState icon={<ShoppingBag />} title="No sales yet" description="Best sellers appear once orders are completed." />
+            <EmptyState icon={<ShoppingBag />} title={tr('No sales yet')} description={tr('Best sellers appear once orders are completed.')} />
           ) : topProducts.map(p => (
             <div key={p.name} className="ws-bar-row">
               <span className="ws-truncate" style={{ fontWeight: 600 }}>{p.name}</span>
-              <span className="ws-hint tabular">{p.qty} sold · <strong style={{ color: 'var(--ws-ink)' }}>{fmt(p.revenue)}</strong></span>
+              <span className="ws-hint tabular">{tr('{qty} sold', { qty: p.qty })} · <strong style={{ color: 'var(--ws-ink)' }}>{fmt(p.revenue)}</strong></span>
               <div className="ws-meter"><span style={{ width: `${(p.revenue / topRevenue) * 100}%`, background: 'var(--ws-series-1)' }} /></div>
             </div>
           ))}
@@ -198,49 +199,49 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
       </div>
 
       <div className="ws-grid ws-grid-2">
-        <Card flush title="Sales" description={plural(orders.length, 'order')}>
+        <Card flush title={tr('Sales')} description={plural(orders.length, 'order')}>
           {sortedSales.length === 0 ? (
-            <EmptyState icon={<ShoppingBag />} title="No sales recorded" action={<Button size="sm" onClick={() => setQuickSaleOpen(true)}>Record a sale</Button>} />
+            <EmptyState icon={<ShoppingBag />} title={tr('No sales recorded')} action={<Button size="sm" onClick={() => setQuickSaleOpen(true)}>{tr('Record a sale')}</Button>} />
           ) : (
             <>
-              <List label="Sales">
+              <List label={tr('Sales')}>
                 {sortedSales.slice(0, salesLimit).map(o => (
                   <ListItem
                     key={o.id}
                     onClick={() => setViewOrder(o)}
                     dim={o.status === 'cancelled'}
-                    title={<><span className="mono">{o.orderNumber}</span><span className="ws-truncate muted" style={{ fontWeight: 400 }}>{o.customerName || 'Walk-in'}</span></>}
+                    title={<><span className="mono">{o.orderNumber}</span><span className="ws-truncate muted" style={{ fontWeight: 400 }}>{o.customerName || tr('Walk-in')}</span></>}
                     subtitle={<><span>{formatDate(o.createdAt)}</span><span>{paymentLabel(o.paymentMethod)}</span>{o.status !== 'completed' && <span>{o.status}</span>}</>}
                     trail={<Amount tone={o.status === 'completed' ? 'positive' : undefined}>{fmt(o.totalAmount)}</Amount>}
                     actions={<>
-                      {o.status !== 'cancelled' && !store.isQueuedOrder(o.id) && <IconButton label={`Edit order ${o.orderNumber}`} onClick={() => setEditTarget(o)}><Pencil /></IconButton>}
-                      <IconButton label={`Delete order ${o.orderNumber}`} variant="danger-ghost" onClick={() => setDeleteTarget({ type: 'order', id: o.id, label: o.orderNumber })}><Trash2 /></IconButton>
+                      {o.status !== 'cancelled' && !store.isQueuedOrder(o.id) && <IconButton label={tr('Edit order {orderNumber}', { orderNumber: o.orderNumber })} onClick={() => setEditTarget(o)}><Pencil /></IconButton>}
+                      <IconButton label={tr('Delete order {orderNumber}', { orderNumber: o.orderNumber })} variant="danger-ghost" onClick={() => setDeleteTarget({ type: 'order', id: o.id, label: o.orderNumber })}><Trash2 /></IconButton>
                     </>}
                   />
                 ))}
               </List>
-              {sortedSales.length > salesLimit && <div style={{ padding: 12, textAlign: 'center' }}><Button size="sm" variant="ghost" onClick={() => setSalesLimit(l => l + 20)}>Show more</Button></div>}
+              {sortedSales.length > salesLimit && <div style={{ padding: 12, textAlign: 'center' }}><Button size="sm" variant="ghost" onClick={() => setSalesLimit(l => l + 20)}>{tr('Show more')}</Button></div>}
             </>
           )}
         </Card>
 
-        <Card flush title="Expenses" description={plural(expenses.length, 'entry', 'entries')}>
+        <Card flush title={tr('Expenses')} description={plural(expenses.length, 'entry', 'entries')}>
           {sortedExpenses.length === 0 ? (
-            <EmptyState icon={<Receipt />} title="No expenses logged" action={<Button size="sm" onClick={() => setManualLogOpen(true)}>Log an expense</Button>} />
+            <EmptyState icon={<Receipt />} title={tr('No expenses logged')} action={<Button size="sm" onClick={() => setManualLogOpen(true)}>{tr('Log an expense')}</Button>} />
           ) : (
             <>
-              <List label="Expenses">
+              <List label={tr('Expenses')}>
                 {sortedExpenses.slice(0, expenseLimit).map(e => (
                   <ListItem
                     key={e.id}
                     title={<span className="ws-truncate">{e.description}</span>}
                     subtitle={<><span>{e.category}</span><span>{formatDate(e.date)}</span><span>{paymentLabel(e.paymentMethod)}</span></>}
                     trail={<Amount tone="danger">−{fmt(e.amount)}</Amount>}
-                    actions={<IconButton label={`Delete expense ${e.description}`} variant="danger-ghost" onClick={() => setDeleteTarget({ type: 'expense', id: e.id, label: e.description })}><Trash2 /></IconButton>}
+                    actions={<IconButton label={tr('Delete expense {description}', { description: e.description })} variant="danger-ghost" onClick={() => setDeleteTarget({ type: 'expense', id: e.id, label: e.description })}><Trash2 /></IconButton>}
                   />
                 ))}
               </List>
-              {sortedExpenses.length > expenseLimit && <div style={{ padding: 12, textAlign: 'center' }}><Button size="sm" variant="ghost" onClick={() => setExpenseLimit(l => l + 20)}>Show more</Button></div>}
+              {sortedExpenses.length > expenseLimit && <div style={{ padding: 12, textAlign: 'center' }}><Button size="sm" variant="ghost" onClick={() => setExpenseLimit(l => l + 20)}>{tr('Show more')}</Button></div>}
             </>
           )}
         </Card>
@@ -253,10 +254,10 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
         taxRate={settings.taxRate}
         onClose={() => setViewOrder(null)}
         actions={viewOrder && <span className="ws-spacer" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {['pending', 'preparing', 'ready'].includes(viewOrder.status) && <Button variant="danger-ghost" onClick={() => { setCancelTarget(viewOrder); setViewOrder(null); }}>Cancel order</Button>}
-          <Button variant="danger-ghost" icon={<Trash2 />} onClick={() => { setDeleteTarget({ type: 'order', id: viewOrder.id, label: viewOrder.orderNumber }); setViewOrder(null); }}>Delete</Button>
+          {['pending', 'preparing', 'ready'].includes(viewOrder.status) && <Button variant="danger-ghost" onClick={() => { setCancelTarget(viewOrder); setViewOrder(null); }}>{tr('Cancel order')}</Button>}
+          <Button variant="danger-ghost" icon={<Trash2 />} onClick={() => { setDeleteTarget({ type: 'order', id: viewOrder.id, label: viewOrder.orderNumber }); setViewOrder(null); }}>{tr('Delete')}</Button>
           {/* Orders still on this device are edited once they reach the server. */}
-          {viewOrder.status !== 'cancelled' && !store.isQueuedOrder(viewOrder.id) && <Button icon={<Pencil />} onClick={() => { setEditTarget(viewOrder); setViewOrder(null); }}>Edit</Button>}
+          {viewOrder.status !== 'cancelled' && !store.isQueuedOrder(viewOrder.id) && <Button icon={<Pencil />} onClick={() => { setEditTarget(viewOrder); setViewOrder(null); }}>{tr('Edit')}</Button>}
         </span>}
       />
       <OrderEditDialog
@@ -275,18 +276,18 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={confirmDelete}
-        title={deleteTarget?.type === 'order' ? `Delete order ${deleteTarget.label}?` : 'Delete this expense?'}
+        title={deleteTarget?.type === 'order' ? tr('Delete order {label}?', { label: deleteTarget.label }) : tr('Delete this expense?')}
         description={deleteTarget?.type === 'order'
-          ? 'The sale is removed from your revenue and reports, and its ingredients go back into stock. This cannot be undone.'
-          : <>“{deleteTarget?.label}” is removed from your expenses. This cannot be undone.</>}
+          ? tr('The sale is removed from your revenue and reports, and its ingredients go back into stock. This cannot be undone.')
+          : <>{tr('“{label}” is removed from your expenses. This cannot be undone.', { label: deleteTarget?.label })}</>}
       />
       <ConfirmDialog
         open={!!cancelTarget}
         onClose={() => setCancelTarget(null)}
         onConfirm={confirmCancel}
-        title={`Cancel ${cancelTarget?.orderNumber || 'order'}?`}
-        confirmLabel="Cancel order"
-        description="The order stays in your history and its ingredients stay deducted from stock. Delete the order instead to return them."
+        title={tr('Cancel {value}?', { value: cancelTarget?.orderNumber || 'order' })}
+        confirmLabel={tr('Cancel order')}
+        description={tr('The order stays in your history and its ingredients stay deducted from stock. Delete the order instead to return them.')}
       />
     </Page>
   );
