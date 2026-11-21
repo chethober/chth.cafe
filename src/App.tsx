@@ -22,6 +22,7 @@ import { api } from './services/api';
 import { applyAppearance } from './utils/appearance';
 import { applyFavicon, brandTitle } from './utils/branding';
 import { PublicMenu } from './components/PublicMenu';
+import { MenuQR } from './components/MenuQR';
 import { SETTINGS_SECTIONS, SettingsPanel } from './components/SettingsPanel';
 import { TimeTracker } from './components/TimeTracker';
 import { FinancialTracker } from './components/FinancialTracker';
@@ -358,13 +359,16 @@ export const App: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 w-full">
         {store.pendingSaves > 0 && <p role="status" className="mb-4 rounded-xl border border-amber-500/30 p-3 text-amber-400">{tr('Saving {pendingSaves} change(s)…', { pendingSaves: store.pendingSaves })}</p>}
-        {store.saveError && <div role="alert" className="mb-4 rounded-xl border border-rose-500/40 p-4 text-rose-300">{store.saveError}<button type="button" onClick={() => store.dismissSaveError()} className="ml-4 underline">{tr('Dismiss')}</button></div>}
+        {store.saveError && <div role="alert" className="mb-4 rounded-xl border border-rose-500/40 p-4 text-rose-300">{store.saveError}<button type="button" onClick={() => store.dismissSaveError()} className="ms-4 underline">{tr('Dismiss')}</button></div>}
         <PublicMenu settings={settings} categories={categories} menuItems={menuItems} menuVariants={menuVariants} onOrderCreated={refresh} theme={theme} />
       </main>
 
       <footer className="bg-zinc-950 border-t border-zinc-900 py-5 text-center text-xs text-zinc-500 mt-8">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <CafeFooterText cafeName={settings.cafeName} />
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-5">
+          <div className="flex flex-col items-center sm:items-start gap-3">
+            <CafeFooterText cafeName={settings.cafeName} />
+          </div>
+          <MenuQR />
         </div>
       </footer>
     </div>

@@ -189,6 +189,8 @@ export const PUBLIC_STRINGS: Record<string, Row> = {
   'All rights reserved.': { fa: 'همهٔ حقوق محفوظ است.', ar: 'جميع الحقوق محفوظة.', ru: 'Все права защищены.', es: 'Todos los derechos reservados.' },
   'See you at the café.': { fa: 'توی کافه می‌بینیمت.', ar: 'نراك في المقهى.', ru: 'Ждём вас в кафе.', es: 'Nos vemos en el café.' },
   'Language': { fa: 'زبان', ar: 'اللغة', ru: 'Язык', es: 'Idioma' },
+  'Scan to open the menu': { fa: 'برای باز کردن منو اسکن کن', ar: 'امسح لفتح القائمة', ru: 'Отсканируйте, чтобы открыть меню', es: 'Escanea para abrir el menú' },
+  'Menu QR code for {url}': { fa: 'کد QR منو برای {url}', ar: 'رمز QR للقائمة لـ{url}', ru: 'QR-код меню: {url}', es: 'Código QR del menú de {url}' },
   // Shared with the workspace: the calendar and dialogs
   'Previous month': { fa: 'ماه قبل', ar: 'الشهر السابق', ru: 'Предыдущий месяц', es: 'Mes anterior' },
   'Next month': { fa: 'ماه بعد', ar: 'الشهر التالي', ru: 'Следующий месяц', es: 'Mes siguiente' },
