@@ -31,7 +31,12 @@ async function phoneTaken(c: Context<Env>, phone: string, exceptId = '') {
 
 export function registerCustomers(app: Hono<Env>) {
   app.get('/api/customers', async c => {
-    const { results } = await c.env.DB.prepare(`SELECT ${COLUMNS} FROM customers ORDER BY name COLLATE NOCASE`).all();
+    // Club balances ride along, so the till and the directory show them without another request.
+    const { results } = await c.env.DB.prepare(
+      `SELECT ${COLUMNS}, COALESCE(l.stamps, 0) AS stamps, COALESCE(l.points, 0) AS points FROM customers
+       LEFT JOIN (SELECT customer_id, SUM(stamps) AS stamps, SUM(points) AS points FROM customer_ledger GROUP BY customer_id) l ON l.customer_id = customers.id
+       ORDER BY name COLLATE NOCASE`
+    ).all();
     return c.json({ data: results });
   });
 
@@ -72,6 +77,7 @@ export function registerCustomers(app: Hono<Env>) {
     const id = c.req.param('id');
     await c.env.DB.batch([
       c.env.DB.prepare('UPDATE orders SET customer_id = NULL WHERE customer_id = ?').bind(id),
+      c.env.DB.prepare('DELETE FROM customer_ledger WHERE customer_id = ?').bind(id),
       c.env.DB.prepare('DELETE FROM customers WHERE id = ?').bind(id)
     ]);
     return c.json({ success: true });

@@ -16,6 +16,14 @@ import { registerTelegramBot, runScheduledTelegram, sendDailyReport } from './se
 import { registerCustomers } from './services/customers';
 import { registerEvents } from './services/events';
 import { registerStockCategories } from './services/stockCategories';
+import { activePromotions, registerPromotions } from './services/promotions';
+import { redemptionStatement, registerLoyalty, syncOrderLoyalty } from './services/loyalty';
+import { registerPurchasing } from './services/purchasing';
+import { availablePickupSlots, registerPickup } from './services/pickup';
+import { normalizePhone } from './services/customers';
+import { bestPromotion, promotionLineDiscount, type Promotion } from './utils/promotions';
+import { parseLoyalty } from './utils/loyalty';
+import { parsePickupSlots } from './utils/pickupSlots';
 import { login, registerCredentials, setupRequired, withSessionSecret } from './services/credentials';
 import { ensureBaseSchema } from './services/baseSchema';
 import { calendarOf, isCalendarSystem } from './utils/events';
@@ -223,7 +231,7 @@ app.use('/api/*', async (c, next) => {
   const [sessionId, expires] = typeof session === 'string' ? session.split(':') : [];
   const authed = Boolean(sessionId && expires && Number(expires) > Date.now() && c.env?.KV && await c.env.KV.get(`session:${workspace}:${sessionId}`) === expires);
   const path = c.req.path;
-  const publicRead = c.req.method === 'GET' && ['/api/settings', '/api/menu', '/api/auth/session', '/api/platform-notice'].includes(path);
+  const publicRead = c.req.method === 'GET' && ['/api/settings', '/api/menu', '/api/auth/session', '/api/platform-notice', '/api/promotions', '/api/pickup-slots'].includes(path);
   const publicWrite = c.req.method === 'POST' && ['/api/auth/login', '/api/auth/setup', '/api/orders'].includes(path);
   const tracking = (c.req.method === 'GET' && /^\/api\/(orders\/[^/]+\/tracking|events\/public|event-bookings\/[^/]+\/status)$/.test(path))
     || (c.req.method === 'POST' && /^\/api\/(events\/[^/]+\/bookings|event-bookings\/[^/]+\/cancel)$/.test(path));
@@ -231,7 +239,7 @@ app.use('/api/*', async (c, next) => {
   const panelAccess = (c.req.method === 'GET' && ['/api/orders', '/api/order-items', '/api/tasks', '/api/staff', '/api/staff/shifts', '/api/stock', '/api/recipes', '/api/customers', '/api/events', '/api/event-bookings'].includes(path))
     || (c.req.method === 'POST' && ['/api/tasks', '/api/staff/clock-in', '/api/staff/clock-out', '/api/customers'].includes(path))
     || (c.req.method === 'PUT' && /^\/api\/(orders\/[^/]+|orders\/[^/]+\/status|tasks\/[^/]+\/status|menu\/items\/[^/]+\/stock|customers\/[^/]+|event-bookings\/[^/]+)$/.test(path))
-    || (c.req.method === 'GET' && /^\/api\/menu\/[^/]+\/recipe$/.test(path));
+    || (c.req.method === 'GET' && /^\/api\/(menu\/[^/]+\/recipe|customers\/[^/]+\/ledger)$/.test(path));
   if (workspace === 'panel' && !publicRead && !publicWrite && !tracking && !path.startsWith('/api/auth/') && !panelAccess) {
     return c.json({ success: false, message: 'This action requires the admin workspace.' }, 403);
   }
@@ -300,6 +308,10 @@ registerTelegramBot(app);
 registerCustomers(app);
 registerEvents(app);
 registerStockCategories(app);
+registerPromotions(app);
+registerLoyalty(app);
+registerPurchasing(app);
+registerPickup(app);
 
 // --- 1. Settings & Branding Routes ---
 const getSettings = async (c: Context<Env>) => {
@@ -328,13 +340,19 @@ app.put('/api/settings', async (c) => {
   if (body.secondaryCalendar !== undefined && body.secondaryCalendar !== '' && !isCalendarSystem(body.secondaryCalendar)) return c.json({ success: false, message: 'Choose a supported secondary calendar.' }, 400);
   const current = c.env?.DB ? await c.env.DB.prepare('SELECT * FROM settings WHERE id = ?').bind('cafe_config').first() : null;
   const savedSettings = { ...store.getSettings(), ...(current ? mapRow(current as Record<string, unknown>) : {}) };
-  const updated = { ...savedSettings, ...body, appearance: JSON.stringify(parseAppearance(body.appearance ?? savedSettings.appearance)), updatedAt: new Date().toISOString() };
+  const updated = {
+    ...savedSettings, ...body,
+    appearance: JSON.stringify(parseAppearance(body.appearance ?? savedSettings.appearance)),
+    loyalty: JSON.stringify(parseLoyalty(body.loyalty ?? savedSettings.loyalty)),
+    pickupSlots: JSON.stringify(parsePickupSlots(body.pickupSlots ?? savedSettings.pickupSlots)),
+    updatedAt: new Date().toISOString()
+  };
 
   if (c.env?.DB) {
     await ensureSettingsColumns(c.env.DB);
     try {
       await c.env.DB.prepare(
-        `UPDATE settings SET cafe_name = ?, logo_url = ?, brand_primary = ?, brand_secondary = ?, currency = ?, tax_rate = ?, open_hours = ?, contact_phone = ?, address = ?, telegram_bot_token = ?, telegram_chat_id = ?, notify_sales = ?, notify_shifts = ?, notify_tasks = ?, notify_daily_report = ?, notify_low_stock = ?, notify_bookings = ?, calendar_system = ?, secondary_calendar = ?, telegram_events_chat_id = ?, appearance = ?, time_zone = ?, updated_at = ? WHERE id = ?`
+        `UPDATE settings SET cafe_name = ?, logo_url = ?, brand_primary = ?, brand_secondary = ?, currency = ?, tax_rate = ?, open_hours = ?, contact_phone = ?, address = ?, telegram_bot_token = ?, telegram_chat_id = ?, notify_sales = ?, notify_shifts = ?, notify_tasks = ?, notify_daily_report = ?, notify_low_stock = ?, notify_bookings = ?, calendar_system = ?, secondary_calendar = ?, telegram_events_chat_id = ?, appearance = ?, time_zone = ?, loyalty = ?, pickup_slots = ?, updated_at = ? WHERE id = ?`
       ).bind(
         updated.cafeName,
         updated.logoUrl,
@@ -358,6 +376,8 @@ app.put('/api/settings', async (c) => {
         String(updated.telegramEventsChatId || '').trim(),
         updated.appearance,
         updated.timeZone || 'Asia/Tehran',
+        updated.loyalty,
+        updated.pickupSlots,
         updated.updatedAt,
         'cafe_config'
       ).run();
@@ -377,8 +397,15 @@ const getMenu = async (c: Context<Env>) => {
     await ensureMenuColumns(c.env.DB);
     try {
       const { results: categories } = await c.env.DB.prepare('SELECT * FROM categories ORDER BY display_order ASC').all();
-      const { results: items } = await c.env.DB.prepare('SELECT * FROM menu_items').all();
-      const { results: variants } = await c.env.DB.prepare('SELECT * FROM menu_variants').all();
+      const { results: items } = await c.env.DB.prepare('SELECT * FROM menu_items ORDER BY display_order, rowid').all();
+      const { results: variants } = await c.env.DB.prepare('SELECT * FROM menu_variants ORDER BY rowid').all();
+      // Staff see what each option changes in the recipe; the public menu does not need it.
+      const variantStock = new Map<string, Array<{ stockItemId: string; quantity: number }>>();
+      if (c.get('authed')) {
+        for (const row of (await c.env.DB.prepare('SELECT variant_id, stock_item_id, quantity_delta FROM variant_recipes ORDER BY rowid').all<Record<string, any>>()).results) {
+          variantStock.set(row.variant_id, [...(variantStock.get(row.variant_id) || []), { stockItemId: row.stock_item_id, quantity: Number(row.quantity_delta) }]);
+        }
+      }
 
       if (categories) {
         const mappedCats = mapRows(categories as Record<string, unknown>[]);
@@ -393,7 +420,7 @@ const getMenu = async (c: Context<Env>) => {
             .filter((item: any) => item.categoryId === cat.id)
             .map((item: any) => ({
               ...item,
-              variants: mappedVariants.filter((v: any) => v.menuItemId === item.id)
+              variants: mappedVariants.filter((v: any) => v.menuItemId === item.id).map((v: any) => c.get('authed') ? { ...v, stock: variantStock.get(v.id) || [] } : v)
             }))
         }));
         return c.json({ source: 'd1_database', data: publicMenu });
@@ -509,6 +536,60 @@ app.put('/api/menu/items/:id/stock', async (c) => {
   return c.json({ success: true, message: 'Stock status updated', data: updated || { id: itemId, isInStock } });
 });
 
+/**
+ * Statements that replace an item's options and what each changes in the recipe, or why they cannot be saved.
+ * Option IDs are kept when given, so past orders still name the option they were made with.
+ */
+async function variantStatements(db: D1Database, itemId: string, input: unknown): Promise<{ error: string } | { statements: D1PreparedStatement[] }> {
+  if (!Array.isArray(input) || input.length > 60) return { error: 'An item can have up to 60 options.' };
+  const statements = [
+    db.prepare('DELETE FROM variant_recipes WHERE variant_id IN (SELECT id FROM menu_variants WHERE menu_item_id = ?)').bind(itemId),
+    db.prepare('DELETE FROM menu_variants WHERE menu_item_id = ?').bind(itemId)
+  ];
+  const stockIds = new Set<string>();
+  const ids = new Set<string>();
+  for (const v of input) {
+    const groupName = typeof v?.groupName === 'string' ? v.groupName.trim().slice(0, 60) : '';
+    const name = typeof v?.name === 'string' ? v.name.trim().slice(0, 100) : '';
+    const priceModifier = Number(v?.priceModifier || 0);
+    if (!groupName || !name || !Number.isFinite(priceModifier) || Math.abs(priceModifier) > 1e9) return { error: 'Each option needs a group, a name and a price change.' };
+    const id = typeof v.id === 'string' && /^[\w-]{1,100}$/.test(v.id) && !ids.has(v.id) ? v.id : `var-${crypto.randomUUID()}`;
+    ids.add(id);
+    statements.push(db.prepare('INSERT INTO menu_variants (id, menu_item_id, group_name, name, price_modifier) VALUES (?, ?, ?, ?, ?)').bind(id, itemId, groupName, name, priceModifier));
+    const stock = Array.isArray(v.stock) ? v.stock : [];
+    if (stock.length > 20 || new Set(stock.map((s: any) => s?.stockItemId)).size !== stock.length) return { error: `Each material can appear once per option (${name}).` };
+    for (const delta of stock) {
+      const quantity = Number(delta?.quantity);
+      if (typeof delta?.stockItemId !== 'string' || !Number.isFinite(quantity) || quantity === 0 || Math.abs(quantity) > 1e6) return { error: `Enter how much each material changes for ${name}, above or below zero.` };
+      stockIds.add(delta.stockItemId);
+      statements.push(db.prepare('INSERT INTO variant_recipes (id, variant_id, stock_item_id, quantity_delta) VALUES (?, ?, ?, ?)').bind(crypto.randomUUID(), id, delta.stockItemId, quantity));
+    }
+  }
+  if (stockIds.size) {
+    const found = (await db.prepare(`SELECT id FROM stock_items WHERE id IN (${[...stockIds].map(() => '?').join(',')})`).bind(...stockIds).all()).results;
+    if (found.length !== stockIds.size) return { error: 'A material used by an option no longer exists.' };
+  }
+  return { statements };
+}
+
+// Staff drag categories and items into place; one request saves every position shown.
+app.put('/api/menu/order', async c => {
+  const body = await c.req.json();
+  const categories: unknown = body.categories, items: unknown = body.items;
+  const ids = (value: unknown) => Array.isArray(value) && value.length <= 1000 && value.every(id => typeof id === 'string') ? value as string[] : null;
+  if ((categories !== undefined && !ids(categories)) || (items !== undefined && (typeof items !== 'object' || items === null || Object.values(items).some(list => !ids(list))))) {
+    return c.json({ success: false, message: 'Invalid menu order.' }, 400);
+  }
+  await ensureMenuColumns(c.env.DB);
+  const statements: D1PreparedStatement[] = [];
+  (ids(categories) || []).forEach((id, index) => statements.push(c.env.DB.prepare('UPDATE categories SET display_order = ? WHERE id = ?').bind(index + 1, id)));
+  for (const [categoryId, list] of Object.entries((items || {}) as Record<string, string[]>)) {
+    list.forEach((id, index) => statements.push(c.env.DB.prepare('UPDATE menu_items SET display_order = ? WHERE id = ? AND category_id = ?').bind(index + 1, id, categoryId)));
+  }
+  if (statements.length) await c.env.DB.batch(statements);
+  return c.json({ success: true });
+});
+
 app.post('/api/menu/items', async (c) => {
   const body = await c.req.json();
   const itemInput = body.item || body;
@@ -517,10 +598,12 @@ app.post('/api/menu/items', async (c) => {
 
   if (c.env?.DB) {
     await ensureMenuColumns(c.env.DB);
+    const options = await variantStatements(c.env.DB, newItem.id, Array.isArray(body.variants) ? body.variants : []);
+    if ('error' in options) return c.json({ success: false, message: options.error }, 400);
     try {
-      await c.env.DB.prepare(
-        `INSERT INTO menu_items (id, category_id, name, description, base_price, profit_margin, is_in_stock, image_url, badge, allergens, dietary_labels, translations, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      const insertItem = c.env.DB.prepare(
+        `INSERT INTO menu_items (id, category_id, name, description, base_price, profit_margin, is_in_stock, image_url, badge, allergens, dietary_labels, translations, created_at, display_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 1 FROM menu_items WHERE category_id = ?))`
       ).bind(
         newItem.id,
         newItem.categoryId,
@@ -534,18 +617,10 @@ app.post('/api/menu/items', async (c) => {
         newItem.allergens || '',
         newItem.dietaryLabels || '',
         translations,
-        newItem.createdAt
-      ).run();
-
-
-      if (body.variants && Array.isArray(body.variants)) {
-        for (const v of body.variants) {
-          const varId = v.id || `var-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-          await c.env.DB.prepare(
-            `INSERT INTO menu_variants (id, menu_item_id, group_name, name, price_modifier) VALUES (?, ?, ?, ?, ?)`
-          ).bind(varId, newItem.id, v.groupName, v.name, v.priceModifier || 0.0).run();
-        }
-      }
+        newItem.createdAt,
+        newItem.categoryId
+      );
+      await c.env.DB.batch([insertItem, ...options.statements.slice(2)]);
     } catch (e) {
       console.warn('D1 Insert Error (menu_item):', e);
       return c.json({ success: false, message: 'The change could not be saved. Please try again.' }, 503);
@@ -563,9 +638,13 @@ app.put('/api/menu/items/:id', async (c) => {
 
   if (c.env?.DB) {
     await ensureMenuColumns(c.env.DB);
+    const options = Array.isArray(body.variants) ? await variantStatements(c.env.DB, id, body.variants) : { statements: [] };
+    if ('error' in options) return c.json({ success: false, message: options.error }, 400);
     try {
-      await c.env.DB.prepare(
+      // An item moved to another category goes to the end of it.
+      const updateItem = c.env.DB.prepare(
         `UPDATE menu_items SET
+           display_order = CASE WHEN ? IS NOT NULL AND ? != category_id THEN (SELECT COALESCE(MAX(m2.display_order), 0) + 1 FROM menu_items m2 WHERE m2.category_id = ?) ELSE display_order END,
            category_id = COALESCE(?, category_id),
            name = COALESCE(?, name),
            description = COALESCE(?, description),
@@ -577,6 +656,7 @@ app.put('/api/menu/items/:id', async (c) => {
            translations = COALESCE(?, translations)
          WHERE id = ?`
       ).bind(
+        body.categoryId ?? null, body.categoryId ?? null, body.categoryId ?? null,
         body.categoryId ?? null,
         body.name ?? null,
         body.description ?? null,
@@ -589,17 +669,8 @@ app.put('/api/menu/items/:id', async (c) => {
         body.dietaryLabels ?? null,
         translations,
         id
-      ).run();
-
-      if (body.variants && Array.isArray(body.variants)) {
-        await c.env.DB.prepare('DELETE FROM menu_variants WHERE menu_item_id = ?').bind(id).run();
-        for (const v of body.variants) {
-          const varId = v.id || `var-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-          await c.env.DB.prepare(
-            `INSERT INTO menu_variants (id, menu_item_id, group_name, name, price_modifier) VALUES (?, ?, ?, ?, ?)`
-          ).bind(varId, id, v.groupName, v.name, v.priceModifier || 0.0).run();
-        }
-      }
+      );
+      await c.env.DB.batch([updateItem, ...options.statements]);
     } catch (e) {
       console.warn('D1 Update Error (menu_item):', e);
       return c.json({ success: false, message: 'The change could not be saved. Please try again.' }, 503);
@@ -615,8 +686,11 @@ app.delete('/api/menu/items/:id', async (c) => {
 
   if (c.env?.DB) {
     try {
-      await c.env.DB.prepare('DELETE FROM menu_items WHERE id = ?').bind(id).run();
-      await c.env.DB.prepare('DELETE FROM menu_variants WHERE menu_item_id = ?').bind(id).run();
+      await c.env.DB.batch([
+        c.env.DB.prepare('DELETE FROM variant_recipes WHERE variant_id IN (SELECT id FROM menu_variants WHERE menu_item_id = ?)').bind(id),
+        c.env.DB.prepare('DELETE FROM menu_variants WHERE menu_item_id = ?').bind(id),
+        c.env.DB.prepare('DELETE FROM menu_items WHERE id = ?').bind(id)
+      ]);
     } catch (e) {
       console.warn('D1 Delete Error (menu_item):', e);
       return c.json({ success: false, message: 'The change could not be saved. Please try again.' }, 503);
@@ -652,7 +726,7 @@ app.post('/api/stock', async (c) => {
     await ensureStockTables(c.env.DB);
     try {
       const insertStock = c.env.DB.prepare(
-        `INSERT INTO stock_items (id, name, category, quantity, unit, unit_cost, total_price, min_threshold, updated_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO stock_items (id, name, category, quantity, unit, unit_cost, total_price, min_threshold, updated_at, created_at, supplier_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT id FROM suppliers WHERE id = ?))`
       ).bind(
         newItem.id,
         newItem.name,
@@ -663,7 +737,8 @@ app.post('/api/stock', async (c) => {
         0,
         newItem.minThreshold,
         newItem.updatedAt,
-        newItem.createdAt
+        newItem.createdAt,
+        typeof body.supplierId === 'string' ? body.supplierId : null
       );
       const statements = [insertStock];
       if (newItem.quantity) statements.push(c.env.DB.prepare('INSERT INTO inventory_movements (id,stock_item_id,kind,quantity,notes,created_at) VALUES (?,?,?,?,?,?)').bind(crypto.randomUUID(),newItem.id,'purchase',newItem.quantity,'Initial stock',newItem.createdAt));
@@ -695,7 +770,7 @@ app.put('/api/stock/:id', async c => {
   if (updated.unit !== row.unit && Number(row.quantity) !== 0) return c.json({ success: false, message: 'An ingredient’s unit cannot change while it has stock. Create a new ingredient instead.' }, 409);
   const now = new Date().toISOString();
   await c.env.DB.batch([
-    c.env.DB.prepare(`UPDATE stock_items SET name=?,category=?,unit=?,unit_cost=?,total_price=quantity*?,min_threshold=?,updated_at=? WHERE id=?`).bind(updated.name,updated.category,updated.unit,updated.unitCost,updated.unitCost,updated.minThreshold,now,id),
+    c.env.DB.prepare(`UPDATE stock_items SET name=?,category=?,unit=?,unit_cost=?,total_price=quantity*?,min_threshold=?,supplier_id=(SELECT id FROM suppliers WHERE id = ?),updated_at=? WHERE id=?`).bind(updated.name,updated.category,updated.unit,updated.unitCost,updated.unitCost,updated.minThreshold,typeof updated.supplierId === 'string' ? updated.supplierId : null,now,id),
     c.env.DB.prepare(`INSERT INTO inventory_movements (id,stock_item_id,kind,quantity,notes,created_at) SELECT ?,id,'adjustment',?-quantity,'Stock editor adjustment',? FROM stock_items WHERE id=? AND ABS(quantity-?)>0.000001`).bind(crypto.randomUUID(),updated.quantity,now,id,updated.quantity)
   ]);
   return c.json({ success: true, data: updated });
@@ -712,6 +787,7 @@ app.delete('/api/stock/:id', async (c) => {
       // One batch, so a failure leaves the material, its recipes and its history as they were.
       await c.env.DB.batch([
         c.env.DB.prepare('DELETE FROM recipes WHERE stock_item_id = ?').bind(id),
+        c.env.DB.prepare('DELETE FROM variant_recipes WHERE stock_item_id = ?').bind(id),
         c.env.DB.prepare('DELETE FROM inventory_movements WHERE stock_item_id = ?').bind(id),
         c.env.DB.prepare('DELETE FROM stock_items WHERE id = ?').bind(id)
       ]);
@@ -1153,10 +1229,10 @@ const round2 = (value: number) => Number(value.toFixed(2));
 
 /**
  * Checks order lines against the menu and prices them from it, in place. Staff may add custom lines and discount single lines;
- * the public pays menu prices and picks an option from every group. When an order is edited, its `existing` lines may stay
+ * the public pays menu prices, less any running promotion, and picks an option from every group. When an order is edited, its `existing` lines may stay
  * even if the item has since sold out or left the menu.
  */
-async function priceOrderItems(c: Context<Env>, items: any[], authed: boolean, existing = new Set<string>()): Promise<{ error: Response } | { subtotal: number; lineDiscounts: number }> {
+async function priceOrderItems(c: Context<Env>, items: any[], authed: boolean, existing = new Set<string>(), promotions?: { list: Promotion[]; timeZone: string }): Promise<{ error: Response } | { subtotal: number; lineDiscounts: number }> {
   const fail = (message: string, status: 400 | 409 = 400) => ({ error: c.json({ success: false, message }, status) });
   if (!Array.isArray(items) || items.length === 0 || items.some((item: any) =>
     !item || typeof item.menuItemId !== 'string' || !item.menuItemId || !Number.isInteger(item.quantity) || item.quantity < 1 ||
@@ -1189,10 +1265,17 @@ async function priceOrderItems(c: Context<Env>, items: any[], authed: boolean, e
     item.unitPrice = round2(Number(row.base_price) + selected.reduce((sum, v) => sum + Number(v.priceModifier), 0));
     if (!authed && Math.abs(submittedPrice - item.unitPrice) > 0.005) return fail('Prices have changed. Review your order and try again.', 409);
     item.variants = selected;
+    if (promotions) {
+      const best = bestPromotion(promotions.list, { id: String(row.id), categoryId: String(row.category_id) }, item.unitPrice, new Date(), promotions.timeZone);
+      item.promotionDiscount = best ? promotionLineDiscount(best.unitDiscount, item.quantity) : 0;
+    }
   }
   // A line discount is for the whole line, not each unit, and never more than the line.
+  // The public's only discounts are running promotions. A line priced with a promotion that has since ended asks for a review.
   for (const item of items) {
-    const discount = authed ? round2(Number(item.discountAmount || 0)) : 0;
+    const discount = authed ? round2(Number(item.discountAmount || 0)) : round2(Number(item.promotionDiscount || 0));
+    if (!authed && item.promotionId && Math.abs(Number(item.discountAmount || 0) - discount) > 0.005) return fail('Prices have changed. Review your order and try again.', 409);
+    delete item.promotionDiscount; delete item.promotionId;
     if (discount < 0 || discount > round2(item.unitPrice * item.quantity)) return fail(`The discount on ${item.itemName} is more than the item costs.`);
     item.discountAmount = discount;
   }
@@ -1214,6 +1297,24 @@ function orderTotals(c: Context<Env>, priced: { subtotal: number; lineDiscounts:
   return { subtotal: priced.subtotal, discountAmount, taxAmount, totalAmount: round2(priced.subtotal - discountAmount + taxAmount) };
 }
 
+/**
+ * Every material an order's lines need: recipe quantities, plus what each chosen option adds (positive) or replaces
+ * (negative). Options are read from the line's stored JSON; older lines stored plain names, which match no option ID.
+ * Binds the order ID twice.
+ */
+const ORDER_NEEDS = `
+  SELECT r.stock_item_id, r.quantity_required * oi.quantity AS quantity FROM recipes r JOIN order_items oi ON oi.menu_item_id = r.menu_item_id
+    WHERE oi.order_id = ? AND r.quantity_required > 0
+  UNION ALL
+  SELECT vr.stock_item_id, vr.quantity_delta * oi.quantity FROM order_items oi
+    JOIN json_each(CASE WHEN json_valid(oi.variants_json) THEN oi.variants_json ELSE '[]' END) j
+    JOIN variant_recipes vr ON vr.variant_id = CASE WHEN j.type = 'object' THEN json_extract(j.value, '$.id') ELSE j.value END
+    WHERE oi.order_id = ?`;
+
+const loyaltySync = async (db: D1Database, orderId: string) => {
+  try { await syncOrderLoyalty(db, orderId); } catch (e) { console.warn('Club balance sync failed:', e); }
+};
+
 const insertOrderItems = (db: D1Database, orderId: string, items: any[]) => items.map((item, index) => db.prepare(
   `INSERT INTO order_items (id, order_id, menu_item_id, item_name, quantity, unit_price, variants_json, discount_amount, item_total)
    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -1232,7 +1333,12 @@ app.post('/api/orders', async (c) => {
   if (!c.env?.DB) return c.json({ success: false, message: 'Ordering is unavailable until the database is configured.' }, 503);
   if (body.id && (typeof body.id !== 'string' || !/^(public|ord)-[0-9a-f-]{36}$/i.test(body.id) || (!authed && !body.id.startsWith('public-')))) return c.json({ success: false, message: 'Invalid order ID.' }, 400);
   body.id ||= `${authed ? 'ord' : 'public'}-${crypto.randomUUID()}`;
-  const fingerprintBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({ items: body.items, customerName: body.customerName, customerId: body.customerId, orderType: body.orderType, paymentMethod: body.paymentMethod, discountAmount: body.discountAmount || 0 })));
+  const fingerprintBytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify({
+    items: body.items, customerName: body.customerName, customerId: body.customerId, orderType: body.orderType, paymentMethod: body.paymentMethod, discountAmount: body.discountAmount || 0,
+    // Fields added later join only when sent, so retries of orders queued by an older till still match.
+    ...(body.tipAmount ? { tipAmount: body.tipAmount } : {}), ...(body.pickupAt ? { pickupAt: body.pickupAt } : {}),
+    ...(body.clubPhone ? { clubPhone: body.clubPhone } : {}), ...(body.loyalty ? { loyalty: body.loyalty } : {})
+  })));
   const fingerprint = Array.from(new Uint8Array(fingerprintBytes), byte=>byte.toString(16).padStart(2,'0')).join('');
   const replay = async () => {
     const row = await c.env.DB.prepare('SELECT o.*, r.fingerprint FROM orders o LEFT JOIN order_requests r ON r.id=o.id WHERE o.id=?').bind(body.id).first();
@@ -1251,28 +1357,48 @@ app.post('/api/orders', async (c) => {
   if (!ORDER_TYPES.includes(body.orderType) || !(authed ? STAFF_PAYMENT_METHODS : ['cash','card']).includes(body.paymentMethod)) {
     return c.json({ success: false, message: 'Invalid order details.' }, 400);
   }
-  const priced = await priceOrderItems(c, body.items, authed);
+  const timeZone = String(config.timeZone || 'Asia/Tehran');
+  const priced = await priceOrderItems(c, body.items, authed, new Set(), authed ? undefined : { list: await activePromotions(c.env.DB), timeZone });
   if ('error' in priced) return priced.error;
-  const totals = orderTotals(c, priced, authed ? body.discountAmount : 0, Number(config.taxRate));
+  const totals = orderTotals(c, priced, authed ? body.discountAmount : priced.lineDiscounts, Number(config.taxRate));
   if ('error' in totals) return totals.error;
   if (body.customerName && (typeof body.customerName !== 'string' || body.customerName.length > 100)) return c.json({ success: false, message: 'Customer name is too long.' }, 400);
   if (authed && body.createdAt && !Number.isFinite(Date.parse(body.createdAt))) return c.json({ success: false, message: 'Invalid order date.' }, 400);
-  // Only staff link orders to club members; the order keeps the member's name as it was at the time.
-  const member = authed && body.customerId ? await c.env.DB.prepare('SELECT id, name FROM customers WHERE id = ?').bind(String(body.customerId)).first<{ id: string; name: string }>() : null;
+  // Tips are staff-entered at the till, never taxed, and kept out of the order total.
+  const tipAmount = authed ? round2(Number(body.tipAmount || 0)) : 0;
+  if (!Number.isFinite(tipAmount) || tipAmount < 0 || tipAmount > 1e9) return c.json({ success: false, message: 'Enter a tip of zero or more.' }, 400);
+  let pickupAt: string | null = null;
+  if (body.pickupAt !== undefined && body.pickupAt !== null && body.pickupAt !== '') {
+    if (body.orderType !== 'pickup') return c.json({ success: false, message: 'Only pickup orders have a pickup time.' }, 400);
+    const slot = (await availablePickupSlots(c.env.DB, configRow as Record<string, unknown>)).slots.find(s => s.at === body.pickupAt);
+    if (!slot) return c.json({ success: false, message: 'That pickup time is no longer available. Choose another.' }, 409);
+    if (slot.remaining < 1) return c.json({ success: false, message: 'That pickup time is full. Choose another.' }, 409);
+    pickupAt = slot.at;
+  }
+  // Staff link orders to club members and the order keeps the member's name as it was at the time. A public order is linked
+  // to the member with the phone number given at checkout, so it collects stamps, but keeps the name the customer typed.
+  const member = authed && body.customerId
+    ? await c.env.DB.prepare('SELECT id, name FROM customers WHERE id = ?').bind(String(body.customerId)).first<{ id: string; name: string }>()
+    : !authed && body.clubPhone ? await c.env.DB.prepare('SELECT id, name FROM customers WHERE phone = ?').bind(normalizePhone(body.clubPhone)).first<{ id: string; name: string }>() : null;
   if (authed && body.customerId && !member) return c.json({ success: false, message: 'This club member no longer exists. Pick them again.' }, 400);
   if (body.id && (typeof body.id !== 'string' || !/^[a-zA-Z0-9-]{16,100}$/.test(body.id))) return c.json({ success: false, message: 'Invalid order ID.' }, 400);
   const orderData = {
     id: body.id || `ord-${crypto.randomUUID()}`,
     // Staff tills number orders themselves, so one taken offline keeps the number on its ticket.
     orderNumber: authed && typeof body.orderNumber === 'string' && /^#[0-9A-F]{8}$/.test(body.orderNumber) ? body.orderNumber : `#${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
-    customerName: member?.name || body.customerName || 'Guest Customer',
+    customerName: (authed ? member?.name : '') || body.customerName || 'Guest Customer',
     customerId: member?.id || null,
     orderType: body.orderType || 'dine_in',
     ...totals,
+    tipAmount,
+    pickupAt,
     paymentMethod: body.paymentMethod || 'card',
     status: authed && body.status === 'completed' ? 'completed' : 'pending',
     createdAt: authed && body.createdAt ? new Date(body.createdAt).toISOString() : new Date().toISOString()
   };
+  const redemption = authed ? await redemptionStatement(c.env.DB, orderData.id, orderData.customerId, body.loyalty) : { statement: null, minimumDiscount: 0 };
+  if ('error' in redemption) return c.json({ success: false, message: redemption.error }, 400);
+  if (totals.discountAmount + 0.005 < redemption.minimumDiscount) return c.json({ success: false, message: 'The discount must cover the points used.' }, 400);
 
   if (c.env?.DB) {
     try {
@@ -1280,19 +1406,21 @@ app.post('/api/orders', async (c) => {
       // D1 batch is transactional: a failed item insert rolls back the whole order.
       // A strict order INSERT also makes concurrent retries of the same ID safe.
       const statements = [c.env.DB.prepare(
-        `INSERT INTO orders (id, order_number, customer_name, customer_id, order_type, subtotal, tax_amount, discount_amount, total_amount, payment_method, status, createdAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO orders (id, order_number, customer_name, customer_id, order_type, subtotal, tax_amount, discount_amount, total_amount, payment_method, status, createdAt, tip_amount, pickup_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         orderData.id, orderData.orderNumber, orderData.customerName, orderData.customerId, orderData.orderType,
         orderData.subtotal, orderData.taxAmount, orderData.discountAmount,
-        orderData.totalAmount, orderData.paymentMethod, orderData.status, orderData.createdAt
+        orderData.totalAmount, orderData.paymentMethod, orderData.status, orderData.createdAt, orderData.tipAmount, orderData.pickupAt
       )];
       statements.push(...insertOrderItems(c.env.DB, orderData.id, body.items));
       statements.push(c.env.DB.prepare('INSERT INTO order_requests (id,fingerprint) VALUES (?,?)').bind(orderData.id,fingerprint));
       statements.push(c.env.DB.prepare(`INSERT INTO inventory_movements (id,stock_item_id,kind,quantity,notes,order_id,created_at)
-        SELECT ? || '-' || r.stock_item_id, r.stock_item_id, 'consumption', -SUM(r.quantity_required * oi.quantity), 'Order ingredients', ?, ?
-        FROM recipes r JOIN order_items oi ON oi.menu_item_id = r.menu_item_id WHERE oi.order_id = ? AND r.quantity_required > 0 GROUP BY r.stock_item_id`).bind(orderData.id, orderData.id, orderData.createdAt, orderData.id));
+        SELECT ? || '-' || n.stock_item_id, n.stock_item_id, 'consumption', -SUM(n.quantity), 'Order ingredients', ?, ?
+        FROM (${ORDER_NEEDS}) n JOIN stock_items s ON s.id = n.stock_item_id GROUP BY n.stock_item_id HAVING SUM(n.quantity) > 0.000001`).bind(orderData.id, orderData.id, orderData.createdAt, orderData.id, orderData.id));
+      if (redemption.statement) statements.push(redemption.statement);
       await c.env.DB.batch(statements);
+      if (orderData.status === 'completed') await loyaltySync(c.env.DB, orderData.id);
     } catch (error) {
       // Another request may have committed this same order while this batch waited.
       try {
@@ -1335,6 +1463,7 @@ app.delete('/api/orders/:id', async (c) => {
         c.env.DB.prepare('DELETE FROM order_requests WHERE id = ?').bind(id),
         c.env.DB.prepare('DELETE FROM orders WHERE id = ?').bind(id)
       ]);
+      await loyaltySync(c.env.DB, id);
     } catch (e) {
       console.warn('D1 Delete Error (orders):', e);
       return c.json({ success: false, message: 'The change could not be saved. Please try again.' }, 503);
@@ -1364,19 +1493,22 @@ app.put('/api/orders/:id', async c => {
   if ('error' in totals) return totals.error;
   const member = body.customerId ? await c.env.DB.prepare('SELECT id, name FROM customers WHERE id = ?').bind(String(body.customerId)).first<{ id: string; name: string }>() : null;
   if (body.customerId && !member) return c.json({ success: false, message: 'This club member no longer exists. Pick them again.' }, 400);
+  const tipAmount = body.tipAmount === undefined ? Number(order.tip_amount || 0) : round2(Number(body.tipAmount));
+  if (!Number.isFinite(tipAmount) || tipAmount < 0 || tipAmount > 1e9) return c.json({ success: false, message: 'Enter a tip of zero or more.' }, 400);
   const updated = {
     ...mapRow(order),
     customerName: member?.name || body.customerName?.trim() || 'Walk-in',
     customerId: member?.id || null,
     orderType: body.orderType,
     paymentMethod: body.paymentMethod,
-    ...totals
+    ...totals,
+    tipAmount
   };
   const now = new Date().toISOString();
   try {
     await c.env.DB.batch([
-      c.env.DB.prepare('UPDATE orders SET customer_name = ?, customer_id = ?, order_type = ?, payment_method = ?, subtotal = ?, tax_amount = ?, discount_amount = ?, total_amount = ? WHERE id = ?')
-        .bind(updated.customerName, updated.customerId, updated.orderType, updated.paymentMethod, totals.subtotal, totals.taxAmount, totals.discountAmount, totals.totalAmount, id),
+      c.env.DB.prepare('UPDATE orders SET customer_name = ?, customer_id = ?, order_type = ?, payment_method = ?, subtotal = ?, tax_amount = ?, discount_amount = ?, total_amount = ?, tip_amount = ? WHERE id = ?')
+        .bind(updated.customerName, updated.customerId, updated.orderType, updated.paymentMethod, totals.subtotal, totals.taxAmount, totals.discountAmount, totals.totalAmount, tipAmount, id),
       c.env.DB.prepare('DELETE FROM order_items WHERE order_id = ?').bind(id),
       ...insertOrderItems(c.env.DB, id, body.items),
       // What the new lines need, less what the order already holds: negative takes more stock, positive returns some.
@@ -1385,18 +1517,18 @@ app.put('/api/orders/:id', async c => {
         SELECT ? || '-' || d.stock_item_id, d.stock_item_id, CASE WHEN d.delta < 0 THEN 'consumption' ELSE 'return' END, d.delta, 'Order edited', ?, ?
         FROM (
           SELECT u.stock_item_id, SUM(u.quantity) AS delta FROM (
-            SELECT r.stock_item_id, -r.quantity_required * oi.quantity AS quantity FROM recipes r JOIN order_items oi ON oi.menu_item_id = r.menu_item_id
-              WHERE oi.order_id = ? AND r.quantity_required > 0
+            SELECT n.stock_item_id, -MAX(0, SUM(n.quantity)) AS quantity FROM (${ORDER_NEEDS}) n GROUP BY n.stock_item_id
             UNION ALL
             SELECT m.stock_item_id, -m.quantity FROM inventory_movements m WHERE m.order_id = ?
           ) u JOIN stock_items s ON s.id = u.stock_item_id
           GROUP BY u.stock_item_id HAVING ABS(SUM(u.quantity)) > 0.000001
-        ) d`).bind(`edit-${crypto.randomUUID()}`, id, now, id, id)
+        ) d`).bind(`edit-${crypto.randomUUID()}`, id, now, id, id, id)
     ]);
   } catch (error) {
     if (String(error).includes('Insufficient stock')) return c.json({ success: false, message: 'There are not enough ingredients for this change. Nothing was changed.' }, 409);
     throw error;
   }
+  await loyaltySync(c.env.DB, id);
   const { results: items } = await c.env.DB.prepare('SELECT * FROM order_items WHERE order_id = ?').bind(id).all();
   return c.json({ success: true, data: { order: updated, items: mapRows(items as Record<string, unknown>[]) } });
 });
@@ -1410,6 +1542,7 @@ app.put('/api/orders/:id/status', async (c) => {
   if (c.env?.DB) {
     try {
       await c.env.DB.prepare('UPDATE orders SET status = ? WHERE id = ?').bind(status, id).run();
+      await loyaltySync(c.env.DB, id);
     } catch (e) {
       console.warn('D1 Update Error (orders):', e);
       return c.json({ success: false, message: 'The change could not be saved. Please try again.' }, 503);

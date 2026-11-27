@@ -2,6 +2,11 @@ import type { Hono } from 'hono';
 import type { Env } from '../server';
 import { bumpDataVersion, cafeDate, ensureFeatureTables } from './operations';
 import { getOpeningStatus } from '../utils/openingHours';
+import { syncOrderLoyalty } from './loyalty';
+import { buildReceipt, orderFromStartPayload } from './receipts';
+import { createReorderDrafts, listPurchaseOrders } from './purchasing';
+import { receiptTelegramMessage } from '../utils/receipt';
+import { reorderQuantity } from '../utils/purchasing';
 import {
   callTelegram, cafeTime, escapeHtml, formatDailyFinancialReportMessage, formatSaleMessage, getTelegramConfig, money,
   orderKeyboard, ORDER_STATUS_LABEL, sendTelegramMessage,
@@ -16,6 +21,7 @@ const COMMANDS: { command: string; description: string }[] = [
   { command: 'orders', description: 'Open orders, with buttons to move them along' },
   { command: 'stock', description: 'Ingredients at or below their reorder level' },
   { command: 'restock', description: 'Record a purchase: /restock milk 12' },
+  { command: 'reorder', description: 'What to order, by supplier, with a button to draft the orders' },
   { command: 'menu', description: 'Find a menu item and mark it sold out or back' },
   { command: 'soldout', description: 'Menu items currently marked sold out' },
   { command: 'staff', description: 'Who is clocked in right now' },
@@ -83,6 +89,7 @@ export async function dailyStats(db: D1Database, date: string, timeZone: string)
     netProfit: totalRevenue - totalExpenses,
     cashTotal, cardTotal, qrTotal,
     otherTotal: totalRevenue - cashTotal - cardTotal - qrTotal,
+    tipsTotal: completed.reduce((total, o) => total + Number(o.tip_amount || 0), 0),
     topItems: [...items.values()].sort((a, b) => b.quantity - a.quantity || b.revenue - a.revenue).slice(0, 5),
   };
 }
@@ -163,7 +170,7 @@ async function orderView(db: D1Database, id: string, ctx: FormatContext): Promis
   if (!order) return null;
   const { results: items } = await db.prepare('SELECT item_name, quantity, item_total FROM order_items WHERE order_id = ?').bind(id).all<Row>();
   return formatSaleMessage(
-    { id: order.id, orderNumber: order.order_number, customerName: order.customer_name, orderType: order.order_type, totalAmount: order.total_amount, paymentMethod: order.payment_method, status: order.status, createdAt: order.createdAt },
+    { id: order.id, orderNumber: order.order_number, customerName: order.customer_name, orderType: order.order_type, totalAmount: order.total_amount, paymentMethod: order.payment_method, status: order.status, createdAt: order.createdAt, pickupAt: order.pickup_at, tipAmount: order.tip_amount },
     items.map(i => ({ itemName: i.item_name, quantity: i.quantity, itemTotal: i.item_total })),
     ctx
   );
@@ -269,6 +276,20 @@ async function restock(db: D1Database, stockId: string, quantity: number): Promi
   return `📦 <b>${escapeHtml(item.name)}</b> +${quantity} ${escapeHtml(item.unit)} → <b>${total.toFixed(2)} ${escapeHtml(item.unit)}</b>${total <= Number(item.min_threshold) ? '\n⚠️ Still at or below the reorder level.' : ''}`;
 }
 
+/** Low stock grouped by supplier, with how much to order to get back to twice the reorder level. */
+async function reorderView(db: D1Database): Promise<TelegramMessage> {
+  const { results } = await db.prepare('SELECT s.*, sup.name AS supplier_name, sup.phone AS supplier_phone FROM stock_items s LEFT JOIN suppliers sup ON sup.id = s.supplier_id WHERE s.quantity <= s.min_threshold ORDER BY sup.name, s.name').all<Row>();
+  if (!results.length) return { text: '✅ <b>Nothing to reorder.</b> Every material is above its reorder level.' };
+  const groups = new Map<string, Row[]>();
+  for (const item of results) groups.set(item.supplier_name || 'No supplier', [...(groups.get(item.supplier_name || 'No supplier') || []), item]);
+  const sections = [...groups].map(([supplier, items]) => {
+    const phone = items[0].supplier_phone ? ` · ${escapeHtml(items[0].supplier_phone)}` : '';
+    const lines = items.map(i => ` • ${escapeHtml(i.name)}: ${reorderQuantity({ quantity: Number(i.quantity), minThreshold: Number(i.min_threshold) })} ${escapeHtml(i.unit)} <i>(have ${Number(i.quantity).toFixed(2)})</i>`);
+    return `🚚 <b>${escapeHtml(supplier)}</b>${phone}\n${lines.join('\n')}`;
+  });
+  return { text: `🛒 <b>To reorder</b>\n\n${sections.join('\n\n')}`, keyboard: [[{ text: '📝 Draft purchase orders', callback_data: 'po:new' }]] };
+}
+
 async function handleCommand(env: Bindings, config: TelegramConfig, command: string, args: string, reply: (m: TelegramMessage) => Promise<unknown>) {
   const db = env.DB;
   switch (command) {
@@ -299,6 +320,8 @@ async function handleCommand(env: Bindings, config: TelegramConfig, command: str
         return reply({ text: `📦 <b>All ingredients</b>\n\n${lines.join('\n') || 'No ingredients yet.'}` });
       }
       return reply(lowStockView(await lowStockItems(db), '📦 <b>Low stock</b>'));
+    case 'reorder':
+      return reply(await reorderView(db));
     case 'restock': {
       const tokens = args.trim().split(/\s+/).filter(Boolean);
       const index = tokens.findIndex(t => /^\d+(\.\d+)?$/.test(t));
@@ -363,6 +386,7 @@ async function handleCallback(env: Bindings, config: TelegramConfig, query: Row)
     } else {
       try {
         await db.prepare('UPDATE orders SET status = ? WHERE id = ?').bind(value, id).run();
+        await syncOrderLoyalty(db, id).catch(e => console.warn('Club balance sync failed:', e));
         toast = `${before.order_number} → ${ORDER_STATUS_LABEL[value] || value}`;
       } catch (e) {
         if (!String(e).includes('Invalid order status transition')) throw e;
@@ -384,6 +408,12 @@ async function handleCallback(env: Bindings, config: TelegramConfig, query: Row)
   } else if (kind === 'rs') {
     const quantity = Number(value);
     view = { text: quantity > 0 ? await restock(db, id, quantity) : 'Invalid quantity.' };
+  } else if (kind === 'po') {
+    const created = await createReorderDrafts(db);
+    const drafts = created.length ? await listPurchaseOrders(db) : [];
+    const names = drafts.filter(po => created.includes(po.id)).map(po => `• ${escapeHtml(po.supplierName || 'No supplier')} — ${po.lines.length} item${po.lines.length === 1 ? '' : 's'}`);
+    toast = created.length ? `${created.length} draft order${created.length === 1 ? '' : 's'} created.` : 'Everything low is already on an open order.';
+    view = { text: created.length ? `📝 <b>Draft purchase orders</b>\n\n${names.join('\n')}\n\n<i>Review and send them from Stock → Purchasing in the admin.</i>` : '📝 Everything low is already on an open purchase order.' };
   } else if (kind === 'nt') {
     const alert = ALERTS.find(a => a.column === id);
     if (alert) {
@@ -418,6 +448,13 @@ export async function handleTelegramUpdate(env: Bindings, config: TelegramConfig
   if (!match) return;
   const command = match[1].toLowerCase();
   const reply = (m: TelegramMessage) => sendTelegramMessage(config.botToken, chatId, m.text, m.keyboard);
+
+  // A customer who tapped "Get it on Telegram" on their receipt: /start with a signed order reference, from any chat.
+  if (command === 'start' && match[2] && env.SESSION_SECRET) {
+    const orderId = await orderFromStartPayload(match[2].trim(), env.SESSION_SECRET);
+    const receipt = orderId ? await buildReceipt(env.DB, orderId) : null;
+    if (orderId) return reply({ text: receipt ? receiptTelegramMessage(receipt) : 'That order could not be found.' });
+  }
 
   if (!authorized) {
     // Answer only what someone needs to link the chat; nothing about the café leaks.
