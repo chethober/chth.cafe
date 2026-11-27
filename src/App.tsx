@@ -15,7 +15,9 @@ import {
   Plus,
   Users,
   Contact,
-  CalendarDays
+  CalendarDays,
+  ChefHat,
+  BadgePercent
 } from 'lucide-react';
 import { store } from './db/store';
 import { api } from './services/api';
@@ -31,6 +33,8 @@ import { PanelManager, PanelSection } from './components/PanelManager';
 import { StockManagement } from './components/StockManagement';
 import { CustomerClub } from './components/CustomerClub';
 import { EventManager } from './components/EventManager';
+import { KitchenDisplay } from './components/KitchenDisplay';
+import { Promotions } from './components/Promotions';
 import { Button, Field, Input, LanguageSelect, Notice, NavItem, WorkspaceShell } from './ui';
 import { currentWorkspace, workspaceHome } from './utils/workspace';
 import { applyDocumentLocale, detectLocale, getLocale, loadStaffStrings, setLocale, tr, useLocale, useStrings, useT } from './i18n';
@@ -54,9 +58,9 @@ function CafeFooterText({ cafeName }: { cafeName: string }) {
   </>;
 }
 
-type AdminTab = 'financials' | 'customers' | 'events' | 'tasks' | 'menu_admin' | 'stock' | 'staff' | 'settings';
-const ADMIN_TABS: AdminTab[] = ['financials', 'customers', 'events', 'tasks', 'menu_admin', 'stock', 'staff', 'settings'];
-const PANEL_SECTIONS: PanelSection[] = ['orders', 'pos', 'customers', 'events', 'tasks', 'shifts'];
+type AdminTab = 'financials' | 'customers' | 'events' | 'tasks' | 'menu_admin' | 'promotions' | 'stock' | 'staff' | 'settings';
+const ADMIN_TABS: AdminTab[] = ['financials', 'customers', 'events', 'tasks', 'menu_admin', 'promotions', 'stock', 'staff', 'settings'];
+const PANEL_SECTIONS: PanelSection[] = ['orders', 'kitchen', 'pos', 'customers', 'events', 'tasks', 'shifts'];
 
 function usePersistentState<T extends string>(key: string, allowed: readonly T[], fallback: T) {
   const [value, setValue] = useState<T>(() => {
@@ -205,6 +209,7 @@ export const App: React.FC = () => {
   const tasksList = store.getTasks();
   const stockItems = store.getStockItems();
   const customers = store.getCustomers();
+  const promotions = store.getPromotions();
 
   // Dynamically update CSS root variables for brand theme
   useEffect(() => {
@@ -294,6 +299,7 @@ export const App: React.FC = () => {
       const openTasks = tasksList.filter(t => t.status !== 'completed').length;
       const panelNav: NavItem<PanelSection>[] = [
         { id: 'orders', label: tr('Orders'), icon: ShoppingBag, badge: liveOrders },
+        { id: 'kitchen', label: tr('Kitchen'), icon: ChefHat },
         { id: 'pos', label: tr('New order'), icon: Plus },
         { id: 'customers', label: tr('Customer club'), icon: Contact },
         { id: 'events', label: tr('Events'), icon: CalendarDays },
@@ -302,7 +308,7 @@ export const App: React.FC = () => {
       ];
       return (
         <WorkspaceShell kind="Panel" nav={panelNav} active={panelSection} onNavigate={setPanelSection} {...shellProps}>
-          {panelSection === 'events' ? <EventManager settings={settings} mode="panel" /> : <PanelManager
+          {panelSection === 'events' ? <EventManager settings={settings} mode="panel" /> : panelSection === 'kitchen' ? <KitchenDisplay settings={settings} orders={orders} orderItems={orderItems} onStateChange={refresh} /> : <PanelManager
             section={panelSection}
             onNavigate={setPanelSection}
             settings={settings}
@@ -315,6 +321,7 @@ export const App: React.FC = () => {
             categories={categories}
             menuVariants={menuVariants}
             customers={customers}
+            promotions={promotions}
             onStateChange={refresh}
           />}
         </WorkspaceShell>
@@ -327,6 +334,7 @@ export const App: React.FC = () => {
       { id: 'customers', label: tr('Customer club'), icon: Contact, group: tr('Business') },
       { id: 'events', label: tr('Events'), icon: CalendarDays, group: tr('Business') },
       { id: 'menu_admin', label: tr('Menu'), icon: UtensilsCrossed, group: tr('Catalogue') },
+      { id: 'promotions', label: tr('Promotions'), icon: BadgePercent, group: tr('Catalogue') },
       { id: 'stock', label: tr('Stock'), icon: Boxes, group: tr('Catalogue'), badge: lowStock },
       { id: 'staff', label: tr('Staff & shifts'), icon: Users, group: tr('Team') },
       { id: 'tasks', label: tr('Checklist'), icon: CheckSquare, group: tr('Team') },
@@ -341,10 +349,11 @@ export const App: React.FC = () => {
         {...shellProps}
       >
         {adminTab === 'financials' && <FinancialTracker settings={settings} orders={orders} expenses={expenses} categories={categories} menuItems={menuItems} onFinancialsUpdated={refresh} />}
-        {adminTab === 'customers' && <CustomerClub settings={settings} customers={customers} orders={orders} orderItems={orderItems} canDelete onChanged={refresh} />}
+        {adminTab === 'customers' && <CustomerClub settings={settings} customers={customers} orders={orders} orderItems={orderItems} categories={categories} canDelete onChanged={refresh} />}
         {adminTab === 'events' && <EventManager settings={settings} mode="admin" />}
         {adminTab === 'tasks' && <TaskManager tasks={tasksList} staffList={staffList} onTasksUpdated={refresh} />}
         {adminTab === 'menu_admin' && <MenuAdmin settings={settings} categories={categories} menuItems={menuItems} menuVariants={menuVariants} onMenuUpdated={refresh} />}
+        {adminTab === 'promotions' && <Promotions settings={settings} categories={categories} menuItems={menuItems} promotions={promotions} onChanged={refresh} />}
         {adminTab === 'stock' && <StockManagement settings={settings} stockItems={stockItems} onStockUpdated={refresh} />}
         {adminTab === 'staff' && <TimeTracker settings={settings} staffList={staffList} shifts={shifts} onShiftUpdated={refresh} />}
         {adminTab === 'settings' && <SettingsPanel settings={settings} onSettingsUpdated={refresh} />}
@@ -359,7 +368,7 @@ export const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1 w-full">
         {store.pendingSaves > 0 && <p role="status" className="mb-4 rounded-xl border border-amber-500/30 p-3 text-amber-400">{tr('Saving {pendingSaves} change(s)…', { pendingSaves: store.pendingSaves })}</p>}
         {store.saveError && <div role="alert" className="mb-4 rounded-xl border border-rose-500/40 p-4 text-rose-300">{store.saveError}<button type="button" onClick={() => store.dismissSaveError()} className="ms-4 underline">{tr('Dismiss')}</button></div>}
-        <PublicMenu settings={settings} categories={categories} menuItems={menuItems} menuVariants={menuVariants} onOrderCreated={refresh} theme={theme} />
+        <PublicMenu settings={settings} categories={categories} menuItems={menuItems} menuVariants={menuVariants} promotions={promotions} onOrderCreated={refresh} theme={theme} />
       </main>
 
       <footer className="bg-zinc-950 border-t border-zinc-900 py-5 text-center text-xs text-zinc-500 mt-8">

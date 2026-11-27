@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Coffee, GlassWater, Leaf, Cake, Utensils, Search, Plus, Minus, ShoppingBag, X, MapPin, Phone, ChevronRight, Heart, SlidersHorizontal, Sparkles, Shuffle, Globe, type LucideIcon } from 'lucide-react';
+import { Coffee, GlassWater, Leaf, Cake, Utensils, Search, Plus, Minus, ShoppingBag, X, MapPin, Phone, ChevronRight, Heart, SlidersHorizontal, Sparkles, Shuffle, Globe, BadgePercent, Award, type LucideIcon } from 'lucide-react';
 import { CategorySelect, MenuItemSelect, MenuVariantSelect, SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { getOpeningStatus } from '../utils/openingHours';
@@ -8,6 +8,9 @@ import { Modal } from './Modal';
 import { formatMoney } from '../utils/money';
 import { PublicEvents } from './PublicEvents';
 import { reducedMotion } from '../ui';
+import { bestPromotion, describePromotion, promotionLineDiscount, promotionLive, type Promotion } from '../utils/promotions';
+import { parseLoyalty, pointsOn, stampsOn } from '../utils/loyalty';
+import { usePickupSlots } from './usePickupSlots';
 import { applyDocumentLocale, detectLocale, isolateNumber, localizeMenu, setLocale, useLocale, useT, type Locale } from '../i18n';
 import { LOCALES } from '../chth-kit/locales.js';
 import { footerModel } from '../chth-kit/footer.js';
@@ -18,6 +21,8 @@ interface PublicMenuProps {
   categories: CategorySelect[];
   menuItems: MenuItemSelect[];
   menuVariants: MenuVariantSelect[];
+  /** Running promotions come off each item's price; the server checks them again. */
+  promotions?: Promotion[];
   onOrderCreated?: () => void;
   theme: 'dark' | 'light';
   /** Switches the theme; the change spreads out from the button that was pressed. */
@@ -123,7 +128,7 @@ function Confetti({ burst }: { burst: number }) {
   </div>;
 }
 
-export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: allCategories, menuItems: allItems, menuVariants, onOrderCreated, theme }) => {
+export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: allCategories, menuItems: allItems, menuVariants, promotions = [], onOrderCreated, theme }) => {
   chooseLocale();
   const locale = useLocale();
   // Guests never see private (staff-only) categories, even on a device signed in to the admin;
@@ -159,6 +164,8 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: al
   const [tableNumber, setTableNumber] = useState('');
   const [orderType, setOrderType] = useState<'dine_in' | 'takeout' | 'pickup'>('dine_in');
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card'>('card');
+  const [pickupAt, setPickupAt] = useState('');
+  const [clubPhone, setClubPhone] = useState('');
   const [orderError, setOrderError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confetti, setConfetti] = useState(0);
@@ -207,6 +214,13 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: al
   }, [menuItems, menuVariants, isSubmitting]);
 
   const opening = getOpeningStatus(settings.openHours, now, settings.timeZone || 'Asia/Tehran');
+  const timeZone = settings.timeZone || 'Asia/Tehran';
+  const promoFor = (item: MenuItemSelect, unitPrice: number) => bestPromotion(promotions, item, unitPrice, now, timeZone);
+  const livePromotions = promotions.filter(p => promotionLive(p, now, timeZone));
+  const loyalty = parseLoyalty(settings.loyalty);
+  const clubOn = loyalty.enabled && (stampsOn(loyalty) || pointsOn(loyalty));
+  const pickup = usePickupSlots(isCartOpen && orderType === 'pickup');
+  useEffect(() => { if (pickupAt && pickup.enabled && !pickup.slots.some(slot => slot.at === pickupAt && slot.remaining > 0)) setPickupAt(''); }, [pickup.slots, pickup.enabled, pickupAt]);
   const greeting = t(greetingFor(now, settings.timeZone || 'Asia/Tehran'));
   const money = (amount: number) => isolateNumber(formatMoney(amount, settings.currency, { trimZeros: true }));
   const query = searchQuery.trim().toLocaleLowerCase();
@@ -356,9 +370,14 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: al
   const quickAdd = (item: MenuItemSelect) => hasVariants(item) ? openDetail(item) : addItem(item, []);
   const customizedPrice = activeItem
     ? activeItem.basePrice + Object.values(selectedVariants).reduce((sum, variant) => sum + variant.priceModifier, 0) : 0;
+  const pricedCart = cart.map(line => {
+    const promo = promoFor(line.item, line.unitPrice);
+    return { line, promo, discount: promo ? promotionLineDiscount(promo.unitDiscount, line.quantity) : 0 };
+  });
   const subtotal = Number(cart.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0).toFixed(2));
-  const tax = Number((subtotal * settings.taxRate / 100).toFixed(2));
-  const total = Number((subtotal + tax).toFixed(2));
+  const savings = Number(Math.min(subtotal, pricedCart.reduce((sum, p) => sum + p.discount, 0)).toFixed(2));
+  const tax = Number(((subtotal - savings) * settings.taxRate / 100).toFixed(2));
+  const total = Number((subtotal - savings + tax).toFixed(2));
   const unavailableInCart = cart.some(line => !menuItems.find(item => item.id === line.item.id)?.isInStock || line.variants.some(selected => !menuVariants.some(variant => variant.id === selected.id && variant.menuItemId === line.item.id)) || menuVariants.some(variant => variant.menuItemId === line.item.id && !line.variants.some(selected => selected.groupName === variant.groupName)));
 
   const handlePlaceOrder = async (event: React.FormEvent) => {
@@ -373,10 +392,13 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: al
     const input = {
       customerName: orderType === 'dine_in' ? `Table ${identity}` : identity,
       orderType, paymentMethod,
-      items: cart.map(line => ({
+      ...(orderType === 'pickup' && pickupAt ? { pickupAt } : {}),
+      ...(clubOn && clubPhone.trim() ? { clubPhone: clubPhone.trim() } : {}),
+      items: pricedCart.map(({ line, promo, discount }) => ({
         menuItemId: line.item.id, itemName: line.item.name,
         quantity: line.quantity, unitPrice: line.unitPrice,
-        variants: line.variants.map(variant => variant.id)
+        variants: line.variants.map(variant => variant.id),
+        ...(promo ? { discountAmount: discount, promotionId: promo.promotion.id } : {})
       }))
     };
     const signature = JSON.stringify(input);
@@ -395,6 +417,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: al
       setIsCartOpen(false);
       setCustomerName('');
       setTableNumber('');
+      setPickupAt('');
       submissionRef.current = null;
       if (!reducedMotion()) {
         setConfetti(previous => previous + 1);
@@ -458,9 +481,17 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: al
         </div>
       </section>
 
-      {receipt && <OrderTracking receipt={receipt} onDismiss={() => { setReceipt(null); try { localStorage.removeItem('chth_order_receipt'); } catch {} }} />}
+      {receipt && <OrderTracking receipt={receipt} timeZone={timeZone} onDismiss={() => { setReceipt(null); try { localStorage.removeItem('chth_order_receipt'); } catch {} }} />}
 
       <PublicEvents settings={settings} />
+
+      {livePromotions.length > 0 && <section className="pm-promos" aria-label={t('Offers running now')}>
+        {livePromotions.map(p => <p key={p.id} className="pm-promo">
+          <BadgePercent size={18} aria-hidden="true" />
+          <b className="pm-own">{p.name}</b>
+          <span>{describePromotion(p, money)}{p.endTime ? ` · ${t('until {time}', { time: p.endTime })}` : ''}</span>
+        </p>)}
+      </section>}
 
       <div className="pm-tools">
         <div className="pm-search">
@@ -514,11 +545,14 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: al
               const minimumModifiers = [...new Set(variants.map(variant => variant.groupName))].reduce((sum, group) => sum + Math.min(...variants.filter(variant => variant.groupName === group).map(variant => variant.priceModifier)), 0);
               const saved = savedItemIds.includes(item.id);
               const labels = item.dietaryLabels?.split(',').map(label => label.trim()).filter(Boolean) || [];
+              const fromPrice = item.basePrice + minimumModifiers;
+              const promo = promoFor(item, fromPrice);
               return <article key={item.id} className={`pm-card ${!item.isInStock ? 'is-sold-out' : ''} ${quantity > 0 ? 'is-in-order' : ''}`} style={{ '--pm-i': Math.min(index, 8) } as React.CSSProperties}>
                 <button type="button" className="pm-card-open" onClick={() => openDetail(item)} aria-label={t('{name}, {price}. View details', { name: item.name, price: money(item.basePrice + minimumModifiers) })}>
                   <div className="pm-art">
                     <ItemArt item={item} Icon={section.Icon} />
                     {item.badge && <span className="pm-badge">{item.badge}</span>}
+                    {promo && item.isInStock && <span className="pm-promo-badge"><BadgePercent size={13} aria-hidden="true" />{describePromotion(promo.promotion, money)}</span>}
                     {!item.isInStock && <span className="pm-sold-out">{t('Sold out')}</span>}
                   </div>
                   <div className="pm-card-body">
@@ -532,7 +566,9 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: al
                   {heartBurst?.id === item.id && <span key={heartBurst.n} className="pm-heart-burst" aria-hidden="true" />}
                 </button>
                 <div className="pm-card-foot">
-                  <span className="pm-price">{variants.length > 0 && <small>{t('from')}</small>}{money(item.basePrice + minimumModifiers)}</span>
+                  <span className="pm-price">{variants.length > 0 && <small>{t('from')}</small>}{promo ? <>
+                    <s className="pm-price-was">{money(fromPrice)}</s>{money(fromPrice - promo.unitDiscount)}
+                  </> : money(fromPrice)}</span>
                   {lastAdded?.id === item.id && <span key={lastAdded.n} className="pm-plus-one" aria-hidden="true">+1</span>}
                   {simpleLine ? <div className="pm-stepper">
                     <button type="button" aria-label={t('Remove one {name}', { name: item.name })} disabled={isSubmitting} onClick={() => updateQuantity(simpleLine.id, -1)}><Minus size={16} /></button>
@@ -576,13 +612,14 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: al
               </label>)}
             </div>
           </fieldset>)}
+          {(() => { const promo = activeItem.isInStock && promoFor(activeItem, customizedPrice); return promo ? <p className="pm-promo"><BadgePercent size={18} aria-hidden="true" /><b className="pm-own">{promo.promotion.name}</b><span>{describePromotion(promo.promotion, money)}{promo.promotion.endTime ? ` · ${t('until {time}', { time: promo.promotion.endTime })}` : ''}</span></p> : null; })()}
           {!activeItem.isInStock ? <p className="pm-detail-soldout">{t('Sold out for now — check back soon.')}</p> : <div className="pm-detail-foot">
             <div className="pm-stepper">
               <button type="button" aria-label={t('One fewer')} disabled={detailQuantity <= 1} onClick={() => setDetailQuantity(value => Math.max(1, value - 1))}><Minus size={16} /></button>
               <span>{detailQuantity}</span>
               <button type="button" aria-label={t('One more')} disabled={detailQuantity >= 20} onClick={() => setDetailQuantity(value => Math.min(20, value + 1))}><Plus size={16} /></button>
             </div>
-            <button type="button" disabled={isSubmitting || !menuItems.find(item => item.id === activeItem.id)?.isInStock} onClick={() => { addItem(activeItem, Object.values(selectedVariants), detailQuantity); setActiveItem(null); }} className="pm-button pm-detail-add">{t('Add · {price}', { price: money(customizedPrice * detailQuantity) })}</button>
+            <button type="button" disabled={isSubmitting || !menuItems.find(item => item.id === activeItem.id)?.isInStock} onClick={() => { addItem(activeItem, Object.values(selectedVariants), detailQuantity); setActiveItem(null); }} className="pm-button pm-detail-add">{t('Add · {price}', { price: money((customizedPrice - (promoFor(activeItem, customizedPrice)?.unitDiscount || 0)) * detailQuantity) })}</button>
           </div>}
         </div>}
       </Modal>
@@ -592,13 +629,14 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: al
           <fieldset disabled={isSubmitting} className="pm-checkout-fields">
             <legend className="sr-only">{t('Order details')}</legend>
             <ul className="pm-checkout-lines">
-              {cart.map(line => {
+              {pricedCart.map(({ line, promo, discount }) => {
                 const available = menuItems.find(item => item.id === line.item.id)?.isInStock;
                 return <li key={line.id} className="pm-checkout-line" data-unavailable={!available || undefined}>
                   <div className="pm-checkout-line-text"><b className="pm-own">{menuItems.find(item => item.id === line.item.id)?.name ?? line.item.name}</b>
                     {!!line.variants.length && <small>{line.variants.map(variant => `${variant.groupName}: ${variant.name}`).join(', ')}</small>}
                     {!available && <small className="pm-checkout-warn">{t('Sold out · please remove this item')}</small>}
-                    <span className="pm-price">{money(line.unitPrice * line.quantity)}</span>
+                    {promo && <small className="pm-checkout-promo"><BadgePercent size={13} aria-hidden="true" />{promo.promotion.name}</small>}
+                    <span className="pm-price">{discount > 0 && <s className="pm-price-was">{money(line.unitPrice * line.quantity)}</s>}{money(line.unitPrice * line.quantity - discount)}</span>
                   </div>
                   <div className="pm-stepper">
                     <button type="button" aria-label={t('Remove one {name}', { name: line.item.name })} onClick={() => updateQuantity(line.id, -1)}><Minus size={16} /></button>
@@ -614,6 +652,18 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: al
             <label className="pm-checkout-field"><span>{t(orderType === 'dine_in' ? 'Table number' : 'Your name')}</span>
               <input id="order-identity" type="text" autoComplete={orderType === 'dine_in' ? 'off' : 'name'} required maxLength={100} placeholder={t(orderType === 'dine_in' ? 'e.g. 04' : 'Your name')} value={orderType === 'dine_in' ? tableNumber : customerName} onChange={event => { if (orderType === 'dine_in') setTableNumber(event.target.value); else setCustomerName(event.target.value); setOrderError(''); }} />
             </label>
+            {orderType === 'pickup' && pickup.enabled && <fieldset className="pm-checkout-group"><legend>{t('Pickup time')}</legend>
+              <div className="pm-checkout-choices pm-slot-choices">
+                <button type="button" aria-pressed={!pickupAt} onClick={() => setPickupAt('')} className="pm-chip">{t('As soon as possible')}</button>
+                {pickup.slots.map(slot => <button type="button" key={slot.at} aria-pressed={pickupAt === slot.at} disabled={slot.remaining < 1} onClick={() => setPickupAt(slot.at)} className="pm-chip"
+                  aria-label={slot.remaining < 1 ? t('{time}, full', { time: slot.label }) : slot.label}><bdi dir="ltr">{slot.label}</bdi></button>)}
+              </div>
+              {pickup.slots.length === 0 && !pickup.loading && <p className="pm-checkout-fine">{t('No more pickup times today. We’ll have it ready as soon as we can.')}</p>}
+            </fieldset>}
+            {clubOn && <label className="pm-checkout-field"><span><Award size={15} aria-hidden="true" /> {t('Club member? Your phone number')}</span>
+              <input type="tel" inputMode="tel" autoComplete="tel" maxLength={30} placeholder={t('Optional')} value={clubPhone} onChange={event => setClubPhone(event.target.value)} />
+              <small className="pm-checkout-fine">{t(stampsOn(loyalty) ? 'Collect stamps on this order. Not a member yet? Ask at the counter.' : 'Collect points on this order. Not a member yet? Ask at the counter.')}</small>
+            </label>}
             <fieldset className="pm-checkout-group"><legend>{t('Pay at the café')}</legend>
               <div className="pm-checkout-choices">{(['card', 'cash'] as const).map(value => <button type="button" key={value} aria-pressed={paymentMethod === value} onClick={() => setPaymentMethod(value)} className="pm-chip">{t(value === 'card' ? 'Card' : 'Cash')}</button>)}</div>
               <p className="pm-checkout-fine">{t('Payment is collected at the café when you receive your order.')}</p>
@@ -621,6 +671,7 @@ export const PublicMenu: React.FC<PublicMenuProps> = ({ settings, categories: al
           </fieldset>
           <dl className="pm-checkout-totals">
             <div><dt>{t('Subtotal')}</dt><dd>{money(subtotal)}</dd></div>
+            {savings > 0 && <div className="is-saving"><dt>{t('Offers')}</dt><dd>−{money(savings)}</dd></div>}
             {settings.taxRate > 0 && <div><dt>{t('Tax ({rate}%)', { rate: settings.taxRate })}</dt><dd>{money(tax)}</dd></div>}
             <div className="is-total"><dt>{t('Total')}</dt><dd>{money(total)}</dd></div>
           </dl>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Boxes, CheckSquare, ChefHat, Clock, History, LayoutGrid, Pencil, Plus, Receipt, ShoppingBag, Shuffle, Tag, Users } from 'lucide-react';
+import { Award, Boxes, CheckSquare, ChefHat, Clock, History, LayoutGrid, Pencil, Plus, Receipt, ShoppingBag, Shuffle, Tag, Users } from 'lucide-react';
 import {
   OrderSelect,
   OrderItemSelect,
@@ -15,18 +15,23 @@ import {
 import { store, orderAmounts } from '../db/store';
 import {
   AffixInput, Avatar, Badge, Button, Card, Chips, ConfirmDialog, Dialog, EmptyState, Field, FormDialog, IconButton, Input,
-  KeyValue, List, ListItem, Meter, Notice, Page, PageHeader, SearchInput, Segmented, Select, Stat, StatGrid, Switch,
+  KeyValue, List, ListItem, Meter, Notice, Page, PageHeader, SearchInput, Segmented, Select, Stat, StatGrid, Switch, ToggleRow,
   ageLabel, formatDate, reducedMotion, formatTime, localDateKey, minutesSince, money, orderTypeLabel, paymentLabel, plural, timestampForDay,
   ORDER_PAYMENT_METHODS, OrderPaymentMethod
 } from '../ui';
 import { CustomerClub, CustomerPicker } from './CustomerClub';
 import {
   MenuPicker, OrderDetailsDialog, OrderEditDialog, OrderLinesEditor, TaskFormDialog, TaskRow, TASK_CATEGORIES, TASK_CATEGORY_ICONS, nextTaskStatus,
-  addMenuItem, discountOff, lineQuantities, toOrderLines, type DiscountType, type EditableLine
+  discountOff, lineQuantities, toOrderLines, useItemAdder, type DiscountType, type EditableLine
 } from './shared';
+import { usePickupSlots } from './usePickupSlots';
+import { earnsStamps, parseLoyalty, pointsOn, stampProgress, stampsOn } from '../utils/loyalty';
+import { pickupLabel } from '../utils/pickupSlots';
+import { optionNames } from '../utils/receipt';
+import type { Promotion } from '../utils/promotions';
 import { intlTag, tr } from '../i18n';
 
-export type PanelSection = 'orders' | 'pos' | 'customers' | 'events' | 'tasks' | 'shifts';
+export type PanelSection = 'orders' | 'kitchen' | 'pos' | 'customers' | 'events' | 'tasks' | 'shifts';
 type OrderStatus = 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
 type OrderType = 'dine_in' | 'takeout' | 'pickup';
 
@@ -43,6 +48,7 @@ interface PanelManagerProps {
   categories: CategorySelect[];
   menuVariants: MenuVariantSelect[];
   customers: CustomerSelect[];
+  promotions: Promotion[];
   onStateChange: () => void;
 }
 
@@ -54,9 +60,11 @@ const LANES: { status: 'pending' | 'preparing' | 'ready'; label: string; empty: 
 const LATE_AFTER_MIN = 15;
 
 export const PanelManager: React.FC<PanelManagerProps> = ({
-  section, onNavigate, settings, orders, orderItems, tasks, staffList: staff, shifts, menuItems, categories, customers, onStateChange
+  section, onNavigate, settings, orders, orderItems, tasks, staffList: staff, shifts, menuItems, categories, menuVariants, customers, promotions, onStateChange
 }) => {
   const currency = settings.currency;
+  const timeZone = settings.timeZone || 'UTC';
+  const loyalty = parseLoyalty(settings.loyalty);
   const fmt = (v: number) => money(v, currency);
 
   // One clock drives order ages and the time clock; it ticks faster only where seconds show.
@@ -116,6 +124,11 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
   const [posDate, setPosDate] = useState(() => localDateKey());
   const [posDiscount, setPosDiscount] = useState('');
   const [posDiscountType, setPosDiscountType] = useState<DiscountType>('percent');
+  const [posTip, setPosTip] = useState<'0' | '5' | '10' | '15' | 'custom'>('0');
+  const [posTipAmount, setPosTipAmount] = useState('');
+  const [posPickupAt, setPosPickupAt] = useState('');
+  const [useFreeItem, setUseFreeItem] = useState(false);
+  const [usePoints, setUsePoints] = useState('');
   const [savingOrder, setSavingOrder] = useState(false);
   const [orderError, setOrderError] = useState('');
   const [orderPlaced, setOrderPlaced] = useState('');
@@ -125,18 +138,34 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
   const [customPrice, setCustomPrice] = useState('');
   const ticketRef = useRef<HTMLDivElement>(null);
 
+  const adder = useItemAdder(setCart, menuVariants, promotions, timeZone, fmt);
   const addToCart = (item: MenuItemSelect) => {
     if (!item.isInStock) return;
     setOrderPlaced('');
-    setCart(prev => addMenuItem(prev, item));
+    adder.add(item);
   };
+  const pickup = usePickupSlots(section === 'pos' && posOrderType === 'pickup');
+  useEffect(() => { setUseFreeItem(false); setUsePoints(''); }, [posMember?.id]);
 
   const cartCount = cart.reduce((sum, l) => sum + l.quantity, 0);
-  const cartLines = toOrderLines(cart);
+  // A full stamp card makes one unit free: the dearest item that earns stamps, so the reward is worth the most.
+  const memberRewards = posMember && stampsOn(loyalty) ? stampProgress(loyalty, posMember.stamps || 0).rewards : 0;
+  const freeTarget = toOrderLines(cart)
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => earnsStamps(loyalty, menuItems.find(i => i.id === line.menuItemId)?.categoryId) && line.unitPrice * line.quantity - (line.discountAmount || 0) >= line.unitPrice)
+    .sort((a, b) => b.line.unitPrice - a.line.unitPrice)[0];
+  const freeApplied = useFreeItem && memberRewards > 0 && !!freeTarget;
+  const cartLines = toOrderLines(cart).map((line, index) => freeApplied && index === freeTarget.index
+    ? { ...line, discountAmount: Number(((line.discountAmount || 0) + line.unitPrice).toFixed(2)) } : line);
+  const gross = cartLines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
   const lineDiscounts = cartLines.reduce((sum, l) => sum + (l.discountAmount || 0), 0);
-  // The order discount applies to what is left after item discounts.
-  const orderDiscount = discountOff(cartLines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0) - lineDiscounts, posDiscount, posDiscountType);
+  // The order discount applies to what is left after item discounts; points come off what is left after that.
+  const typedDiscount = discountOff(gross - lineDiscounts, posDiscount, posDiscountType);
+  const pointsAvailable = posMember && pointsOn(loyalty) ? posMember.points || 0 : 0;
+  const pointsUsed = Math.max(0, Math.min(pointsAvailable, parseInt(usePoints, 10) || 0, Math.floor((gross - lineDiscounts - typedDiscount) / (loyalty.pointValue || 1) + 1e-9)));
+  const orderDiscount = Number((typedDiscount + pointsUsed * loyalty.pointValue).toFixed(2));
   const { subtotal, discountAmount: discount, taxAmount: tax, totalAmount: total } = orderAmounts(cartLines, orderDiscount, settings.taxRate);
+  const tipAmount = posTip === 'custom' ? Math.max(0, Number((parseFloat(posTipAmount) || 0).toFixed(2))) : Number((total * Number(posTip) / 100).toFixed(2));
 
   const submitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,6 +182,9 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
         discountAmount: orderDiscount,
         status: 'pending',
         createdAt: timestampForDay(posDate),
+        tipAmount,
+        pickupAt: posOrderType === 'pickup' && posPickupAt ? posPickupAt : null,
+        loyalty: { stamps: freeApplied ? loyalty.stampsPerReward : 0, points: pointsUsed },
         items: cartLines
       });
     } catch (error) {
@@ -167,6 +199,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
     setPosMember(null);
     setPosDiscount('');
     setPosDate(localDateKey());
+    setPosTip('0'); setPosTipAmount(''); setPosPickupAt(''); setUseFreeItem(false); setUsePoints('');
     onStateChange();
   };
 
@@ -303,13 +336,14 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                               <div style={{ minWidth: 0 }}>
                                 <div className="ws-ticket-num">{order.orderNumber}</div>
                                 <div className="ws-hint ws-truncate">{order.customerName || tr('Walk-in')} · {orderTypeLabel(order.orderType)}{store.isQueuedOrder(order.id) && tr(' · on this device, not sent yet')}</div>
+                                {order.pickupAt && <Badge tone="info" icon={<Clock />}>{tr('Pickup {time}', { time: pickupLabel(order.pickupAt, timeZone) })}</Badge>}
                               </div>
                               <span className="ws-ticket-age" data-late={lane.status !== 'ready' && age >= LATE_AFTER_MIN ? '' : undefined}>
                                 <Clock width={12} height={12} style={{ display: 'inline', verticalAlign: '-1px', marginInlineEnd: 4 }} />{ageLabel(age)}
                               </span>
                             </div>
                             <ul className="ws-ticket-lines">
-                              {lines.map(line => <li key={line.id}><span><strong className="tabular">{line.quantity}×</strong> {line.itemName}</span></li>)}
+                              {lines.map(line => <li key={line.id}><span><strong className="tabular">{line.quantity}×</strong> {line.itemName}{optionNames(line.variantsJson).length > 0 && <span className="ws-hint" style={{ display: 'block' }}>{optionNames(line.variantsJson).join(', ')}</span>}</span></li>)}
                               {lines.length === 0 && <li className="ws-hint">{tr('No items recorded')}</li>}
                             </ul>
                             <div className="ws-ticket-foot">
@@ -417,7 +451,30 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                   <Segmented block label={tr('Order type')} value={posOrderType} onChange={setPosOrderType} options={[
                     { value: 'dine_in', label: tr('Dine-in') }, { value: 'takeout', label: tr('Takeout') }, { value: 'pickup', label: tr('Pickup') }
                   ]} />
-                  <CustomerPicker customers={customers} orders={orders} text={posCustomer} onTextChange={setPosCustomer} member={posMember} onMemberChange={setPosMember} />
+                  {posOrderType === 'pickup' && pickup.enabled && (
+                    <Field label={tr('Pickup time')} optional>{id => (
+                      <Select id={id} value={posPickupAt} onChange={e => setPosPickupAt(e.target.value)}>
+                        <option value="">{tr('As soon as possible')}</option>
+                        {pickup.slots.map(slot => <option key={slot.at} value={slot.at} disabled={slot.remaining < 1}>{slot.remaining < 1 ? tr('{time} · full', { time: slot.label }) : tr('{time} · {count} left', { time: slot.label, count: slot.remaining })}</option>)}
+                      </Select>
+                    )}</Field>
+                  )}
+                  <CustomerPicker customers={customers} orders={orders} text={posCustomer} onTextChange={setPosCustomer} member={posMember} onMemberChange={setPosMember} loyalty={loyalty} />
+                  {posMember && loyalty.enabled && (memberRewards > 0 || pointsAvailable > 0) && (
+                    <div className="ws-panel ws-form">
+                      {memberRewards > 0 && (
+                        <ToggleRow icon={<Award />} title={tr('Use a free item')} checked={freeApplied} disabled={!freeTarget} onChange={setUseFreeItem}
+                          description={freeTarget
+                            ? tr('Full card: {item} is free ({value}).', { item: freeTarget.line.itemName, value: fmt(freeTarget.line.unitPrice) })
+                            : tr('Full card: add an item that earns stamps to give it free.')} />
+                      )}
+                      {pointsAvailable > 0 && (
+                        <Field label={tr('Points to use')} hint={tr('{count} available, {value} each', { count: pointsAvailable, value: fmt(loyalty.pointValue) })}>{(id, hint) => (
+                          <Input id={id} aria-describedby={hint} type="number" inputMode="numeric" min="0" max={pointsAvailable} step="1" placeholder="0" value={usePoints} onChange={e => setUsePoints(e.target.value)} />
+                        )}</Field>
+                      )}
+                    </div>
+                  )}
                   <div className="ws-form-row cols-2">
                     <Field label={tr('Payment')}>{id => (
                       <Select id={id} value={posPayment} onChange={e => setPosPayment(e.target.value as OrderPaymentMethod)}>
@@ -429,16 +486,24 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
                   <Field label={tr('Order discount')} hint={lineDiscounts > 0 ? tr('On top of the item discounts') : undefined} aside={
                     <Segmented label={tr('Discount type')} value={posDiscountType} onChange={setPosDiscountType} options={[{ value: 'percent', label: '%' }, { value: 'fixed', label: currency }]} />
                   }>{id => <Input id={id} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" value={posDiscount} onChange={e => setPosDiscount(e.target.value)} />}</Field>
+                  <div className="ws-field">
+                    <span className="ws-label">{tr('Tip')}</span>
+                    <Segmented block label={tr('Tip')} value={posTip} onChange={setPosTip} options={[
+                      { value: '0', label: tr('None') }, { value: '5', label: '5%' }, { value: '10', label: '10%' }, { value: '15', label: '15%' }, { value: 'custom', label: tr('Other') }
+                    ]} />
+                    {posTip === 'custom' && <AffixInput aria-label={tr('Tip amount')} affix={currency} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" autoFocus value={posTipAmount} onChange={e => setPosTipAmount(e.target.value)} />}
+                  </div>
                   <KeyValue
                     items={[
                       { label: tr('Subtotal'), value: fmt(subtotal) },
                       ...(discount > 0 ? [{ label: tr('Discounts'), value: `−${fmt(discount)}`, tone: 'positive' as const }] : []),
-                      { label: tr('Tax ({taxRate}%)', { taxRate: settings.taxRate }), value: fmt(tax) }
+                      { label: tr('Tax ({taxRate}%)', { taxRate: settings.taxRate }), value: fmt(tax) },
+                      ...(tipAmount > 0 ? [{ label: tr('Tip'), value: fmt(tipAmount) }] : [])
                     ]}
-                    total={{ label: tr('Total'), value: fmt(total) }}
+                    total={{ label: tipAmount > 0 ? tr('To pay') : tr('Total'), value: fmt(total + tipAmount) }}
                   />
                   <Button type="submit" variant="primary" size="lg" block loading={savingOrder} disabled={cart.length === 0}>
-                    {savingOrder ? tr('Sending…') : tr('Send to board · {total}', { total: fmt(total) })}
+                    {savingOrder ? tr('Sending…') : tr('Send to board · {total}', { total: fmt(total + tipAmount) })}
                   </Button>
                 </form>
               </Card>
@@ -447,7 +512,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
           {cart.length > 0 && (
             <div className="ws-mobile-bar">
               <Button variant="primary" size="lg" block icon={<ShoppingBag />} onClick={() => ticketRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-                {tr('Review order · {cartCount} · {total}', { cartCount: plural(cartCount, 'item'), total: fmt(total) })}
+                {tr('Review order · {cartCount} · {total}', { cartCount: plural(cartCount, 'item'), total: fmt(total + tipAmount) })}
               </Button>
             </div>
           )}
@@ -550,6 +615,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
         items={detailsOrder ? itemsByOrder.get(detailsOrder.id) || [] : []}
         currency={currency}
         taxRate={settings.taxRate}
+        settings={settings}
         onClose={() => setDetailsOrder(null)}
         actions={detailsOrder && ['pending', 'preparing', 'ready'].includes(detailsOrder.status) && <>
           <span className="ws-spacer"><Button variant="danger-ghost" onClick={() => { setCancelTarget(detailsOrder); setDetailsOrder(null); }}>{tr('Cancel order')}</Button></span>
@@ -593,6 +659,7 @@ export const PanelManager: React.FC<PanelManagerProps> = ({
         {clockFeedback && <Notice tone={clockFeedback.success ? 'positive' : 'danger'}>{clockFeedback.message}</Notice>}
       </FormDialog>
 
+      {adder.dialog}
       <TaskFormDialog open={taskFormOpen} onClose={() => setTaskFormOpen(false)} onCreated={onStateChange} />
 
       <FormDialog open={customOpen} onClose={() => setCustomOpen(false)} title={tr('Custom item')} description={tr('For catering, specials, or an agreed price.')} submitLabel={tr('Add to order')} submitDisabled={!customName.trim() || customPrice === ''} onSubmit={addCustomItem}>

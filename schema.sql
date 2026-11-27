@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS settings (
   telegram_events_chat_id TEXT NOT NULL DEFAULT '',
   notify_bookings INTEGER NOT NULL DEFAULT 1,
   stock_categories TEXT, -- JSON list of material categories, NULL for the defaults
+  loyalty TEXT NOT NULL DEFAULT '{}', -- v1.2: stamp card and points rules, JSON
+  pickup_slots TEXT NOT NULL DEFAULT '{}', -- v1.2: scheduled pickup slots, JSON
   updated_at TEXT NOT NULL
 );
 
@@ -38,6 +40,7 @@ CREATE TABLE IF NOT EXISTS stock_items (
   unit_cost REAL NOT NULL DEFAULT 0.0,
   total_price REAL NOT NULL DEFAULT 0.0,
   min_threshold REAL NOT NULL DEFAULT 5.0,
+  supplier_id TEXT, -- v1.2: who it is usually ordered from
   updated_at TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
@@ -71,6 +74,7 @@ CREATE TABLE IF NOT EXISTS menu_items (
   allergens TEXT NOT NULL DEFAULT '',
   dietary_labels TEXT NOT NULL DEFAULT '',
   translations TEXT NOT NULL DEFAULT '{}',
+  display_order INTEGER NOT NULL DEFAULT 0, -- v1.2: position within its category
   created_at TEXT NOT NULL
 );
 
@@ -115,6 +119,8 @@ CREATE TABLE IF NOT EXISTS orders (
   total_amount REAL NOT NULL,
   payment_method TEXT NOT NULL DEFAULT 'card',
   status TEXT NOT NULL DEFAULT 'completed',
+  tip_amount REAL NOT NULL DEFAULT 0, -- v1.2: not taxed and not part of total_amount
+  pickup_at TEXT, -- v1.2: the pickup slot the customer chose, as an ISO instant
   createdAt TEXT NOT NULL
 );
 
@@ -295,6 +301,7 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
   quantity REAL NOT NULL CHECK(quantity != 0),
   notes TEXT NOT NULL DEFAULT '',
   order_id TEXT,
+  reason TEXT NOT NULL DEFAULT '', -- v1.2: why stock was wasted
   created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS reconciliations (
@@ -379,3 +386,69 @@ CREATE TABLE IF NOT EXISTS event_bookings (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS promotions (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'percent' CHECK(kind IN ('percent','fixed')),
+  value REAL NOT NULL CHECK(value > 0),
+  category_ids TEXT NOT NULL DEFAULT '[]',
+  item_ids TEXT NOT NULL DEFAULT '[]',
+  days TEXT NOT NULL DEFAULT '[]',
+  start_time TEXT NOT NULL DEFAULT '',
+  end_time TEXT NOT NULL DEFAULT '',
+  starts_on TEXT NOT NULL DEFAULT '',
+  ends_on TEXT NOT NULL DEFAULT '',
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS customer_ledger (
+  id TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  order_id TEXT,
+  kind TEXT NOT NULL CHECK(kind IN ('earn','redeem','adjust')),
+  stamps INTEGER NOT NULL DEFAULT 0,
+  points INTEGER NOT NULL DEFAULT 0,
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ledger_customer ON customer_ledger(customer_id);
+CREATE INDEX IF NOT EXISTS idx_ledger_order ON customer_ledger(order_id);
+CREATE TABLE IF NOT EXISTS variant_recipes (
+  id TEXT PRIMARY KEY,
+  variant_id TEXT NOT NULL,
+  stock_item_id TEXT NOT NULL,
+  quantity_delta REAL NOT NULL CHECK(quantity_delta != 0)
+);
+CREATE INDEX IF NOT EXISTS idx_variant_recipes_variant ON variant_recipes(variant_id);
+CREATE TABLE IF NOT EXISTS suppliers (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL DEFAULT '',
+  telegram TEXT NOT NULL DEFAULT '',
+  lead_time_days INTEGER NOT NULL DEFAULT 1,
+  notes TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id TEXT PRIMARY KEY,
+  supplier_id TEXT,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','sent','received','cancelled')),
+  notes TEXT NOT NULL DEFAULT '',
+  expected_on TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  sent_at TEXT,
+  received_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(status);
+CREATE TABLE IF NOT EXISTS purchase_order_lines (
+  id TEXT PRIMARY KEY,
+  purchase_order_id TEXT NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+  stock_item_id TEXT NOT NULL,
+  quantity REAL NOT NULL CHECK(quantity > 0),
+  unit_cost REAL NOT NULL DEFAULT 0,
+  received_quantity REAL NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_purchase_order_lines_order ON purchase_order_lines(purchase_order_id);

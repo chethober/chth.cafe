@@ -1,6 +1,8 @@
 import type { Hono } from 'hono';
 import type { Env } from '../server';
 import migration from './operationsMigration';
+import { buildReceipt, telegramReceiptLink } from './receipts';
+import { isWasteReason } from '../utils/purchasing';
 const ready = new WeakMap<object, Promise<void>>();
 export function ensureFeatureTables(db: D1Database) {
   let pending = ready.get(db);
@@ -19,6 +21,22 @@ export function ensureFeatureTables(db: D1Database) {
         if (sql.startsWith('CREATE INDEX')) await db.prepare(sql).run().catch(error => console.warn('Index skipped:', error));
         else await db.prepare(sql).run();
       }
+      // Release 1.2 columns, after the statements above so inventory_movements exists; see migrations/0008.
+      const added: Array<[string, string, string]> = [
+        ['orders', 'tip_amount', 'REAL NOT NULL DEFAULT 0'],
+        ['orders', 'pickup_at', 'TEXT'],
+        ['menu_items', 'display_order', 'INTEGER NOT NULL DEFAULT 0'],
+        ['stock_items', 'supplier_id', 'TEXT'],
+        ['inventory_movements', 'reason', "TEXT NOT NULL DEFAULT ''"],
+        ['settings', 'loyalty', "TEXT NOT NULL DEFAULT '{}'"],
+        ['settings', 'pickup_slots', "TEXT NOT NULL DEFAULT '{}'"]
+      ];
+      const columns = new Map<string, Set<unknown>>();
+      for (const [table, column, type] of added) {
+        if (!columns.has(table)) columns.set(table, new Set((await db.prepare(`PRAGMA table_info(${table})`).all()).results.map(row => row.name)));
+        if (!columns.get(table)!.has(column)) await db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`).run();
+      }
+      await db.prepare('CREATE INDEX IF NOT EXISTS idx_orders_pickup ON orders(pickup_at)').run();
     })();
     ready.set(db, pending);
     pending.catch(() => ready.delete(db));
@@ -34,7 +52,7 @@ export function bumpDataVersion(db: D1Database) {
   return db.prepare('INSERT INTO sync_state (id, version) VALUES (1, 1) ON CONFLICT(id) DO UPDATE SET version = version + 1').run();
 }
 export function publicSettings(config: Record<string, unknown>) {
-  const keys = ['id','cafeName','logoUrl','brandPrimary','brandSecondary','appearance','currency','taxRate','openHours','timeZone','calendarSystem','secondaryCalendar','contactPhone','address','updatedAt'];
+  const keys = ['id','cafeName','logoUrl','brandPrimary','brandSecondary','appearance','currency','taxRate','openHours','timeZone','calendarSystem','secondaryCalendar','contactPhone','address','loyalty','pickupSlots','updatedAt'];
   return Object.fromEntries(keys.map(key => [key, config[key]]));
 }
 export async function trackingToken(id: string, secret?: string) {
@@ -52,9 +70,12 @@ export function registerOperations(app: Hono<Env>) {
   app.get('/api/orders/:id/tracking', async c => {
     const id = c.req.param('id');
     if (!c.env.DB || c.req.query('token') !== await trackingToken(id, c.env.SESSION_SECRET)) return c.json({ message: 'Order not found.' }, 404);
-    const order = await c.env.DB.prepare('SELECT order_number, status, total_amount FROM orders WHERE id = ?').bind(id).first();
+    const order = await c.env.DB.prepare('SELECT order_number, status, total_amount, tip_amount, pickup_at FROM orders WHERE id = ?').bind(id).first();
     if (!order) return c.json({ message: 'Order not found.' }, 404);
-    return c.json({ data: order });
+    // The full receipt is asked for once, when the customer opens it, not on every status poll.
+    if (c.req.query('receipt') !== '1') return c.json({ data: order });
+    const [receipt, telegramUrl] = await Promise.all([buildReceipt(c.env.DB, id), telegramReceiptLink(c.env, id)]);
+    return c.json({ data: { ...order, receipt, telegramUrl } });
   });
   app.get('/api/inventory-movements', async c => {
     const result = await c.env.DB.prepare('SELECT m.*, s.name, s.unit FROM inventory_movements m JOIN stock_items s ON s.id = m.stock_item_id ORDER BY m.created_at DESC LIMIT 200').all();
@@ -62,8 +83,11 @@ export function registerOperations(app: Hono<Env>) {
   });
   app.post('/api/inventory-movements', async c => {
     const body = await c.req.json();
-    if (!['purchase','waste','adjustment'].includes(body.kind) || !Number.isFinite(body.quantity) || !body.quantity || (body.kind === 'purchase' && body.quantity <= 0) || (body.kind === 'waste' && body.quantity >= 0) || typeof body.notes !== 'string' || !body.notes.trim()) return c.json({ message: 'Enter a valid quantity and reason. Waste must be negative; purchases positive.' }, 400);
-    await c.env.DB.prepare('INSERT INTO inventory_movements (id, stock_item_id, kind, quantity, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)').bind(crypto.randomUUID(), body.stockItemId, body.kind, body.quantity, body.notes.slice(0, 1000), new Date().toISOString()).run();
+    // Waste names a reason from the list, so it can be reported by reason; a note is then optional.
+    const reason = body.kind === 'waste' && isWasteReason(body.reason) ? body.reason : '';
+    const notes = typeof body.notes === 'string' ? body.notes.trim() : '';
+    if (!['purchase','waste','adjustment'].includes(body.kind) || !Number.isFinite(body.quantity) || !body.quantity || (body.kind === 'purchase' && body.quantity <= 0) || (body.kind === 'waste' && body.quantity >= 0) || (!notes && !reason)) return c.json({ message: 'Enter a valid quantity and reason. Waste must be negative; purchases positive.' }, 400);
+    await c.env.DB.prepare('INSERT INTO inventory_movements (id, stock_item_id, kind, quantity, notes, reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(crypto.randomUUID(), body.stockItemId, body.kind, body.quantity, notes.slice(0, 1000), reason, new Date().toISOString()).run();
     return c.json({ success: true });
   });
   async function expected(db: D1Database, date: string, openingCash: number) {
@@ -73,8 +97,9 @@ export function registerOperations(app: Hono<Env>) {
     const orders = (await db.prepare("SELECT * FROM orders WHERE status = 'completed' AND createdAt >= ? AND createdAt < ?").bind(from, to).all()).results.filter(o => cafeDate(new Date(String(o.createdAt)), timeZone) === date);
     const expenses = (await db.prepare("SELECT amount FROM expenses WHERE date = ? AND payment_method = 'cash'").bind(date).all()).results;
     return {
-      expectedCash: Number((openingCash + orders.filter(o => o.payment_method === 'cash').reduce((sum, o) => sum + Number(o.total_amount), 0) - expenses.reduce((sum, e) => sum + Number(e.amount), 0)).toFixed(2)),
-      expectedCard: Number(orders.filter(o => o.payment_method === 'card').reduce((sum, o) => sum + Number(o.total_amount), 0).toFixed(2))
+      // Tips are collected with the payment, so they sit in the drawer or the card batch too.
+      expectedCash: Number((openingCash + orders.filter(o => o.payment_method === 'cash').reduce((sum, o) => sum + Number(o.total_amount) + Number(o.tip_amount || 0), 0) - expenses.reduce((sum, e) => sum + Number(e.amount), 0)).toFixed(2)),
+      expectedCard: Number(orders.filter(o => o.payment_method === 'card').reduce((sum, o) => sum + Number(o.total_amount) + Number(o.tip_amount || 0), 0).toFixed(2))
     };
   }
   app.get('/api/reconciliation', async c => {

@@ -7,6 +7,7 @@ import './styles/design-system.css';
 import './styles/public-menu.css';
 import './styles/workspace.css';
 import './styles/events.css';
+import './styles/operations.css';
 import './chth-kit/brand.css';
 
 installWorkspaceHeader();

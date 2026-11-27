@@ -34,6 +34,8 @@ export const settings = sqliteTable('settings', {
   telegramEventsChatId: text('telegram_events_chat_id').notNull().default(''), // Customer-facing group or channel for event posts
   notifyBookings: integer('notify_bookings', { mode: 'boolean' }).notNull().default(true),
   stockCategories: text('stock_categories'), // JSON list of material categories, or null for the defaults
+  loyalty: text('loyalty').notNull().default('{}'), // Stamp card and points rules, see utils/loyalty
+  pickupSlots: text('pickup_slots').notNull().default('{}'), // Scheduled pickup slots, see utils/pickupSlots
   updatedAt: text('updated_at').notNull()
 });
 
@@ -65,6 +67,7 @@ export const menuItems = sqliteTable('menu_items', {
   dietaryLabels: text('dietary_labels').notNull().default(''),
   badge: text('badge').default(''), // e.g. "Popular", "New", "Organic"
   translations: text('translations', { mode: 'json' }).$type<MenuTranslations>().notNull().default({}),
+  displayOrder: integer('display_order').notNull().default(0), // Position within its category
   createdAt: text('created_at').notNull()
 });
 
@@ -113,6 +116,8 @@ export const orders = sqliteTable('orders', {
   totalAmount: real('total_amount').notNull(),
   paymentMethod: text('payment_method').notNull().default('card'), // 'cash', 'card', 'qr_pay'
   status: text('status').notNull().default('completed'), // 'completed', 'pending', 'cancelled'
+  tipAmount: real('tip_amount').notNull().default(0.0), // Not taxed and not part of totalAmount
+  pickupAt: text('pickup_at'), // The pickup slot the customer chose, as an ISO instant
   createdAt: text('created_at').notNull()
 });
 
@@ -165,6 +170,7 @@ export const stockItems = sqliteTable('stock_items', {
   unitCost: real('unit_cost').notNull().default(0.0), // Cost per unit
   totalPrice: real('total_price').notNull().default(0.0), // Total valuation (quantity * unitCost)
   minThreshold: real('min_threshold').notNull().default(5.0), // Minimum stock level alert trigger
+  supplierId: text('supplier_id'), // Who it is usually ordered from
   updatedAt: text('updated_at').notNull(),
   createdAt: text('created_at').notNull()
 });
@@ -188,17 +194,22 @@ export const customers = sqliteTable('customers', {
 });
 
 // Types exported for frontend & backend consumption
-export type SettingsSelect = Omit<typeof settings.$inferSelect, 'timeZone' | 'calendarSystem' | 'secondaryCalendar' | 'telegramEventsChatId' | 'notifyBookings' | 'stockCategories'>
-  & { timeZone?: string; calendarSystem?: string; secondaryCalendar?: string; telegramEventsChatId?: string; notifyBookings?: boolean; stockCategories?: string | null };
+export type SettingsSelect = Omit<typeof settings.$inferSelect, 'timeZone' | 'calendarSystem' | 'secondaryCalendar' | 'telegramEventsChatId' | 'notifyBookings' | 'stockCategories' | 'loyalty' | 'pickupSlots'>
+  & { timeZone?: string; calendarSystem?: string; secondaryCalendar?: string; telegramEventsChatId?: string; notifyBookings?: boolean; stockCategories?: string | null; loyalty?: string; pickupSlots?: string };
 export type CategorySelect = Omit<typeof categories.$inferSelect, 'isPrivate' | 'translations'> & { isPrivate?: boolean; translations?: MenuTranslations };
-export type MenuItemSelect = Omit<typeof menuItems.$inferSelect, 'allergens' | 'dietaryLabels' | 'translations'> & { allergens?: string; dietaryLabels?: string; translations?: MenuTranslations };
-export type MenuVariantSelect = typeof menuVariants.$inferSelect;
+export type MenuItemSelect = Omit<typeof menuItems.$inferSelect, 'allergens' | 'dietaryLabels' | 'translations' | 'displayOrder'> & { allergens?: string; dietaryLabels?: string; translations?: MenuTranslations; displayOrder?: number };
+/** What choosing an option changes in the item's recipe: extra material is positive, material it replaces negative. */
+export type VariantStockDelta = { stockItemId: string; quantity: number };
+export type MenuVariantSelect = typeof menuVariants.$inferSelect & { stock?: VariantStockDelta[] };
 export type StaffSelect = typeof staff.$inferSelect;
 export type ShiftSelect = typeof shifts.$inferSelect;
-export type OrderSelect = typeof orders.$inferSelect;
+export type OrderSelect = Omit<typeof orders.$inferSelect, 'tipAmount' | 'pickupAt'> & { tipAmount?: number; pickupAt?: string | null };
 export type OrderItemSelect = typeof orderItems.$inferSelect;
 export type ExpenseSelect = typeof expenses.$inferSelect;
 export type TaskSelect = typeof tasks.$inferSelect;
-export type StockItemSelect = typeof stockItems.$inferSelect;
+export type StockItemSelect = Omit<typeof stockItems.$inferSelect, 'supplierId'> & { supplierId?: string | null };
 export type RecipeSelect = typeof recipes.$inferSelect;
-export type CustomerSelect = typeof customers.$inferSelect;
+export type CustomerSelect = typeof customers.$inferSelect & {
+  /** Club balances from the ledger: stamps toward the next reward, and points to spend. */
+  stamps?: number; points?: number;
+};

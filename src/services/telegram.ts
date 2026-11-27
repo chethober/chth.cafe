@@ -254,7 +254,7 @@ export function formatSaleMessage(order: any, items: any[] = [], ctx: FormatCont
 <b>Type:</b> ${orderType}
 <b>Total Amount:</b> <b>${money(ctx, order.totalAmount)}</b> (${paymentMethod})
 <b>Status:</b> ${ORDER_STATUS_LABEL[order.status] || 'Pending'}
-<b>Time:</b> ${cafeTime(ctx, order.createdAt || Date.now())}${itemsList}
+<b>Time:</b> ${cafeTime(ctx, order.createdAt || Date.now())}${order.pickupAt ? `\n<b>⏰ Ready at:</b> ${cafeTime(ctx, order.pickupAt)}` : ''}${Number(order.tipAmount) > 0 ? `\n<b>Tip:</b> ${money(ctx, Number(order.tipAmount))}` : ''}${itemsList}
 
 ${footer(ctx, 'POS')}`;
   return { text, keyboard: order.id ? orderKeyboard({ id: order.id, status: order.status || 'pending' }) : [] };
@@ -315,6 +315,8 @@ export interface DailyStats {
   cardTotal: number;
   qrTotal: number;
   otherTotal: number;
+  /** Tips collected on completed orders; not part of revenue. */
+  tipsTotal?: number;
   topItems: { name: string; quantity: number; revenue: number }[];
 }
 
@@ -338,7 +340,7 @@ export function formatDailyFinancialReportMessage(stats: DailyStats, ctx: Format
 💳 <b>Payment Breakdown:</b>
  • Cash: ${money(ctx, stats.cashTotal)}
  • Card: ${money(ctx, stats.cardTotal)}
- • QR Pay: ${money(ctx, stats.qrTotal)}${stats.otherTotal ? `\n • Other: ${money(ctx, stats.otherTotal)}` : ''}${top}
+ • QR Pay: ${money(ctx, stats.qrTotal)}${stats.otherTotal ? `\n • Other: ${money(ctx, stats.otherTotal)}` : ''}${stats.tipsTotal ? `\n\n🙏 <b>Tips:</b> ${money(ctx, stats.tipsTotal)}` : ''}${top}
 
 ${footer(ctx, 'Cafe Manager')}`;
 }

@@ -11,6 +11,7 @@ import { OpeningHoursEditor, openingHoursErrors, parseOpeningHours } from './Ope
 import { AppearanceSettings, parseAppearance } from '../utils/appearance';
 import { Button, Card, ConfirmDialog, Field, IconButton, Input, Notice, Page, PageHeader, Segmented, Select, ToggleRow, localDateKey } from '../ui';
 import { CALENDAR_SYSTEMS, calendarOf, cafeToday, formatDateKey } from '../utils/events';
+import { PICKUP_INTERVALS, parsePickupSlots, type PickupSlotSettings } from '../utils/pickupSlots';
 import { tr } from '../i18n';
 
 interface SettingsPanelProps {
@@ -68,6 +69,9 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
   const appearance = parseAppearance(formData.appearance);
   const updateAppearance = (partial: Partial<AppearanceSettings>) =>
     edit(prev => ({ ...prev, appearance: JSON.stringify({ ...parseAppearance(prev.appearance), ...partial }) }));
+  const pickupSlots = parsePickupSlots(formData.pickupSlots);
+  const updatePickup = (partial: Partial<PickupSlotSettings>) =>
+    edit(prev => ({ ...prev, pickupSlots: JSON.stringify({ ...parsePickupSlots(prev.pickupSlots), ...partial }) }));
   const openingHours = parseOpeningHours(formData.openHours);
   const hoursInvalid = Object.keys(openingHoursErrors(openingHours)).length > 0;
 
@@ -197,6 +201,24 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, onSettin
 
               <section id="settings-hours" className="ws-section" aria-label={tr('Opening hours')}>
                 <OpeningHoursEditor hours={openingHours} disabled={saving} onChange={hours => edit({ openHours: JSON.stringify(hours) })} />
+                <Card title={tr('Pickup slots')} description={tr('Customers ordering for pickup choose a time within your opening hours. A slot closes once it holds as many orders as you allow.')}>
+                  <div className="ws-form">
+                    <ToggleRow icon={<Clock />} title={tr('Offer pickup times')} description={tr('Off: pickup orders are made as soon as possible.')} checked={pickupSlots.enabled} disabled={saving} onChange={enabled => updatePickup({ enabled })} />
+                    {pickupSlots.enabled && <div className="ws-form-row cols-2">
+                      <Field label={tr('Every')}>{id => (
+                        <Select id={id} value={pickupSlots.intervalMinutes} disabled={saving} onChange={e => updatePickup({ intervalMinutes: Number(e.target.value) })}>
+                          {PICKUP_INTERVALS.map(m => <option key={m} value={m}>{tr('{count} minutes', { count: m })}</option>)}
+                        </Select>
+                      )}</Field>
+                      <Field label={tr('Orders per slot')}>{id => <Input id={id} type="number" inputMode="numeric" min="1" max="100" step="1" disabled={saving} value={pickupSlots.capacity} onChange={e => updatePickup({ capacity: Math.max(1, parseInt(e.target.value, 10) || 1) })} />}</Field>
+                      <Field label={tr('Earliest slot')} hint={tr('How long you need after an order arrives.')}>{(id, hint) => (
+                        <Select id={id} aria-describedby={hint} value={pickupSlots.leadMinutes} disabled={saving} onChange={e => updatePickup({ leadMinutes: Number(e.target.value) })}>
+                          {[0, 5, 10, 15, 20, 30, 45, 60, 90, 120].map(m => <option key={m} value={m}>{m ? tr('{count} minutes from now', { count: m }) : tr('Right away')}</option>)}
+                        </Select>
+                      )}</Field>
+                    </div>}
+                  </div>
+                </Card>
               </section>
 
               <section id="settings-appearance" className="ws-section" aria-label={tr('Appearance')}>
