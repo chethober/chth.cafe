@@ -17,6 +17,7 @@ const release = {
 };
 const releaseFiles = {
   'manifest.json': JSON.stringify(release),
+  'assets/chth-flags/en.svg': '<svg xmlns="http://www.w3.org/2000/svg"/>',
   'server.js': 'export default { fetch() { return new Response("café"); } };',
   'demo.sql': "INSERT OR IGNORE INTO categories (id, name, display_order, icon) VALUES ('demo', 'Demo', 1, 'coffee');",
   ...Object.fromEntries(Object.entries(ASSETS).map(([path, asset]) => [`assets${path}`, asset.body]))
@@ -125,6 +126,25 @@ try {
   check((await owner('/favicon.ico')).headers.get('content-type'), 'image/svg+xml');
   response = await owner('/logo.png');
   check([response.headers.get('content-type'), [...new Uint8Array(await response.arrayBuffer()).slice(1, 4)]], ['image/png', [80, 78, 71]]);
+  // Search basics: canonical and language alternates, social cards, structured data, robots and sitemap.
+  check(landing.includes('<link rel="canonical" href="https://chth.cafe/">'), true);
+  check(landing.includes('<link rel="alternate" hreflang="fa" href="https://chth.cafe/?lang=fa">') && landing.includes('hreflang="x-default" href="https://chth.cafe/"'), true);
+  check(landing.includes('<meta property="og:title" content="Your café, on your own Cloudflare · CHTH Café Cloud">') && landing.includes('<meta name="twitter:card" content="summary_large_image">'), true);
+  check(landing.includes('content="https://chth.cafe/og.jpg"') && landing.includes('Made for independent cafés'), true);
+  check(landing.includes('chth.cafe · deploy') && !landing.includes('id="look"'), true);
+  check(landing.includes('Is this a POS?') && landing.includes('github.com/chethober/chth.cafe/issues'), true);
+  check((await owner('/og.jpg')).headers.get('content-type'), 'image/jpeg');
+  check(landing.includes('<main id="main">') && landing.includes('"@type":"SoftwareApplication"'), true);
+  const ld = JSON.parse(/<script type="application\/ld\+json">([^<]+)<\/script>/.exec(landing)[1]);
+  check(ld['@graph'].map(node => node['@type']), ['WebSite', 'SoftwareApplication']);
+  response = await owner('/robots.txt');
+  check([response.headers.get('content-type'), (await response.text()).includes('Sitemap: https://chth.cafe/sitemap.xml')], ['text/plain; charset=utf-8', true]);
+  response = await owner('/sitemap.xml');
+  const sitemap = await response.text();
+  check([response.headers.get('content-type'), sitemap.match(/<url>/g).length, sitemap.includes('<loc>https://chth.cafe/?lang=ru</loc>')], ['application/xml; charset=utf-8', 5, true]);
+  response = await owner('/assets/chth-flags/en.svg');
+  check([response.status, (await response.text()).startsWith('<svg')], [200, true]);
+  check([(await owner('/assets/chth-flags/xx.svg')).status, (await owner('/assets/chth-flags/..%2Fmanifest.json')).status], [404, 404]);
   // The theme toggle is a form: it saves the choice, goes back, and only the next page load reveals it.
   const viewer = browser();
   response = await viewer('/theme', { theme: 'light' }, { Referer: `${HOST}/` });
@@ -139,6 +159,8 @@ try {
   const persianPage = await persian.text();
   check(/<html lang="fa"[^>]*dir="rtl"/.test(persianPage), true);
   check(persianPage.includes('ورود با کلادفلر'), true);
+  check(persianPage.includes('<link rel="canonical" href="https://chth.cafe/?lang=fa">') && persianPage.includes('<meta property="og:locale" content="fa_IR">'), true);
+  check(persianPage.includes('<meta property="og:title" content="کافه‌ات، روی کلادفلر خودت · CHTH Café Cloud">'), true);
   check(persianPage.includes('class="chth-footer"'), true);
   // One footer (the CHTH mark, linking to chth.wtf), the language menu in the navbar, and the brand fonts.
   check(persianPage.match(/<footer\b/g).length, 1);

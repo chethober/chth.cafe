@@ -6,11 +6,13 @@ import { decrypt, encrypt, randomToken, sha256 } from './crypto';
 import { authorizeUrl, exchangeCode, newVerifier, oauthConfigured, revoke, type Credentials } from './oauth';
 import { FAVICON, OLD_THEME_COOKIE, THEME_COOKIE, THEME_SWITCH_COOKIE } from './design';
 import { LOGO_PNG } from './logo';
-import { attempts, audit as auditFor, clientFor as clientForEnv, currentRelease, deployRow, guarded, message, now, resourcesOf, themed, type Bindings, type CafeRow, type ConnectionRow } from './shared';
+import { OG_JPG } from './og';
+import { attempts, audit as auditFor, clientFor as clientForEnv, currentRelease, deployRow, guarded, message, now, releaseFile, resourcesOf, themed, type Bindings, type CafeRow, type ConnectionRow } from './shared';
 import internal from './internal';
 import * as views from './views';
 import { landingLocale, localizeLanding } from './i18n';
 import { track } from './hub';
+import { ROBOTS_TXT, sitemapXml } from './seo';
 
 /** Owners are Cloudflare accounts: whoever can reach an account with OAuth or a token manages its cafés. */
 type Owner = { id: string; name: string };
@@ -114,7 +116,18 @@ app.get('/', c => c.get('owner') ? c.redirect('/dashboard') : landing(c));
 const favicon = (c: C) => c.body(FAVICON, 200, { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'public, max-age=86400' });
 app.get('/favicon.svg', favicon);
 app.get('/favicon.ico', favicon);
+app.get('/robots.txt', c => c.body(ROBOTS_TXT, 200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=3600' }));
+app.get('/sitemap.xml', c => c.body(sitemapXml(), 200, { 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'public, max-age=3600' }));
+/** The language menu's flags ship in the café release's assets; the Worker runs first, so it serves them. */
+app.get('/assets/chth-flags/:file', async c => {
+  const name = c.req.param('file');
+  if (!/^[a-z]{2}\.(?:svg|png)$/.test(name)) return c.notFound();
+  const file = await releaseFile(c.env)(`assets/chth-flags/${name}`);
+  if (!file.ok) return c.notFound();
+  return c.body(await file.arrayBuffer(), 200, { 'Content-Type': file.headers.get('Content-Type') ?? 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' });
+});
 app.get('/logo.png', c => c.body(Uint8Array.from(atob(LOGO_PNG), ch => ch.charCodeAt(0)), 200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' }));
+app.get('/og.jpg', c => c.body(Uint8Array.from(atob(OG_JPG), ch => ch.charCodeAt(0)), 200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=86400' }));
 
 /** Saves the theme and goes back to the page it was chosen on, which then reveals it from the toggle. */
 app.post('/theme', async c => {
