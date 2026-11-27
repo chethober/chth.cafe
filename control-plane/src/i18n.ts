@@ -5,6 +5,7 @@
 
 import { dirOf, isLocale, localeCookie, localeFromCookie, pickLocale, type Locale } from '../../src/chth-kit/locales.js';
 import { cookieNoticeHtml } from '../../src/chth-kit/shell.js';
+import { landingSeo } from './seo';
 
 type Row = [fa: string, ar: string, ru: string, es: string];
 const COL: Record<Exclude<Locale, 'en'>, number> = { fa: 0, ar: 1, ru: 2, es: 3 };
@@ -98,7 +99,7 @@ export const LANDING: Record<string, Row> = {
   'FAQ': ['پرسش‌های رایج', 'الأسئلة الشائعة', 'Вопросы', 'Preguntas'],
   'Example: deploying a café called Corner Beans': ['نمونه: انتشار کافه‌ای به نام Corner Beans', 'مثال: نشر مقهى باسم Corner Beans', 'Пример: развёртывание кафе Corner Beans', 'Ejemplo: desplegar un café llamado Corner Beans'],
   'Your café, on your own Cloudflare': ['کافه‌ات، روی کلادفلر خودت', 'مقهاك على Cloudflare الخاص بك', 'Ваше кафе на вашем Cloudflare', 'Tu café, en tu propio Cloudflare'],
-  'Menu, orders, stock, staff and finances for your café, deployed in one click to your own Cloudflare account.': ['منو، سفارش، انبار، کارکنان و مالی کافه‌ات، با یک کلیک روی حساب کلادفلر خودت.', 'القائمة والطلبات والمخزون والموظفون والمالية لمقهاك، تُنشر بنقرة على حسابك في Cloudflare.', 'Меню, заказы, склад, персонал и финансы кафе — в один клик в вашем аккаунте Cloudflare.', 'Menú, pedidos, stock, personal y finanzas de tu café, desplegados en un clic en tu cuenta de Cloudflare.'],
+  'Open-source café software: QR menu and ordering, order board, stock, shifts, bookings and finances. Deploys to your own Cloudflare account in about a minute.': ['نرم‌افزار متن‌باز کافه: منوی QR و سفارش، تابلوی سفارش‌ها، انبار، شیفت کارکنان، رزرو و حسابداری. در حدود یک دقیقه روی حساب کلادفلر خودت اجرا می‌شود.', 'برنامج مفتوح المصدر للمقاهي: قائمة QR وطلبات، لوحة طلبات، مخزون، ورديات، حجوزات وحسابات. يُنشر على حسابك في Cloudflare خلال نحو دقيقة.', 'Открытое ПО для кафе: QR-меню и заказы, доска заказов, склад, смены, брони и финансы. Развёртывается в ваш аккаунт Cloudflare примерно за минуту.', 'Software de código abierto para cafés: menú QR y pedidos, tablero de pedidos, stock, turnos, reservas y finanzas. Se despliega en tu cuenta de Cloudflare en un minuto.'],
   'CHTH Café Cloud · open source café management on Cloudflare': ['CHTH Café Cloud · مدیریت متن‌باز کافه روی کلادفلر', 'CHTH Café Cloud · إدارة مقاهٍ مفتوحة المصدر على Cloudflare', 'CHTH Café Cloud · управление кафе с открытым кодом на Cloudflare', 'CHTH Café Cloud · gestión de cafés de código abierto en Cloudflare'],
   'Main': ['اصلی', 'الرئيسي', 'Главное', 'Principal'],
   'Switch to light appearance': ['حالت روشن', 'الوضع الفاتح', 'Светлая тема', 'Modo claro'],
@@ -153,7 +154,9 @@ export function localizeLanding(page: string, locale: Locale): string {
     ).join('');
     out = out.replace(/<title>([^<]*) · CHTH Café Cloud<\/title>/, (m, title: string) => { const t = tr(title); return t == null ? m : `<title>${t} · CHTH Café Cloud</title>`; });
   }
+  const title = /<title>([^<]*)<\/title>/.exec(out)?.[1] ?? '';
+  const description = /<meta name="description" content="([^"]*)">/.exec(out)?.[1] ?? '';
   return out
     .replace('<html lang="en" data-chth-product="cafe">', `<html lang="${locale}" dir="${dirOf(locale)}" data-chth-product="cafe">`)
-    .replace('</head>', `<style>${LANDING_CSS}</style></head>`);
+    .replace('</head>', `${landingSeo(locale, title, description)}\n<style>${LANDING_CSS}</style></head>`);
 }

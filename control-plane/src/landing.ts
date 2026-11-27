@@ -186,7 +186,7 @@ const FEATURES = ['Public menu & QR ordering', 'Order board', 'Stock & recipes',
 
 export function landing(params: { oauth: boolean; error?: string; message?: string }) {
   const signInHref = params.oauth ? '/connect/oauth' : '#start';
-  return page(html`
+  return page(html`<main id="main">
 ${params.error || params.message ? html`<div class="wrap banner">${notice(params.error)}${notice(params.message, 'ok')}${params.error ? html`<a href="#start">Try again ↓</a>` : ''}</div>` : ''}
 <header class="hero">
   <div class="glow"></div><div class="grain"></div>
@@ -388,9 +388,10 @@ ${params.error || params.message ? html`<div class="wrap banner">${notice(params
     </div>
   </div>
 </section>
+</main>
 `, {
     title: 'Your café, on your own Cloudflare',
-    description: 'Menu, orders, stock, staff and finances for your café, deployed in one click to your own Cloudflare account.',
+    description: 'Open-source café software: QR menu and ordering, order board, stock, shifts, bookings and finances. Deploys to your own Cloudflare account in about a minute.',
     styles: STYLES,
     signInHref,
     languageMenu: true,
