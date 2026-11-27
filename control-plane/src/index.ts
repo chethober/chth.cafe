@@ -6,6 +6,7 @@ import { decrypt, encrypt, randomToken, sha256 } from './crypto';
 import { authorizeUrl, exchangeCode, newVerifier, oauthConfigured, revoke, type Credentials } from './oauth';
 import { FAVICON, OLD_THEME_COOKIE, THEME_COOKIE, THEME_SWITCH_COOKIE } from './design';
 import { LOGO_PNG } from './logo';
+import { OG_JPG } from './og';
 import { attempts, audit as auditFor, clientFor as clientForEnv, currentRelease, deployRow, guarded, message, now, releaseFile, resourcesOf, themed, type Bindings, type CafeRow, type ConnectionRow } from './shared';
 import internal from './internal';
 import * as views from './views';
@@ -126,6 +127,15 @@ app.get('/assets/chth-flags/:file', async c => {
   return c.body(await file.arrayBuffer(), 200, { 'Content-Type': file.headers.get('Content-Type') ?? 'application/octet-stream', 'Cache-Control': 'public, max-age=86400' });
 });
 app.get('/logo.png', c => c.body(Uint8Array.from(atob(LOGO_PNG), ch => ch.charCodeAt(0)), 200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' }));
+app.get('/og.jpg', c => c.body(Uint8Array.from(atob(OG_JPG), ch => ch.charCodeAt(0)), 200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=86400' }));
+/** Product screenshots for the landing page, packaged into the café release under assets/landing/. */
+app.get('/landing/:file', async c => {
+  const name = c.req.param('file');
+  if (!/^[a-z0-9-]+\.(?:jpg|jpeg|png|webp)$/.test(name)) return c.notFound();
+  const file = await releaseFile(c.env)(`assets/landing/${name}`);
+  if (!file.ok) return c.notFound();
+  return c.body(await file.arrayBuffer(), 200, { 'Content-Type': file.headers.get('Content-Type') ?? 'image/jpeg', 'Cache-Control': 'public, max-age=86400' });
+});
 
 /** Saves the theme and goes back to the page it was chosen on, which then reveals it from the toggle. */
 app.post('/theme', async c => {

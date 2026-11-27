@@ -21,6 +21,19 @@ header.hero{position:relative;margin-top:calc(-1 * var(--chth-nav-space));paddin
 .lede{font-size:var(--chth-text-18);color:var(--muted);max-width:34em;margin:0 0 var(--chth-space-30)}
 .cta{display:flex;gap:var(--chth-space-12);flex-wrap:wrap;align-items:center}
 .fine{font-size:var(--chth-text-13);color:var(--dim);margin-top:var(--chth-space-16)}
+.audience{font-size:var(--chth-text-15);color:var(--muted);max-width:34em;margin:calc(-1 * var(--chth-space-12)) 0 var(--chth-space-22)}
+.trust{display:flex;flex-wrap:wrap;gap:var(--chth-space-8) var(--chth-space-16);margin-top:var(--chth-space-18);padding:0;list-style:none}
+.trust li{display:inline-flex;align-items:center;gap:var(--chth-space-8);font-size:var(--chth-text-13);color:var(--dim)}
+.trust li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--mint);flex:none}
+.trust a{color:var(--muted);text-decoration:underline;text-underline-offset:3px}.trust a:hover{color:var(--ink)}
+.shots{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.2fr) minmax(0,1.2fr);gap:var(--chth-space-16);margin-top:var(--chth-space-8);align-items:start}
+.shot{margin:0;border:1px solid var(--line);border-radius:var(--chth-radius-xl);overflow:hidden;background:var(--panel)}
+.shot img{display:block;width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;object-position:top;background:var(--soft)}
+.shot.phone{max-width:280px}
+.shot.phone img{aspect-ratio:9/16;object-fit:cover}
+.shot figcaption{padding:var(--chth-space-12) var(--chth-space-14);font-size:var(--chth-text-13);color:var(--muted);border-top:1px solid var(--line)}
+@media (max-width:900px){.shots{grid-template-columns:minmax(0,1fr)}.shot.phone{max-width:280px;margin-inline:auto}}
+.faq p a{color:var(--accent2);text-decoration:underline;text-underline-offset:3px}
 
 .window{margin:0;min-width:0;border:1px solid var(--line);border-radius:var(--chth-radius-16);background:linear-gradient(180deg,var(--panel2),var(--panel));color:var(--ink);box-shadow:0 40px 80px -30px rgba(0,0,0,.6);overflow:hidden}
 .window .bar{display:flex;align-items:center;gap:var(--chth-space-6);padding:var(--chth-space-12) var(--chth-space-14);border-bottom:1px solid var(--line);font-size:var(--chth-text-12);color:var(--dim)}
@@ -194,16 +207,22 @@ ${params.error || params.message ? html`<div class="wrap banner">${notice(params
     <div>
       <span class="eyebrow"><i class="dot ping"></i><b>Open source</b> · runs on the Cloudflare free plan</span>
       <h1 class="display hero-title">Your café, running on <em>your own</em> Cloudflare.</h1>
-      <p class="lede">Menu, QR orders, stock, shifts, bookings and the books, in one app. Deploy it to your Cloudflare account in about a minute. You keep the data and the bill. We only keep a way to send you updates.</p>
+      <p class="audience">Made for independent cafés and small coffee shops. No coding, no terminal, no monthly fee to us.</p>
+      <p class="lede">Menu, QR orders, stock, shifts, bookings and the books, in one app. Deploys to your own Cloudflare account in about a minute, free on Cloudflare’s free plan. Your data and your bill stay yours.</p>
       <div class="cta">
         <a class="btn cf" href="${signInHref}">${CLOUD} Sign in with Cloudflare</a>
         <a class="btn ghost" href="#demo">See it working ↓</a>
       </div>
-      <p class="fine">No new account or password. You sign in with Cloudflare or an API token, and sign out whenever you like.</p>
+      <p class="fine">That is your sign-up. It takes about a minute, and you can disconnect any time. No new account or password.</p>
+      <ul class="trust">
+        <li><a href="https://github.com/chethober/chth.cafe">MIT licensed on GitHub</a></li>
+        <li>Free on Cloudflare’s free plan</li>
+        <li>No tracking cookies</li>
+      </ul>
     </div>
 
     <figure class="window force-dark" aria-label="Example: deploying a café called Corner Beans">
-      <div class="bar"><i></i><i></i><i></i><span>cloud.chth.cafe · deploy</span></div>
+      <div class="bar"><i></i><i></i><i></i><span>chth.cafe · deploy</span></div>
       <div class="progress"><b></b></div>
       <div class="console">
         <div class="ln" style="--i:0"><span class="cmd">▸ Deploying “Corner Beans” to Corner Beans Ltd</span></div>
@@ -313,6 +332,28 @@ ${params.error || params.message ? html`<div class="wrap banner">${notice(params
   </div>
 </section>
 
+<section class="band" id="look">
+  <div class="wrap">
+    <div class="kicker">Inside the app</div>
+    <h2 class="display title">The real screens your staff and guests see.</h2>
+    <p class="sub">Not mockups: the guest menu, the staff panel and the admin, from a café running on Cloudflare.</p>
+    <div class="shots">
+      <figure class="shot phone">
+        <img src="/landing/menu-mobile.jpg" width="780" height="1688" loading="lazy" decoding="async" alt="Guest QR menu on a phone: categories, drinks and an order cart">
+        <figcaption>Guest menu · phone</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="/landing/panel.jpg" width="1440" height="900" loading="lazy" decoding="async" alt="Staff panel with open orders and a point-of-sale view">
+        <figcaption>Staff panel · orders</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="/landing/admin-menu.jpg" width="1440" height="900" loading="lazy" decoding="async" alt="Admin menu editor with categories and item prices">
+        <figcaption>Admin · menu</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
 <section class="band" id="how" style="background:var(--bg2);border-block:1px solid var(--line)">
   <div class="wrap">
     <div class="kicker">How it works</div>
@@ -379,12 +420,14 @@ ${params.error || params.message ? html`<div class="wrap banner">${notice(params
     <div class="kicker">Questions</div>
     <h2 class="display title">Good to know</h2>
     <div class="faq">
-      <details><summary>What does it cost?</summary><p>The software is free and open source. The café runs on your Cloudflare account, and the free plan is enough for one café. Whatever Cloudflare bills, it bills to you directly.</p></details>
-      <details><summary>What can you see in my account?</summary><p>We can see what your token or consent allows: Workers, D1 and KV, and Zone and Routes if you add your own domain. We use that only to deploy, update or delete cafés when you ask. Every action goes in an audit log.</p></details>
+      <details><summary>What does it cost?</summary><p>The software is free and open source. The café runs on your Cloudflare account, and the free plan is enough for one café. Free forever from us: you only pay Cloudflare if you outgrow their free plan, and they bill you directly.</p></details>
+      <details><summary>What can you see in my account?</summary><p>Only what you approve on Cloudflare’s consent screen: your Workers, databases and storage, and DNS routes if you add your own domain. We use that only to deploy, update or delete cafés when you click, and every action is logged.</p></details>
       <details><summary>Why sign in with Cloudflare and not an email?</summary><p>Your café lives in your Cloudflare account anyway, so that account is your identity here. There’s no extra password for us to store or for you to lose.</p></details>
       <details><summary>What happens if I disconnect?</summary><p>We forget your access and sign you out everywhere. Your cafés keep running with all their data. Sign in again whenever you want one-click updates back.</p></details>
-      <details><summary>Can I use my own domain?</summary><p>Yes. Give us a domain on a zone in your account, and the menu opens at the domain, the admin at admin. and the staff panel at panel.</p></details>
+      <details><summary>Can I use my own domain?</summary><p>Yes. Give us a domain already on Cloudflare in your account, and the menu opens at that domain, the admin at admin. and the staff panel at panel.</p></details>
+      <details><summary>Is this a POS?</summary><p>It covers the café floor: QR ordering, an order board, a staff panel for taking orders, stock, shifts, bookings and the books. It does not process card payments itself.</p></details>
       <details><summary>Can I host it myself, without this site?</summary><p>Yes. Everything is on GitHub, and <code>wrangler deploy</code> gives you the same café.</p></details>
+      <details><summary>Where do I ask a question or report a bug?</summary><p>Open an issue on <a href="https://github.com/chethober/chth.cafe/issues">GitHub</a>. The source, docs and releases live there too.</p></details>
     </div>
   </div>
 </section>
