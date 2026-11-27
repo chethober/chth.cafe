@@ -26,13 +26,6 @@ header.hero{position:relative;margin-top:calc(-1 * var(--chth-nav-space));paddin
 .trust li{display:inline-flex;align-items:center;gap:var(--chth-space-8);font-size:var(--chth-text-13);color:var(--dim)}
 .trust li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--mint);flex:none}
 .trust a{color:var(--muted);text-decoration:underline;text-underline-offset:3px}.trust a:hover{color:var(--ink)}
-.shots{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.2fr) minmax(0,1.2fr);gap:var(--chth-space-16);margin-top:var(--chth-space-8);align-items:start}
-.shot{margin:0;border:1px solid var(--line);border-radius:var(--chth-radius-xl);overflow:hidden;background:var(--panel)}
-.shot img{display:block;width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;object-position:top;background:var(--soft)}
-.shot.phone{max-width:280px}
-.shot.phone img{aspect-ratio:9/16;object-fit:cover}
-.shot figcaption{padding:var(--chth-space-12) var(--chth-space-14);font-size:var(--chth-text-13);color:var(--muted);border-top:1px solid var(--line)}
-@media (max-width:900px){.shots{grid-template-columns:minmax(0,1fr)}.shot.phone{max-width:280px;margin-inline:auto}}
 .faq p a{color:var(--accent2);text-decoration:underline;text-underline-offset:3px}
 
 .window{margin:0;min-width:0;border:1px solid var(--line);border-radius:var(--chth-radius-16);background:linear-gradient(180deg,var(--panel2),var(--panel));color:var(--ink);box-shadow:0 40px 80px -30px rgba(0,0,0,.6);overflow:hidden}
@@ -328,28 +321,6 @@ ${params.error || params.message ? html`<div class="wrap banner">${notice(params
           </div>
         </div>
       </article>
-    </div>
-  </div>
-</section>
-
-<section class="band" id="look">
-  <div class="wrap">
-    <div class="kicker">Inside the app</div>
-    <h2 class="display title">The real screens your staff and guests see.</h2>
-    <p class="sub">Not mockups: the guest menu, the staff panel and the admin, from a café running on Cloudflare.</p>
-    <div class="shots">
-      <figure class="shot phone">
-        <img src="/landing/menu-mobile.jpg" width="780" height="1688" loading="lazy" decoding="async" alt="Guest QR menu on a phone: categories, drinks and an order cart">
-        <figcaption>Guest menu · phone</figcaption>
-      </figure>
-      <figure class="shot">
-        <img src="/landing/panel.jpg" width="1440" height="900" loading="lazy" decoding="async" alt="Staff panel with open orders and a point-of-sale view">
-        <figcaption>Staff panel · orders</figcaption>
-      </figure>
-      <figure class="shot">
-        <img src="/landing/admin-menu.jpg" width="1440" height="900" loading="lazy" decoding="async" alt="Admin menu editor with categories and item prices">
-        <figcaption>Admin · menu</figcaption>
-      </figure>
     </div>
   </div>
 </section>
