@@ -620,7 +620,10 @@ class CafeStore {
       body: JSON.stringify(input)
     });
     const data = normalizePromotion((await response.json() as { data: Record<string, unknown> }).data);
-    this.state.promotions = input.id ? this.state.promotions.map(p => p.id === data.id ? data : p) : [...this.state.promotions, data];
+    // A sync started by the mutation may already have brought the new row in.
+    this.state.promotions = this.state.promotions.some(p => p.id === data.id)
+      ? this.state.promotions.map(p => p.id === data.id ? data : p)
+      : [...this.state.promotions, data];
     this.confirmedState.promotions = structuredClone(this.state.promotions);
     this.notify();
     return data;

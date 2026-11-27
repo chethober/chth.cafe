@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Trash } from 'lucide-react';
 import { SettingsSelect } from '../db/schema';
 import { api } from '../services/api';
-import { Badge, Card, DataTable, EmptyState, Notice, Segmented, money } from '../ui';
+import { Badge, Card, DataTable, EmptyState, Notice, Segmented, money, plural } from '../ui';
 import { cafeToday } from '../utils/events';
 import { WASTE_REASONS } from '../utils/purchasing';
 import { tr } from '../i18n';
@@ -63,7 +63,7 @@ export function WasteReport({ settings }: { settings: SettingsSelect }) {
           {report.byReason.length > 0 && report.byReason.map(r => (
             <div key={r.reason} className="ws-bar-row">
               <span className="ws-truncate" style={{ fontWeight: 600 }}>{reasonLabel(r.reason)}</span>
-              <span className="ws-hint tabular">{tr('{count} times', { count: r.count })} · <strong style={{ color: 'var(--ws-ink)' }}>{fmt(r.cost)}</strong></span>
+              <span className="ws-hint tabular">{plural(r.count, 'time')} · <strong style={{ color: 'var(--ws-ink)' }}>{fmt(r.cost)}</strong></span>
               <div className="ws-meter"><span style={{ width: `${(r.cost / topReason) * 100}%`, background: 'var(--ws-series-2)' }} /></div>
             </div>
           ))}
