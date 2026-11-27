@@ -1,14 +1,118 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Contact, Pencil, Phone, Trash2, UserPlus, X } from 'lucide-react';
-import { CustomerSelect, OrderItemSelect, OrderSelect, SettingsSelect } from '../db/schema';
+import { Award, Contact, Pencil, Phone, Settings2, SlidersHorizontal, Trash2, UserPlus, X } from 'lucide-react';
+import { CategorySelect, CustomerSelect, OrderItemSelect, OrderSelect, SettingsSelect } from '../db/schema';
 import { store } from '../db/store';
 import { normalizePhone } from '../services/customers';
 import {
-  Avatar, Badge, Button, Card, ConfirmDialog, Dialog, EmptyState, Field, FormDialog, IconButton, Input, KeyValue, List, ListItem,
-  Notice, Page, PageHeader, SearchInput, Segmented, Stat, StatGrid, Textarea, formatDate, money, orderStatusTone, plural, ORDER_STATUS_LABELS
+  AffixInput, Avatar, Badge, Button, Card, Checkbox, ConfirmDialog, Dialog, EmptyState, Field, FormDialog, IconButton, Input, KeyValue, List, ListItem,
+  Notice, Page, PageHeader, SearchInput, Segmented, Stat, StatGrid, Textarea, ToggleRow, formatDate, money, orderStatusTone, plural, ORDER_STATUS_LABELS
 } from '../ui';
 import { OrderDetailsDialog } from './shared';
+import { parseLoyalty, pointsOn, stampProgress, stampsOn, type LoyaltySettings } from '../utils/loyalty';
 import { tr } from '../i18n';
+
+/** "3 of 8 stamps · 12 points", or '' when the club has no stamp card or points. */
+export function balanceLabel(loyalty: LoyaltySettings, member: Pick<CustomerSelect, 'stamps' | 'points'>) {
+  const parts: string[] = [];
+  if (stampsOn(loyalty)) {
+    const { rewards, onCard, per } = stampProgress(loyalty, member.stamps || 0);
+    parts.push(rewards ? tr('{count} free ready · {onCard} of {per} stamps', { count: rewards, onCard, per }) : tr('{onCard} of {per} stamps', { onCard, per }));
+  }
+  if (pointsOn(loyalty)) parts.push(plural(member.points || 0, 'point'));
+  return parts.join(' · ');
+}
+
+/** The stamp card as dots: filled for each stamp on the current card. */
+export function StampCard({ loyalty, stamps }: { loyalty: LoyaltySettings; stamps: number }) {
+  const { rewards, onCard, per } = stampProgress(loyalty, stamps);
+  return (
+    <div className="ws-stamp-card" role="img" aria-label={tr('{onCard} of {per} stamps', { onCard, per })}>
+      {Array.from({ length: per }, (_, i) => <span key={i} className="ws-stamp" data-on={i < onCard || undefined} />)}
+      {rewards > 0 && <Badge tone="positive" icon={<Award />}>{plural(rewards, 'free item')}</Badge>}
+    </div>
+  );
+}
+
+interface LedgerEntry { id: string; orderId: string | null; orderNumber: string | null; kind: 'earn' | 'redeem' | 'adjust'; stamps: number; points: number; note: string; createdAt: string }
+
+/** The club's rules: the stamp card, points, and what each is worth. Saved with the café settings. */
+function ClubRulesDialog({ open, onClose, settings, categories, onSaved }: { open: boolean; onClose: () => void; settings: SettingsSelect; categories: CategorySelect[]; onSaved: () => void }) {
+  const [rules, setRules] = useState(() => parseLoyalty(settings.loyalty));
+  const [stamps, setStamps] = useState('');
+  const [spend, setSpend] = useState('');
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    if (!open) return;
+    const current = parseLoyalty(settings.loyalty);
+    setRules(current); setStamps(current.stampsPerReward ? String(current.stampsPerReward) : '');
+    setSpend(current.spendPerPoint ? String(current.spendPerPoint) : ''); setValue(current.pointValue ? String(current.pointValue) : ''); setError('');
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const next = parseLoyalty({ ...rules, stampsPerReward: parseInt(stamps, 10) || 0, spendPerPoint: parseFloat(spend) || 0, pointValue: parseFloat(value) || 0 });
+    if (next.enabled && !stampsOn(next) && !pointsOn(next)) return setError(tr('Set up a stamp card, points, or both.'));
+    setSaving(true); setError('');
+    try {
+      await store.saveSettings({ ...settings, loyalty: JSON.stringify(next) });
+      onSaved(); onClose();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : tr('The rules could not be saved.'));
+    } finally { setSaving(false); }
+  };
+  const toggle = (id: string) => setRules(r => ({ ...r, stampCategoryIds: r.stampCategoryIds.includes(id) ? r.stampCategoryIds.filter(c => c !== id) : [...r.stampCategoryIds, id] }));
+  return (
+    <FormDialog open={open} onClose={onClose} busy={saving} title={tr('Club rewards')} description={tr('Members earn when an order linked to them is completed. Cancelled orders give back what they spent.')} submitLabel={tr('Save rules')} onSubmit={submit}>
+      {error && <Notice tone="danger">{error}</Notice>}
+      <ToggleRow icon={<Award />} title={tr('Rewards on')} description={tr('Off keeps balances but stops earning and spending.')} checked={rules.enabled} onChange={enabled => setRules(r => ({ ...r, enabled }))} />
+      <Field label={tr('Stamps for a free item')} hint={tr('A stamp for each paid item in the categories below. 0 for no stamp card.')}>{(id, hint) => <Input id={id} aria-describedby={hint} type="number" inputMode="numeric" min="0" max="50" step="1" value={stamps} onChange={e => setStamps(e.target.value)} placeholder="8" />}</Field>
+      <div className="ws-field">
+        <span className="ws-label">{tr('Stamp categories')}</span>
+        <div className="ws-check-grid">
+          {categories.map(c => <Checkbox key={c.id} checked={rules.stampCategoryIds.includes(c.id)} onChange={() => toggle(c.id)}>{c.name}</Checkbox>)}
+        </div>
+        <span className="ws-hint">{rules.stampCategoryIds.length ? tr('Only these earn stamps and can be the free item.') : tr('None picked: every category.')}</span>
+      </div>
+      <div className="ws-form-row cols-2">
+        <Field label={tr('Spend for one point')} hint={tr('Empty for no points.')}>{(id, hint) => <AffixInput id={id} aria-describedby={hint} affix={settings.currency} type="number" inputMode="decimal" min="0" step="any" value={spend} onChange={e => setSpend(e.target.value)} />}</Field>
+        <Field label={tr('One point is worth')}>{id => <AffixInput id={id} affix={settings.currency} type="number" inputMode="decimal" min="0" step="any" value={value} onChange={e => setValue(e.target.value)} />}</Field>
+      </div>
+    </FormDialog>
+  );
+}
+
+/** Adds or takes away stamps and points by hand, with the reason kept in the member's history. */
+function AdjustBalanceDialog({ member, onClose, onSaved }: { member: CustomerSelect | null; onClose: () => void; onSaved: () => void }) {
+  const [stamps, setStamps] = useState('');
+  const [points, setPoints] = useState('');
+  const [note, setNote] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => { if (member) { setStamps(''); setPoints(''); setNote(''); setError(''); } }, [member?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!member) return;
+    setSaving(true); setError('');
+    try {
+      await store.adjustMemberBalance(member.id, { stamps: parseInt(stamps, 10) || 0, points: parseInt(points, 10) || 0, note: note.trim() });
+      onSaved(); onClose();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : tr('The balance could not be changed.'));
+    } finally { setSaving(false); }
+  };
+  return (
+    <FormDialog open={!!member} onClose={onClose} busy={saving} size="sm" title={tr('Adjust balance')} description={member ? tr('{name} has {balance}.', { name: member.name, balance: `${plural(member.stamps || 0, 'stamp')}, ${plural(member.points || 0, 'point')}` }) : undefined}
+      submitLabel={tr('Save')} submitDisabled={(!parseInt(stamps, 10) && !parseInt(points, 10)) || !note.trim()} onSubmit={submit}>
+      {error && <Notice tone="danger">{error}</Notice>}
+      <div className="ws-form-row cols-2">
+        <Field label={tr('Stamps')} hint={tr('Below zero takes away')}>{(id, hint) => <Input id={id} aria-describedby={hint} type="number" inputMode="numeric" step="1" value={stamps} onChange={e => setStamps(e.target.value)} placeholder="+1" />}</Field>
+        <Field label={tr('Points')}>{id => <Input id={id} type="number" inputMode="numeric" step="1" value={points} onChange={e => setPoints(e.target.value)} placeholder="0" />}</Field>
+      </div>
+      <Field label={tr('Reason')}>{id => <Input id={id} required maxLength={200} value={note} onChange={e => setNote(e.target.value)} placeholder={tr('e.g. Paper card brought in')} />}</Field>
+    </FormDialog>
+  );
+}
 
 export interface CustomerStats { visits: number; spend: number; lastVisit: string | null }
 const NO_VISITS: CustomerStats = { visits: 0, spend: 0, lastVisit: null };
@@ -99,8 +203,10 @@ export function CustomerFormDialog({ open, onClose, customer, initialQuery = '',
  * The till's "Customer or table" field: free text still works for tables and walk-ins,
  * and typing a name or phone offers club members to link the order to.
  */
-export function CustomerPicker({ customers, orders, text, onTextChange, member, onMemberChange, allowSignUp = true }: {
+export function CustomerPicker({ customers, orders, text, onTextChange, member, onMemberChange, allowSignUp = true, loyalty }: {
   customers: CustomerSelect[]; orders: OrderSelect[];
+  /** The club's rules, to show a linked member's stamps and points. */
+  loyalty?: LoyaltySettings;
   text: string; onTextChange: (text: string) => void;
   member: CustomerSelect | null; onMemberChange: (member: CustomerSelect | null) => void;
   /** Off inside another dialog, where a sign-up form would stack a second modal. */
@@ -120,7 +226,7 @@ export function CustomerPicker({ customers, orders, text, onTextChange, member, 
           <Avatar name={member.name} />
           <div className="ws-list-main">
             <div className="ws-list-title">{member.name} <Badge tone="positive">{tr('Member')}</Badge></div>
-            <div className="ws-list-sub"><span className="tabular">{member.phone}</span><span>{visitsLabel(s)}</span></div>
+            <div className="ws-list-sub"><span className="tabular">{member.phone}</span><span>{visitsLabel(s)}</span>{loyalty?.enabled && balanceLabel(loyalty, member) && <span>{balanceLabel(loyalty, member)}</span>}</div>
           </div>
           <IconButton label={tr('Unlink {name}', { name: member.name })} onClick={() => onMemberChange(null)}><X /></IconButton>
         </div>
@@ -153,12 +259,16 @@ export function CustomerPicker({ customers, orders, text, onTextChange, member, 
 
 type SortKey = 'name' | 'visits' | 'recent';
 
-export function CustomerClub({ settings, customers, orders, orderItems, canDelete, onChanged }: {
-  settings: SettingsSelect; customers: CustomerSelect[]; orders: OrderSelect[]; orderItems: OrderItemSelect[];
-  /** Only the admin removes members; the panel can add and correct them. */
+export function CustomerClub({ settings, customers, orders, orderItems, categories = [], canDelete, onChanged }: {
+  settings: SettingsSelect; customers: CustomerSelect[]; orders: OrderSelect[]; orderItems: OrderItemSelect[]; categories?: CategorySelect[];
+  /** Only the admin removes members, sets the club's rewards and adjusts balances; the panel can add and correct members. */
   canDelete: boolean; onChanged: () => void;
 }) {
   const fmt = (v: number) => money(v, settings.currency);
+  const loyalty = parseLoyalty(settings.loyalty);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [adjusting, setAdjusting] = useState<CustomerSelect | null>(null);
+  const [ledger, setLedger] = useState<LedgerEntry[] | null>(null);
   const stats = useCustomerStats(orders);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState<SortKey>('name');
@@ -168,6 +278,13 @@ export function CustomerClub({ settings, customers, orders, orderItems, canDelet
   const [deleteTarget, setDeleteTarget] = useState<CustomerSelect | null>(null);
   const [viewOrder, setViewOrder] = useState<OrderSelect | null>(null);
   const viewing = customers.find(c => c.id === viewingId) || null;
+  const balanceKey = viewing ? `${viewing.id}:${viewing.stamps}:${viewing.points}` : '';
+  useEffect(() => {
+    if (!viewing || !loyalty.enabled) { setLedger(null); return; }
+    let live = true;
+    fetch(`/api/customers/${encodeURIComponent(viewing.id)}/ledger`).then(r => r.json() as Promise<{ data?: LedgerEntry[] }>).then(result => { if (live) setLedger(result.data || []); }).catch(() => { if (live) setLedger([]); });
+    return () => { live = false; };
+  }, [balanceKey, loyalty.enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const statsOf = (id: string) => stats.get(id) || NO_VISITS;
   const visible = matchCustomers(customers, search).slice().sort((a, b) =>
@@ -188,8 +305,12 @@ export function CustomerClub({ settings, customers, orders, orderItems, canDelet
       <PageHeader
         title={tr('Customer club')}
         description={tr('Members are linked to orders at the till by name or phone. Visits and spend count completed orders.')}
-        actions={<Button variant="primary" icon={<UserPlus />} onClick={() => openForm(null)}>{tr('New member')}</Button>}
+        actions={<>
+          {canDelete && <Button icon={<Settings2 />} onClick={() => setRulesOpen(true)}>{tr('Rewards')}</Button>}
+          <Button variant="primary" icon={<UserPlus />} onClick={() => openForm(null)}>{tr('New member')}</Button>
+        </>}
       />
+      {canDelete && !loyalty.enabled && <Notice tone="info" action={<Button size="sm" variant="ghost" onClick={() => setRulesOpen(true)}>{tr('Set up')}</Button>}>{tr('Reward regulars with a stamp card or points. Members earn on every completed order.')}</Notice>}
       <StatGrid>
         <Stat label={tr('Members')} value={customers.length} />
         <Stat label={tr('Joined this month')} value={newThisMonth} tone={newThisMonth ? 'positive' : 'neutral'} />
@@ -219,8 +340,8 @@ export function CustomerClub({ settings, customers, orders, orderItems, canDelet
                   key={c.id}
                   lead={<Avatar name={c.name} />}
                   title={c.name}
-                  subtitle={<><span className="tabular">{c.phone}</span><span>{visitsLabel(s)}</span></>}
-                  trail={<span className="ws-amount">{fmt(s.spend)}</span>}
+                  subtitle={<><span className="tabular">{c.phone}</span><span>{visitsLabel(s)}</span>{loyalty.enabled && balanceLabel(loyalty, c) && <span>{balanceLabel(loyalty, c)}</span>}</>}
+                  trail={<>{loyalty.enabled && stampsOn(loyalty) && stampProgress(loyalty, c.stamps || 0).rewards > 0 && <Badge tone="positive" icon={<Award />}>{tr('Free item')}</Badge>}<span className="ws-amount">{fmt(s.spend)}</span></>}
                   onClick={() => setViewingId(c.id)}
                   label={`${c.name}, ${visitsLabel(s)}`}
                 />
@@ -232,7 +353,7 @@ export function CustomerClub({ settings, customers, orders, orderItems, canDelet
 
       {/* Hidden, not closed, while an order or the edit form is on top, so closing those returns here. */}
       <Dialog
-        open={!!viewing && !formOpen && !viewOrder}
+        open={!!viewing && !formOpen && !viewOrder && !adjusting}
         onClose={() => setViewingId(null)}
         title={viewing?.name || ''}
         description={viewing ? tr('Member since {createdAt}', { createdAt: formatDate(viewing.createdAt, { dateStyle: 'medium' }) }) : undefined}
@@ -251,6 +372,29 @@ export function CustomerClub({ settings, customers, orders, orderItems, canDelet
               { label: tr('Average order'), value: statsOf(viewing.id).visits ? fmt(statsOf(viewing.id).spend / statsOf(viewing.id).visits) : '—' }
             ]} total={{ label: tr('Total spend'), value: fmt(statsOf(viewing.id).spend) }} />
             {viewing.notes && <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{viewing.notes}</p>}
+            {loyalty.enabled && (
+              <div className="ws-panel ws-form">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                  <strong>{tr('Rewards')}</strong>
+                  {canDelete && <Button size="sm" variant="ghost" icon={<SlidersHorizontal />} onClick={() => setAdjusting(viewing)}>{tr('Adjust')}</Button>}
+                </div>
+                {stampsOn(loyalty) && <StampCard loyalty={loyalty} stamps={viewing.stamps || 0} />}
+                {pointsOn(loyalty) && <span className="tabular">{tr('{points}, worth {value}', { points: plural(viewing.points || 0, 'point'), value: fmt((viewing.points || 0) * loyalty.pointValue) })}</span>}
+                {ledger && ledger.length > 0 && (
+                  <ul className="ws-ledger" aria-label={tr('Rewards history')}>
+                    {ledger.slice(0, 12).map(entry => (
+                      <li key={entry.id}>
+                        <span>{entry.kind === 'earn' ? tr('Earned on {order}', { order: entry.orderNumber || '' }) : entry.kind === 'redeem' ? tr('Spent on {order}', { order: entry.orderNumber || '' }) : entry.note || tr('Adjusted')}</span>
+                        <span className="tabular" data-tone={entry.stamps + entry.points >= 0 ? 'positive' : 'danger'}>
+                          {[entry.stamps ? `${entry.stamps > 0 ? '+' : ''}${plural(entry.stamps, 'stamp')}` : '', entry.points ? `${entry.points > 0 ? '+' : ''}${plural(entry.points, 'point')}` : ''].filter(Boolean).join(' · ')}
+                        </span>
+                        <span className="ws-hint">{formatDate(entry.createdAt)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             {memberOrders.length === 0 ? <p className="ws-hint">{tr('No orders linked yet.')}</p> : (
               <List label={tr('Orders for {name}', { name: viewing.name })} maxHeight={280}>
                 {memberOrders.slice(0, 50).map(o => (
@@ -269,6 +413,8 @@ export function CustomerClub({ settings, customers, orders, orderItems, canDelet
       </Dialog>
 
       <CustomerFormDialog open={formOpen} onClose={() => setFormOpen(false)} customer={editing} onSaved={onChanged} />
+      {canDelete && <ClubRulesDialog open={rulesOpen} onClose={() => setRulesOpen(false)} settings={settings} categories={categories} onSaved={onChanged} />}
+      <AdjustBalanceDialog member={adjusting} onClose={() => setAdjusting(null)} onSaved={onChanged} />
       <OrderDetailsDialog order={viewOrder} items={viewOrder ? orderItems.filter(i => i.orderId === viewOrder.id) : []} currency={settings.currency} taxRate={settings.taxRate} onClose={() => setViewOrder(null)} />
       <ConfirmDialog
         open={!!deleteTarget}

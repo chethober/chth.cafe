@@ -1,4 +1,5 @@
 import { Reconciliation } from './Reconciliation';
+import { WasteReport } from './WasteReport';
 import React, { useMemo, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, Download, PenLine, Pencil, Percent, Plus, Receipt, ShoppingBag, Trash2, Wallet } from 'lucide-react';
 import { CategorySelect, OrderSelect, ExpenseSelect, SettingsSelect, MenuItemSelect } from '../db/schema';
@@ -103,6 +104,11 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
     return [...map.values()].sort((a, b) => b.revenue - a.revenue).slice(0, 6);
   }, [completed, orders]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const tips = useMemo(() => {
+    const tipped = completed.filter(o => (o.tipAmount || 0) > 0);
+    return { total: tipped.reduce((sum, o) => sum + (o.tipAmount || 0), 0), count: tipped.length };
+  }, [completed]);
+
   const sortedSales = useMemo(() => [...orders].sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [orders]);
   const sortedExpenses = useMemo(() => [...expenses].sort((a, b) => (b.date || b.createdAt).localeCompare(a.date || a.createdAt)), [expenses]);
   const topRevenue = topProducts[0]?.revenue || 1;
@@ -178,6 +184,9 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
                   </li>
                 ))}
               </List>
+              {tips.count > 0 && <p className="ws-hint" style={{ margin: 'var(--chth-space-12) 0 0' }}>
+                {tr('Tips: {amount} on {count}, kept apart from revenue.', { amount: fmt(tips.total), count: plural(tips.count, 'sale') })}
+              </p>}
             </>
           )}
         </Card>
@@ -197,6 +206,8 @@ export const FinancialTracker: React.FC<FinancialTrackerProps> = ({ settings, or
         </Card>
         <Reconciliation settings={settings} />
       </div>
+
+      <WasteReport settings={settings} />
 
       <div className="ws-grid ws-grid-2">
         <Card flush title={tr('Sales')} description={plural(orders.length, 'order')}>

@@ -1,6 +1,6 @@
 import { ImageUpload } from './ImageUpload';
 import React, { useMemo, useState } from 'react';
-import { Boxes, CheckCircle2, Coffee, Download, EyeOff, FolderPlus, Languages, Pencil, Percent, Plus, Trash2, UtensilsCrossed, XCircle } from 'lucide-react';
+import { ArrowUpDown, Boxes, CheckCircle2, Coffee, Download, EyeOff, FolderPlus, Languages, Pencil, Percent, Plus, SlidersHorizontal, Trash2, UtensilsCrossed, XCircle } from 'lucide-react';
 import { CategorySelect, MenuItemSelect, MenuTranslations, MenuVariantSelect, SettingsSelect } from '../db/schema';
 import { LOCALES } from '../chth-kit/locales.js';
 import { store } from '../db/store';
@@ -10,6 +10,8 @@ import {
   List, ListItem, Notice, Page, PageHeader, SearchInput, Segmented, Select, SortFilter, Stat, StatGrid, Switch, Textarea, ToggleRow, localDateKey, money, plural, slug
 } from '../ui';
 import { CATEGORY_ICONS } from './shared';
+import { MenuArrangeDialog } from './MenuArrangeDialog';
+import { MenuOptionsDialog } from './MenuOptionsDialog';
 import { intlTag, tr } from '../i18n';
 
 interface MenuAdminProps {
@@ -62,7 +64,7 @@ function TranslationFields({ value, onChange, withDescription }: { value: MenuTr
   );
 }
 
-export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menuItems, onMenuUpdated }) => {
+export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menuItems, menuVariants, onMenuUpdated }) => {
   const currency = settings.currency;
   const fmt = (v: number) => money(v, currency);
   const [search, setSearch] = useState('');
@@ -70,6 +72,9 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menu
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [exportOpen, setExportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'item' | 'category'; id: string; name: string; itemCount?: number } | null>(null);
+  const [arrangeOpen, setArrangeOpen] = useState(false);
+  const [optionsItem, setOptionsItem] = useState<MenuItemSelect | null>(null);
+  const optionCount = (itemId: string) => menuVariants.filter(v => v.menuItemId === itemId).length;
 
   /* ------------------------------------------------------- Category form */
   const [catOpen, setCatOpen] = useState(false);
@@ -222,6 +227,7 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menu
         description={tr('What customers can order, what it costs you, and what\'s available right now.')}
         actions={<>
           <Button icon={<Download />} onClick={() => setExportOpen(true)}>{tr('Export')}</Button>
+          <Button icon={<ArrowUpDown />} onClick={() => setArrangeOpen(true)} disabled={!categories.length}>{tr('Arrange')}</Button>
           <Button icon={<FolderPlus />} onClick={() => openCategory()}>{tr('New category')}</Button>
           <Button variant="primary" icon={<Plus />} onClick={() => openItem()} disabled={!categories.length}>{tr('Add item')}</Button>
         </>}
@@ -283,12 +289,14 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menu
                       subtitle={<>
                         {i.description && <span className="ws-truncate" style={{ maxWidth: 320, display: 'block' }}><bdi>{i.description}</bdi></span>}
                         <span className="tabular">{tr('Cost {amount}', { amount: fmt(Math.max(0, i.basePrice - margin)) })}</span>
+                        {optionCount(i.id) > 0 && <span>{plural(optionCount(i.id), 'option')}</span>}
                         <span className="tabular" style={{ color: pct >= 50 ? 'var(--ws-positive)' : pct < 20 ? 'var(--ws-danger)' : undefined }}>{tr('{pct}% margin', { pct: pct.toFixed(0) })}</span>
                       </>}
                       trail={<span className="ws-amount" style={{ fontSize: 15 }}>{fmt(i.basePrice)}</span>}
                       actions={<>
                         <Switch label={tr('{name} available', { name: i.name })} checked={i.isInStock} onChange={() => { store.toggleStock(i.id); onMenuUpdated(); }} />
                         <IconButton label={tr('Recipe for {name}', { name: i.name })} onClick={() => openRecipe(i)}><Boxes /></IconButton>
+                        <IconButton label={tr('Options for {name}', { name: i.name })} onClick={() => setOptionsItem(i)}><SlidersHorizontal /></IconButton>
                         <IconButton label={tr('Delete {name}', { name: i.name })} variant="danger-ghost" onClick={() => setDeleteTarget({ type: 'item', id: i.id, name: i.name })}><Trash2 /></IconButton>
                       </>}
                     />
@@ -313,7 +321,10 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menu
       </FormDialog>
 
       <FormDialog open={itemOpen} onClose={() => setItemOpen(false)} title={editingItem ? tr('Edit {name}', { name: editingItem.name }) : tr('Add menu item')} submitLabel={editingItem ? tr('Save changes') : tr('Add item')} onSubmit={saveItem}
-        secondaryAction={editingItem && <Button variant="ghost" icon={<Boxes />} onClick={() => { const target = editingItem; setItemOpen(false); openRecipe(target); }}>{tr('Recipe')}</Button>}>
+        secondaryAction={editingItem && <>
+          <Button variant="ghost" icon={<Boxes />} onClick={() => { const target = editingItem; setItemOpen(false); openRecipe(target); }}>{tr('Recipe')}</Button>
+          <Button variant="ghost" icon={<SlidersHorizontal />} onClick={() => { const target = editingItem; setItemOpen(false); setOptionsItem(target); }}>{tr('Options')}</Button>
+        </>}>
         {itemError && <Notice tone="danger">{itemError}</Notice>}
         <div className="ws-form-row cols-2">
           <Field label={tr('Name')}>{id => <Input id={id} autoFocus required value={item.name} onChange={e => setItem({ ...item, name: e.target.value })} placeholder={tr('e.g. Vanilla cloud latte')} />}</Field>
@@ -400,6 +411,9 @@ export const MenuAdmin: React.FC<MenuAdminProps> = ({ settings, categories, menu
           )}
         </div>
       </Dialog>
+
+      <MenuArrangeDialog open={arrangeOpen} onClose={() => setArrangeOpen(false)} categories={categories} menuItems={menuItems} onSaved={onMenuUpdated} />
+      <MenuOptionsDialog item={optionsItem} variants={menuVariants} stock={stock} currency={currency} onClose={() => setOptionsItem(null)} onSaved={onMenuUpdated} />
 
       <ConfirmDialog
         open={!!deleteTarget}

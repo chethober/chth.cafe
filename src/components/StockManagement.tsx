@@ -1,4 +1,5 @@
 import { InventoryMovements } from './InventoryMovements';
+import { Purchasing, useSuppliers } from './Purchasing';
 import React, { useMemo, useState } from 'react';
 import { AlertTriangle, Boxes, Check, Download, Package, Pencil, Plus, Tags, Trash2, Wallet, X, XCircle } from 'lucide-react';
 import { StockItemSelect, SettingsSelect } from '../db/schema';
@@ -38,17 +39,18 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
   const [deleteTarget, setDeleteTarget] = useState<StockItemSelect | null>(null);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const stockCategories = store.getStockCategories();
+  const { suppliers, reload: reloadSuppliers } = useSuppliers();
 
   /* ------------------------------------------------------- Add / edit */
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<StockItemSelect | null>(null);
-  const [form, setForm] = useState({ name: '', category: '', newCategory: '', quantity: '', unit: 'kg', unitCost: '', minThreshold: '5' });
+  const [form, setForm] = useState({ name: '', category: '', newCategory: '', quantity: '', unit: 'kg', unitCost: '', minThreshold: '5', supplierId: '' });
   const [formError, setFormError] = useState('');
   const openForm = (item?: StockItemSelect) => {
     setEditing(item || null);
     setForm(item
-      ? { name: item.name, category: item.category, newCategory: '', quantity: String(item.quantity), unit: item.unit, unitCost: String(item.unitCost), minThreshold: String(item.minThreshold) }
-      : { name: '', category: category !== 'all' ? category : stockCategories[0] || NEW_CATEGORY, newCategory: '', quantity: '', unit: 'kg', unitCost: '', minThreshold: '5' });
+      ? { name: item.name, category: item.category, newCategory: '', quantity: String(item.quantity), unit: item.unit, unitCost: String(item.unitCost), minThreshold: String(item.minThreshold), supplierId: item.supplierId || '' }
+      : { name: '', category: category !== 'all' ? category : stockCategories[0] || NEW_CATEGORY, newCategory: '', quantity: '', unit: 'kg', unitCost: '', minThreshold: '5', supplierId: '' });
     setFormError('');
     setFormOpen(true);
   };
@@ -66,7 +68,7 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
     // A typed name that matches an existing category, in any case, files the material there.
     const materialCategory = form.category !== NEW_CATEGORY ? form.category
       : stockCategories.find(c => c.toLowerCase() === typed.toLowerCase()) || typed;
-    const data = { name: form.name.trim(), category: materialCategory, quantity, unit: form.unit, unitCost, minThreshold };
+    const data = { name: form.name.trim(), category: materialCategory, quantity, unit: form.unit, unitCost, minThreshold, supplierId: form.supplierId || null };
     if (editing) store.updateStockItem(editing.id, data);
     else store.addStockItem(data);
     if (!stockCategories.includes(materialCategory)) {
@@ -201,6 +203,8 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
         )}
       </Card>
 
+      <Purchasing settings={settings} stockItems={stockItems} suppliers={suppliers} onSuppliersChanged={() => void reloadSuppliers()} />
+
       <InventoryMovements items={stockItems} />
 
       <FormDialog open={formOpen} onClose={() => setFormOpen(false)} title={editing ? tr('Edit {name}', { name: editing.name }) : tr('Add material')} submitLabel={editing ? tr('Save changes') : tr('Add material')} onSubmit={saveForm}>
@@ -227,6 +231,12 @@ export const StockManagement: React.FC<StockManagementProps> = ({ settings, stoc
           <Field label={tr('Cost per unit')}>{id => <AffixInput id={id} affix={currency} type="number" inputMode="decimal" step="any" min="0" required value={form.unitCost} onChange={e => setForm({ ...form, unitCost: e.target.value })} placeholder="0.00" />}</Field>
           <Field label={tr('Reorder at')}>{id => <Input id={id} type="number" inputMode="decimal" step="any" min="0" required value={form.minThreshold} onChange={e => setForm({ ...form, minThreshold: e.target.value })} />}</Field>
         </div>
+        <Field label={tr('Supplier')} optional hint={suppliers.length ? undefined : tr('Add suppliers from Purchase orders.')}>{(id, hint) => (
+          <Select id={id} aria-describedby={hint} value={form.supplierId} onChange={e => setForm({ ...form, supplierId: e.target.value })}>
+            <option value="">{tr('No supplier')}</option>
+            {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </Select>
+        )}</Field>
         <div className="ws-panel" style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span className="ws-hint">{tr('Stock value')}</span>
           <strong className="tabular">{fmt((parseFloat(form.quantity) || 0) * (parseFloat(form.unitCost) || 0))}</strong>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Boxes, Cake, CheckCircle2, ChevronDown, Circle, Coffee, GlassWater, Leaf, Moon, Percent, PlayCircle, Plus, Sparkles, Sun, Trash2, User, Utensils, Wrench } from 'lucide-react';
-import { CategorySelect, CustomerSelect, MenuItemSelect, OrderItemSelect, OrderSelect, SettingsSelect, StaffSelect, TaskSelect } from '../db/schema';
+import { BadgePercent, Boxes, Cake, CheckCircle2, ChevronDown, Circle, Coffee, GlassWater, Leaf, Moon, Percent, PlayCircle, Plus, Printer, Sparkles, Sun, Trash2, User, Utensils, Wrench } from 'lucide-react';
+import { CategorySelect, CustomerSelect, MenuItemSelect, MenuVariantSelect, OrderItemSelect, OrderSelect, SettingsSelect, StaffSelect, TaskSelect } from '../db/schema';
 import { store, orderAmounts, type OrderLineInput } from '../db/store';
 import {
   AffixInput, Badge, Button, Dialog, EmptyState, Field, FormDialog, IconButton, Input, KeyValue, ListItem, Notice, SearchInput, Segmented, Select, Stepper,
@@ -8,6 +8,10 @@ import {
 } from '../ui';
 import { CustomerPicker } from './CustomerClub';
 import { localizeMenu, tr } from '../i18n';
+import { bestPromotion, type Promotion } from '../utils/promotions';
+import { pickupLabel } from '../utils/pickupSlots';
+import { optionNames } from '../utils/receipt';
+import { printReceipt, receiptFromOrder } from './Receipt';
 
 /* --------------------------------------------------------------- Menu */
 
@@ -189,6 +193,8 @@ export interface EditableLine {
   variantLabel?: string;
   discount: string;
   discountType: 'percent' | 'fixed';
+  /** A running promotion's discount on each unit, used while no discount is typed. */
+  promotion?: { id: string; name: string; unitDiscount: number };
 }
 export type DiscountType = EditableLine['discountType'];
 
@@ -197,7 +203,9 @@ export const discountOff = (gross: number, value: string, type: DiscountType) =>
   const typed = Math.max(0, parseFloat(value) || 0);
   return Number(Math.min(gross, type === 'percent' ? (gross * typed) / 100 : typed).toFixed(2));
 };
-export const lineDiscount = (line: EditableLine) => discountOff(line.unitPrice * line.quantity, line.discount, line.discountType);
+export const lineDiscount = (line: EditableLine) => line.discount === '' && line.promotion
+  ? Number(Math.min(line.unitPrice * line.quantity, line.promotion.unitDiscount * line.quantity).toFixed(2))
+  : discountOff(line.unitPrice * line.quantity, line.discount, line.discountType);
 export const toOrderLines = (lines: EditableLine[]): OrderLineInput[] => lines.map(line => ({
   menuItemId: line.menuItemId, itemName: line.itemName, quantity: line.quantity, unitPrice: line.unitPrice, variants: line.variants, discountAmount: lineDiscount(line)
 }));
@@ -206,6 +214,72 @@ export const addMenuItem = (lines: EditableLine[], item: MenuItemSelect): Editab
   lines.some(l => l.menuItemId === item.id && !l.variants.length)
     ? lines.map(l => l.menuItemId === item.id && !l.variants.length ? { ...l, quantity: l.quantity + 1 } : l)
     : [...lines, { key: crypto.randomUUID(), menuItemId: item.id, itemName: item.name, quantity: 1, unitPrice: item.basePrice, variants: [], discount: '', discountType: 'percent' }];
+/** One more of a menu item with these options (and the promotion running on it): onto a matching line, else a new line. */
+export function addConfiguredItem(lines: EditableLine[], item: MenuItemSelect, chosen: MenuVariantSelect[], promotions: Promotion[] = [], timeZone = 'UTC'): EditableLine[] {
+  const variants = chosen.map(v => v.id);
+  const key = [...variants].sort().join();
+  const same = (l: EditableLine) => l.menuItemId === item.id && [...l.variants].sort().join() === key && l.discount === '';
+  if (lines.some(same)) return lines.map(l => same(l) ? { ...l, quantity: l.quantity + 1 } : l);
+  const unitPrice = Number((item.basePrice + chosen.reduce((sum, v) => sum + v.priceModifier, 0)).toFixed(2));
+  const best = bestPromotion(promotions, item, unitPrice, new Date(), timeZone);
+  return [...lines, {
+    key: crypto.randomUUID(), menuItemId: item.id, itemName: item.name, quantity: 1, unitPrice, variants,
+    variantLabel: chosen.map(v => v.name).join(', ') || undefined, discount: '', discountType: 'percent',
+    ...(best && { promotion: { id: best.promotion.id, name: best.promotion.name, unitDiscount: best.unitDiscount } })
+  }];
+}
+
+/** Choose one option from each of an item's groups before it goes on the order. Staff may leave a group out. */
+export function OptionPickerDialog({ item, variants, fmt, onClose, onPick }: {
+  item: MenuItemSelect | null; variants: MenuVariantSelect[]; fmt: (value: number) => string; onClose: () => void; onPick: (chosen: MenuVariantSelect[]) => void;
+}) {
+  const own = item ? variants.filter(v => v.menuItemId === item.id) : [];
+  const groups = [...new Set(own.map(v => v.groupName))];
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!item) return;
+    setPicked(Object.fromEntries(groups.map(g => [g, own.find(v => v.groupName === g)!.id])));
+  }, [item?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const chosen = own.filter(v => picked[v.groupName] === v.id);
+  const price = (item?.basePrice || 0) + chosen.reduce((sum, v) => sum + v.priceModifier, 0);
+  return (
+    <FormDialog open={!!item} onClose={onClose} size="sm" title={item ? localizeMenu(item).name : ''} submitLabel={tr('Add · {price}', { price: fmt(price) })}
+      onSubmit={e => { e.preventDefault(); onPick(chosen); onClose(); }}>
+      {groups.map(group => (
+        <fieldset key={group} className="ws-option-pick">
+          <legend className="ws-label">{group}</legend>
+          {own.filter(v => v.groupName === group).map(v => (
+            <label key={v.id} className="ws-option-choice">
+              <input type="radio" name={`opt-${group}`} checked={picked[group] === v.id} onChange={() => setPicked(p => ({ ...p, [group]: v.id }))} />
+              <span>{v.name}</span>
+              {v.priceModifier !== 0 && <span className="ws-hint tabular">{v.priceModifier > 0 ? '+' : '−'}{fmt(Math.abs(v.priceModifier))}</span>}
+            </label>
+          ))}
+          <label className="ws-option-choice">
+            <input type="radio" name={`opt-${group}`} checked={!picked[group]} onChange={() => setPicked(p => ({ ...p, [group]: '' }))} />
+            <span className="ws-hint">{tr('Leave out')}</span>
+          </label>
+        </fieldset>
+      ))}
+    </FormDialog>
+  );
+}
+
+/**
+ * Adds menu items to a list of lines, asking for options first when the item has any,
+ * and applying the promotion running on it. Render `dialog` once.
+ */
+export function useItemAdder(setLines: (update: (lines: EditableLine[]) => EditableLine[]) => void, menuVariants: MenuVariantSelect[], promotions: Promotion[], timeZone: string, fmt: (value: number) => string) {
+  const [choosing, setChoosing] = useState<MenuItemSelect | null>(null);
+  const add = (item: MenuItemSelect) => {
+    if (menuVariants.some(v => v.menuItemId === item.id)) setChoosing(item);
+    else setLines(prev => addConfiguredItem(prev, item, [], promotions, timeZone));
+  };
+  const dialog = <OptionPickerDialog item={choosing} variants={menuVariants} fmt={fmt} onClose={() => setChoosing(null)}
+    onPick={chosen => { const item = choosing; if (item) setLines(prev => addConfiguredItem(prev, item, chosen, promotions, timeZone)); }} />;
+  return { add, dialog };
+}
+
 export const lineQuantities = (lines: EditableLine[]) =>
   lines.reduce<Record<string, number>>((all, l) => ({ ...all, [l.menuItemId]: (all[l.menuItemId] || 0) + l.quantity }), {});
 
@@ -232,8 +306,9 @@ export function OrderLinesEditor({ lines, onChange, currency, editablePrice, flu
           <li key={line.key} className="ws-list-item" style={{ flexWrap: 'wrap', gap: 8, ...(flush ? {} : { paddingInline: 0 }) }}>
             <div className="ws-list-main" style={{ flexBasis: '100%' }}>
               <div className="ws-list-title"><span className="ws-truncate">{line.itemName}</span></div>
-              {(line.variantLabel || !editablePrice) && <div className="ws-list-sub">
+              {(line.variantLabel || !editablePrice || (line.promotion && line.discount === '')) && <div className="ws-list-sub">
                 {line.variantLabel && <span>{line.variantLabel}</span>}
+                {line.promotion && line.discount === '' && <span><BadgePercent />{line.promotion.name}</span>}
                 {!editablePrice && <span className="tabular">{tr('{unitPrice} each', { unitPrice: fmt(line.unitPrice) })}</span>}
               </div>}
             </div>
@@ -256,8 +331,8 @@ export function OrderLinesEditor({ lines, onChange, currency, editablePrice, flu
             <IconButton label={tr('Remove {itemName}', { itemName: line.itemName })} variant="danger-ghost" onClick={() => onChange(prev => prev.filter(l => l.key !== line.key))}><Trash2 /></IconButton>
             {showDiscount && (
               <div style={{ flexBasis: '100%', display: 'flex', gap: 8, alignItems: 'center' }}>
-                <Input aria-label={tr('Discount on {itemName}', { itemName: line.itemName })} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" autoFocus={line.discount === ''}
-                  value={line.discount} onChange={e => update(line.key, { discount: e.target.value })} style={{ minHeight: 36, flex: 1 }} />
+                <Input aria-label={tr('Discount on {itemName}', { itemName: line.itemName })} type="number" inputMode="decimal" min="0" step="0.01" autoFocus={line.discount === ''}
+                  value={line.discount} onChange={e => update(line.key, { discount: e.target.value })} style={{ minHeight: 36, flex: 1 }} placeholder={line.promotion ? String(lineDiscount({ ...line, discount: '' })) : '0'} />
                 <Segmented label={tr('Discount type for {itemName}', { itemName: line.itemName })} value={line.discountType} onChange={discountType => update(line.key, { discountType })}
                   options={[{ value: 'percent', label: '%' }, { value: 'fixed', label: currency }]} />
                 {off > 0 && <span className="ws-amount" data-tone="positive">−{fmt(off)}</span>}
@@ -284,10 +359,12 @@ export function OrderEditDialog({ order, items, settings, categories, menuItems,
   const [payment, setPayment] = useState('card');
   const [discount, setDiscount] = useState('');
   const [discountType, setDiscountType] = useState<DiscountType>('fixed');
+  const [tip, setTip] = useState('');
   const [search, setSearch] = useState('');
   const [openCategories, setOpenCategories] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const adder = useItemAdder(setLines, store.getMenuVariants(), store.getPromotions(), settings.timeZone || 'UTC', fmt);
 
   useEffect(() => {
     if (!order) return;
@@ -306,6 +383,7 @@ export function OrderEditDialog({ order, items, settings, categories, menuItems,
     setMember(linked); setCustomer(linked ? '' : order.customerName || '');
     setOrderType(order.orderType as typeof orderType); setPayment(order.paymentMethod);
     setDiscount(wholeOrder > 0 ? String(wholeOrder) : ''); setDiscountType('fixed');
+    setTip(order.tipAmount ? String(order.tipAmount) : '');
     setSearch(''); setOpenCategories([]); setError('');
   }, [order?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -323,7 +401,7 @@ export function OrderEditDialog({ order, items, settings, categories, menuItems,
     try {
       const saved = await store.updateOrder(order.id, {
         customerName: member?.name || customer.trim() || 'Walk-in', customerId: member?.id || null,
-        orderType, paymentMethod: payment, orderDiscount, items: orderLines
+        orderType, paymentMethod: payment, orderDiscount, tipAmount: Math.max(0, parseFloat(tip) || 0), items: orderLines
       });
       onSaved?.(saved);
       onClose();
@@ -354,7 +432,7 @@ export function OrderEditDialog({ order, items, settings, categories, menuItems,
         <div className="ws-toolbar-stack">
           <SearchInput value={search} onChange={setSearch} placeholder={tr('Find a drink or dish')} label={tr('Search menu')} />
           <MenuPicker categories={categories} menuItems={menuItems} query={search} open={openCategories} onOpenChange={setOpenCategories}
-            quantities={lineQuantities(lines)} onAdd={item => setLines(prev => addMenuItem(prev, item))} fmt={fmt} />
+            quantities={lineQuantities(lines)} onAdd={adder.add} fmt={fmt} />
         </div>
       </div>
       <Segmented block label={tr('Order type')} value={orderType} onChange={setOrderType} options={[{ value: 'dine_in', label: tr('Dine-in') }, { value: 'takeout', label: tr('Takeout') }, { value: 'pickup', label: tr('Pickup') }]} />
@@ -369,21 +447,26 @@ export function OrderEditDialog({ order, items, settings, categories, menuItems,
           <Segmented label={tr('Order discount type')} value={discountType} onChange={setDiscountType} options={[{ value: 'percent', label: '%' }, { value: 'fixed', label: currency }]} />
         }>{id => <Input id={id} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" value={discount} onChange={e => setDiscount(e.target.value)} />}</Field>
       </div>
+      <Field label={tr('Tip')} optional hint={tr('Not taxed and not part of the total')}>{(id, hint) => <AffixInput id={id} aria-describedby={hint} affix={currency} type="number" inputMode="decimal" min="0" step="0.01" placeholder="0" value={tip} onChange={e => setTip(e.target.value)} />}</Field>
       <KeyValue
         items={[
           { label: tr('Subtotal · {plural}', { plural: plural(lines.reduce((sum, l) => sum + l.quantity, 0), 'item') }), value: fmt(amounts.subtotal) },
           ...(amounts.discountAmount > 0 ? [{ label: tr('Discounts'), value: `−${fmt(amounts.discountAmount)}`, tone: 'positive' as const }] : []),
-          { label: tr('Tax ({taxRate}%)', { taxRate: settings.taxRate }), value: fmt(amounts.taxAmount) }
+          { label: tr('Tax ({taxRate}%)', { taxRate: settings.taxRate }), value: fmt(amounts.taxAmount) },
+          ...((parseFloat(tip) || 0) > 0 ? [{ label: tr('Tip'), value: fmt(parseFloat(tip)) }] : [])
         ]}
         total={{ label: tr('Total'), value: fmt(amounts.totalAmount) }}
       />
+      {adder.dialog}
     </FormDialog>
   );
 }
 
 /** Read-only order receipt, shared by the panel and the finance ledger. */
-export function OrderDetailsDialog({ order, items, currency, taxRate, onClose, actions }: {
+export function OrderDetailsDialog({ order, items, currency, taxRate, onClose, actions, settings }: {
   order: OrderSelect | null; items: OrderItemSelect[]; currency: string; taxRate: number; onClose: () => void; actions?: React.ReactNode;
+  /** With the café's settings, the receipt can be printed. */
+  settings?: SettingsSelect;
 }) {
   return (
     <Dialog
@@ -391,7 +474,11 @@ export function OrderDetailsDialog({ order, items, currency, taxRate, onClose, a
       onClose={onClose}
       title={order ? <span className="mono">{order.orderNumber}</span> : ''}
       description={order ? `${order.customerName || 'Walk-in'} · ${formatDateTime(order.createdAt)}` : undefined}
-      footer={<>{actions}<Button variant="primary" onClick={onClose}>{tr('Done')}</Button></>}
+      footer={<>
+        {actions}
+        {settings && order && <Button icon={<Printer />} onClick={() => printReceipt(receiptFromOrder(order, items, settings))}>{tr('Print receipt')}</Button>}
+        <Button variant="primary" onClick={onClose}>{tr('Done')}</Button>
+      </>}
     >
       {order && (
         <div className="ws-form">
@@ -399,6 +486,7 @@ export function OrderDetailsDialog({ order, items, currency, taxRate, onClose, a
             <Badge tone={orderStatusTone(order.status)} dot>{ORDER_STATUS_LABELS[order.status] || order.status}</Badge>
             <Badge>{orderTypeLabel(order.orderType)}</Badge>
             <Badge>{paymentLabel(order.paymentMethod)}</Badge>
+            {order.pickupAt && <Badge tone="info">{tr('Pickup {time}', { time: pickupLabel(order.pickupAt, settings?.timeZone || 'UTC') })}</Badge>}
           </div>
           {items.length === 0 ? (
             <p className="ws-hint">{tr('No line items were recorded for this order.')}</p>
@@ -406,7 +494,10 @@ export function OrderDetailsDialog({ order, items, currency, taxRate, onClose, a
             <ul className="ws-ticket-lines" style={{ fontSize: 14 }}>
               {items.map(item => (
                 <li key={item.id}>
-                  <span><strong className="tabular">{item.quantity}×</strong> {item.itemName}</span>
+                  <span>
+                    <strong className="tabular">{item.quantity}×</strong> {item.itemName}
+                    {optionNames(item.variantsJson).length > 0 && <span className="ws-hint" style={{ display: 'block' }}>{optionNames(item.variantsJson).join(', ')}</span>}
+                  </span>
                   <span className="tabular" style={{ textAlign: 'end' }}>
                     {money(item.quantity * item.unitPrice - (item.discountAmount || 0), currency)}
                     {item.discountAmount > 0 && <span className="ws-hint" style={{ display: 'block' }}>{tr('−{discountAmount} off', { discountAmount: money(item.discountAmount, currency) })}</span>}
@@ -419,7 +510,8 @@ export function OrderDetailsDialog({ order, items, currency, taxRate, onClose, a
             items={[
               { label: tr('Subtotal'), value: money(order.subtotal, currency) },
               ...(order.discountAmount > 0 ? [{ label: tr('Discount'), value: `−${money(order.discountAmount, currency)}`, tone: 'positive' as const }] : []),
-              { label: tr('Tax ({taxRate}%)', { taxRate }), value: money(order.taxAmount, currency) }
+              { label: tr('Tax ({taxRate}%)', { taxRate }), value: money(order.taxAmount, currency) },
+              ...(order.tipAmount ? [{ label: tr('Tip'), value: money(order.tipAmount, currency) }] : [])
             ]}
             total={{ label: tr('Total'), value: money(order.totalAmount, currency) }}
           />

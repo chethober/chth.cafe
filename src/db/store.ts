@@ -22,6 +22,7 @@ import {
 import { deviceStore, type QueuedRequest } from './offline';
 import { DEFAULT_STOCK_CATEGORIES, parseStockCategories } from '../utils/stockCategories';
 import { currentWorkspace } from '../utils/workspace';
+import { normalizePromotion, type Promotion } from '../utils/promotions';
 
 const STORAGE_KEY = 'chth_cafe_settings_v1';
 
@@ -33,6 +34,8 @@ export interface OrderLineInput {
   unitPrice: number;
   variants: string[];
   discountAmount?: number;
+  /** The promotion a public order line was priced with, so the server can say when it has ended. */
+  promotionId?: string;
 }
 
 /** Order money as the server works it out: `discountAmount` is every line discount plus `orderDiscount`. */
@@ -69,6 +72,7 @@ export interface CafeState {
   stockItems: StockItemSelect[];
   recipes: RecipeSelect[];
   customers: CustomerSelect[];
+  promotions: Promotion[];
   kvCache: {
     cafe_settings_cache?: string;
     public_menu_cache?: string;
@@ -187,7 +191,7 @@ class CafeStore {
       const fetchJSON = (url: string) => this.safeFetchJSON(url).then(result => { if (!result) incomplete = true; return result; });
       const privateFetch = (url: string) => session?.authenticated && managementView ? fetchJSON(url) : Promise.resolve(null);
       if (!session?.authenticated || !managementView) this.clearPrivateData();
-      const [ordersData, orderItemsData, tasksData, staffData, shiftsData, expensesData, settingsData, menuData, stockData, recipesData, customersData] = await Promise.all([
+      const [ordersData, orderItemsData, tasksData, staffData, shiftsData, expensesData, settingsData, menuData, stockData, recipesData, customersData, promotionsData] = await Promise.all([
         privateFetch('/api/orders'),
         privateFetch('/api/order-items'),
         privateFetch('/api/tasks'),
@@ -198,7 +202,8 @@ class CafeStore {
         fetchJSON(adminAccess ? '/api/admin/menu' : '/api/menu'),
         privateFetch('/api/stock'),
         privateFetch('/api/recipes'),
-        privateFetch('/api/customers')
+        privateFetch('/api/customers'),
+        fetchJSON('/api/promotions')
       ]);
 
       let hasChanges = false;
@@ -212,6 +217,10 @@ class CafeStore {
       }
       if (customersData?.data && Array.isArray(customersData.data)) {
         this.state.customers = customersData.data;
+        hasChanges = true;
+      }
+      if (promotionsData?.data && Array.isArray(promotionsData.data)) {
+        this.state.promotions = promotionsData.data.map(normalizePromotion);
         hasChanges = true;
       }
       if (ordersData?.data && Array.isArray(ordersData.data)) {
@@ -458,6 +467,7 @@ class CafeStore {
       stockItems: [],
       recipes: [],
       customers: [],
+      promotions: [],
       kvCache: {}
     };
   }
@@ -562,8 +572,64 @@ class CafeStore {
     return [...this.state.categories].sort((a, b) => a.displayOrder - b.displayOrder);
   }
 
+  /** In the order staff arranged them within each category; a stable sort keeps the server's order for ties. */
   public getMenuItems(): MenuItemSelect[] {
-    return this.state.menuItems;
+    return [...this.state.menuItems].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
+  }
+
+  /** Saves the order staff dragged categories and items into. `items` lists each category's items, top first. */
+  public saveMenuOrder(categories: string[] | null, items: Record<string, string[]> = {}): void {
+    if (categories) {
+      const position = new Map(categories.map((id, index) => [id, index + 1]));
+      this.state.categories = this.state.categories.map(c => position.has(c.id) ? { ...c, displayOrder: position.get(c.id)! } : c);
+    }
+    for (const [categoryId, ids] of Object.entries(items)) {
+      const position = new Map(ids.map((id, index) => [id, index + 1]));
+      this.state.menuItems = this.state.menuItems.map(i => i.categoryId === categoryId && position.has(i.id) ? { ...i, displayOrder: position.get(i.id)! } : i);
+    }
+    this.refreshKVCache();
+    this.saveToStorage();
+    if (typeof window !== 'undefined') {
+      this.mutationFetch('/api/menu/order', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...(categories && { categories }), items })
+      }).catch(err => console.warn('API Menu Order Error:', err));
+    }
+  }
+
+  /** Replaces an item's options and what each changes in its recipe. Waits for the server, which checks the materials. */
+  public async saveMenuItemOptions(itemId: string, variants: MenuVariantSelect[]): Promise<void> {
+    await this.formMutation(`/api/menu/items/${encodeURIComponent(itemId)}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ variants })
+    });
+    this.state.menuVariants = [...this.state.menuVariants.filter(v => v.menuItemId !== itemId), ...variants.map(v => ({ ...v, menuItemId: itemId }))];
+    this.confirmedState.menuVariants = structuredClone(this.state.menuVariants);
+    this.refreshKVCache();
+    this.notify();
+  }
+
+  // --- Promotions ---
+  public getPromotions(): Promotion[] {
+    return this.state.promotions;
+  }
+
+  public async savePromotion(input: Omit<Promotion, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<Promotion> {
+    const response = await this.formMutation(input.id ? `/api/promotions/${encodeURIComponent(input.id)}` : '/api/promotions', {
+      method: input.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input)
+    });
+    const data = normalizePromotion((await response.json() as { data: Record<string, unknown> }).data);
+    this.state.promotions = input.id ? this.state.promotions.map(p => p.id === data.id ? data : p) : [...this.state.promotions, data];
+    this.confirmedState.promotions = structuredClone(this.state.promotions);
+    this.notify();
+    return data;
+  }
+
+  public deletePromotion(id: string): void {
+    this.state.promotions = this.state.promotions.filter(p => p.id !== id);
+    this.notify();
+    this.mutationFetch(`/api/promotions/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(err => console.warn('API Delete Promotion Error:', err));
   }
 
   public getMenuVariants(itemId?: string): MenuVariantSelect[] {
@@ -665,12 +731,13 @@ class CafeStore {
 
   public createMenuItem(
     itemData: Omit<MenuItemSelect, 'id' | 'createdAt'> & { id?: string; createdAt?: string },
-    variants: Array<{ id?: string; groupName: string; name: string; priceModifier: number }> = []
+    variants: Array<{ id?: string; groupName: string; name: string; priceModifier: number; stock?: MenuVariantSelect['stock'] }> = []
   ): MenuItemSelect {
     const itemId = itemData.id || `item-${Date.now()}`;
     const newItem: MenuItemSelect = {
       ...itemData,
       id: itemId,
+      displayOrder: itemData.displayOrder ?? Math.max(0, ...this.state.menuItems.filter(i => i.categoryId === itemData.categoryId).map(i => i.displayOrder ?? 0)) + 1,
       createdAt: itemData.createdAt || new Date().toISOString()
     };
 
@@ -679,7 +746,8 @@ class CafeStore {
       menuItemId: itemId,
       groupName: v.groupName,
       name: v.name,
-      priceModifier: v.priceModifier
+      priceModifier: v.priceModifier,
+      ...(v.stock?.length ? { stock: v.stock } : {})
     }));
 
     this.state.menuItems.push(newItem);
@@ -701,7 +769,11 @@ class CafeStore {
   public updateMenuItem(itemId: string, partial: Partial<MenuItemSelect>): MenuItemSelect | undefined {
     const index = this.state.menuItems.findIndex((i) => i.id === itemId);
     if (index !== -1) {
-      this.state.menuItems[index] = { ...this.state.menuItems[index], ...partial };
+      const current = this.state.menuItems[index];
+      // Moved to another category: it goes to the end there, as the server does.
+      const moved = partial.categoryId && partial.categoryId !== current.categoryId
+        ? { displayOrder: Math.max(0, ...this.state.menuItems.filter(i => i.categoryId === partial.categoryId).map(i => i.displayOrder ?? 0)) + 1 } : {};
+      this.state.menuItems[index] = { ...current, ...partial, ...moved };
       this.refreshKVCache();
       this.saveToStorage();
 
@@ -1000,18 +1072,17 @@ class CafeStore {
 
   /** Public checkout only commits local state after the server accepts the order. */
   public async submitPublicOrder(
-    input: Parameters<CafeStore['createOrder']>[0],
+    input: Parameters<CafeStore['createOrder']>[0] & { clubPhone?: string },
     submissionId: string
   ): Promise<OrderSelect & { trackingToken?: string }> {
-    const subtotal = Number(input.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0).toFixed(2));
-    const taxAmount = Number((subtotal * this.state.settings.taxRate / 100).toFixed(2));
+    // The only public discounts are running promotions, priced on each line.
+    const { subtotal, discountAmount, taxAmount, totalAmount } = orderAmounts(input.items, 0, this.state.settings.taxRate);
     const payload = {
       ...input,
       id: submissionId,
       orderNumber: `#${submissionId.replace(/^public-/, '').slice(0, 8).toUpperCase()}`,
       customerName: input.customerName?.trim() || 'Guest Customer',
-      subtotal, taxAmount, discountAmount: 0,
-      totalAmount: Number((subtotal + taxAmount).toFixed(2)),
+      subtotal, taxAmount, discountAmount, totalAmount,
       status: 'pending', createdAt: new Date().toISOString()
     };
     const response = await this.mutationFetch('/api/orders', {
@@ -1066,6 +1137,12 @@ class CafeStore {
     discountAmount?: number;
     status?: 'pending' | 'preparing' | 'completed' | 'cancelled';
     createdAt?: string;
+    /** Kept apart from the total: not taxed, and paid to the team. */
+    tipAmount?: number;
+    /** A pickup slot (ISO time) for pickup orders. */
+    pickupAt?: string | null;
+    /** Club stamps and points the member spends on this order; the discount must cover what they are worth. */
+    loyalty?: { stamps: number; points: number };
     items: OrderLineInput[];
   }): Promise<OrderSelect> {
     const signature = JSON.stringify({ ...orderInput, createdAt: undefined });
@@ -1088,7 +1165,9 @@ class CafeStore {
       totalAmount,
       paymentMethod: orderInput.paymentMethod,
       status: orderInput.status || 'pending',
-      createdAt: now
+      createdAt: now,
+      ...(orderInput.tipAmount ? { tipAmount: Number(orderInput.tipAmount.toFixed(2)) } : {}),
+      ...(orderInput.pickupAt ? { pickupAt: orderInput.pickupAt } : {})
     };
 
     if (typeof window === 'undefined') {
@@ -1096,7 +1175,7 @@ class CafeStore {
     }
     const response = await this.queueableMutation('/api/orders', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...newOrder, items: orderInput.items })
+      body: JSON.stringify({ ...newOrder, items: orderInput.items, ...(orderInput.loyalty && (orderInput.loyalty.stamps || orderInput.loyalty.points) ? { loyalty: orderInput.loyalty } : {}) })
     });
     this.orderAttempts.delete(signature);
     if (!response) {
@@ -1119,6 +1198,7 @@ class CafeStore {
     paymentMethod: string;
     /** Taken off the whole order, on top of any line discounts. */
     orderDiscount: number;
+    tipAmount?: number;
     items: OrderLineInput[];
   }): Promise<OrderSelect> {
     const { orderDiscount, ...details } = input;
@@ -1216,6 +1296,16 @@ class CafeStore {
     this.state.orders = this.state.orders.map(o => o.customerId === customerId ? { ...o, customerId: null } : o);
     this.notify();
     this.mutationFetch(`/api/customers/${customerId}`, { method: 'DELETE' }).catch(err => console.warn('API Delete Customer Error:', err));
+  }
+
+  /** Adds or takes away stamps and points by hand, with the reason. Waits for the server, which keeps balances from going below zero. */
+  public async adjustMemberBalance(customerId: string, input: { stamps: number; points: number; note: string }): Promise<void> {
+    await this.formMutation(`/api/customers/${encodeURIComponent(customerId)}/ledger`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input)
+    });
+    this.state.customers = this.state.customers.map(c => c.id === customerId ? { ...c, stamps: (c.stamps || 0) + input.stamps, points: (c.points || 0) + input.points } : c);
+    this.notify();
   }
 
   // --- 5. Expenses & Financial Analytics ---
@@ -1388,6 +1478,7 @@ class CafeStore {
       unitCost: cost,
       totalPrice: Number((qty * cost).toFixed(2)),
       minThreshold: Number(item.minThreshold) || 5.0,
+      supplierId: item.supplierId || null,
       createdAt: now,
       updatedAt: now
     };

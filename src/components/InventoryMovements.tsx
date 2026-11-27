@@ -4,12 +4,14 @@ import { api } from '../services/api';
 import { store } from '../db/store';
 import { Badge, Button, Card, DataTable, Field, Input, Notice, Segmented, Select, formatDateTime } from '../ui';
 import { tr } from '../i18n';
+import { WASTE_REASONS, type WasteReason } from '../utils/purchasing';
 
-interface Movement { id: string; name: string; kind: string; quantity: number; unit: string; notes: string; created_at: string }
+interface Movement { id: string; name: string; kind: string; quantity: number; unit: string; notes: string; reason?: string; created_at: string }
+const reasonLabel = (id?: string) => { const found = WASTE_REASONS.find(r => r.id === id); return found ? tr(found.label) : ''; };
 type Kind = 'purchase' | 'waste' | 'adjustment';
 const KIND_HINT: Record<Kind, string> = {
   purchase: 'Positive amount added to stock',
-  waste: 'Negative amount removed from stock',
+  waste: 'Amount thrown away; it is taken off stock',
   adjustment: 'Positive or negative correction'
 };
 
@@ -20,6 +22,7 @@ export function InventoryMovements({ items }: { items: StockItemSelect[] }) {
   const [kind, setKind] = useState<Kind>('purchase');
   const [quantity, setQuantity] = useState('');
   const [notes, setNotes] = useState('');
+  const [reason, setReason] = useState<WasteReason>('expired');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -33,7 +36,9 @@ export function InventoryMovements({ items }: { items: StockItemSelect[] }) {
     if (busy) return;
     setBusy(true); setError('');
     try {
-      await api('/api/inventory-movements', { stockItemId: stockId, kind, quantity: Number(quantity), notes });
+      // Waste is always recorded as stock leaving, whichever sign was typed.
+      const amount = kind === 'waste' ? -Math.abs(Number(quantity)) : Number(quantity);
+      await api('/api/inventory-movements', { stockItemId: stockId, kind, quantity: amount, notes, ...(kind === 'waste' && { reason }) });
       setQuantity(''); setNotes('');
       await store.syncFromAPI();
       await refresh();
@@ -56,11 +61,20 @@ export function InventoryMovements({ items }: { items: StockItemSelect[] }) {
                 {items.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
               </Select>
             )}</Field>
-            <Field label={`Quantity${unit ? ` (${unit})` : ''}`} hint={KIND_HINT[kind]}>{(id, hint) => (
+            <Field label={`Quantity${unit ? ` (${unit})` : ''}`} hint={tr(KIND_HINT[kind])}>{(id, hint) => (
               <Input id={id} aria-describedby={hint} required type="number" inputMode="decimal" step="any" value={quantity} onChange={e => setQuantity(e.target.value)} />
             )}</Field>
-            <Field label={tr('Reason')}>{id => <Input id={id} required maxLength={1000} value={notes} onChange={e => setNotes(e.target.value)} placeholder={tr('e.g. Weekly supplier delivery')} />}</Field>
+            {kind === 'waste' ? (
+              <Field label={tr('Why')}>{id => (
+                <Select id={id} value={reason} onChange={e => setReason(e.target.value as WasteReason)}>
+                  {WASTE_REASONS.map(r => <option key={r.id} value={r.id}>{tr(r.label)}</option>)}
+                </Select>
+              )}</Field>
+            ) : (
+              <Field label={tr('Reason')}>{id => <Input id={id} required maxLength={1000} value={notes} onChange={e => setNotes(e.target.value)} placeholder={tr('e.g. Weekly supplier delivery')} />}</Field>
+            )}
           </div>
+          {kind === 'waste' && <Field label={tr('Note')} optional>{id => <Input id={id} maxLength={1000} value={notes} onChange={e => setNotes(e.target.value)} placeholder={tr('e.g. Milk past its date after the weekend')} />}</Field>}
         </fieldset>
         {error && <Notice tone="danger">{error}</Notice>}
         <div><Button type="submit" variant="primary" loading={busy} disabled={!items.length}>{busy ? tr('Saving…') : tr('Record movement')}</Button></div>
@@ -77,7 +91,7 @@ export function InventoryMovements({ items }: { items: StockItemSelect[] }) {
             { key: 'name', header: tr('Material'), render: m => m.name },
             { key: 'kind', header: tr('Type'), render: m => <Badge tone={m.kind === 'purchase' ? 'positive' : m.kind === 'waste' ? 'danger' : 'neutral'}>{m.kind === 'purchase' ? tr('Delivery') : m.kind === 'waste' ? tr('Waste') : m.kind === 'adjustment' ? tr('Correction') : m.kind}</Badge> },
             { key: 'qty', header: tr('Quantity'), align: 'right', render: m => <span style={{ whiteSpace: 'nowrap' }}>{m.quantity > 0 ? '+' : ''}{m.quantity} {m.unit}</span> },
-            { key: 'notes', header: tr('Reason'), render: m => m.notes }
+            { key: 'notes', header: tr('Reason'), render: m => [reasonLabel(m.reason), m.notes].filter(Boolean).join(' · ') }
           ]}
         />
       </div>

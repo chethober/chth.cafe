@@ -30,10 +30,11 @@ Built with React, TypeScript and Tailwind CSS, served by Hono on Cloudflare Work
 
 | | |
 |---|---|
-| ☕ **Public menu** | Categories, search, filters, favourites, "Spin for me", ordering and order tracking, opening hours and events |
-| 📋 **Daily panel** | A live order board (waiting, preparing, ready), new orders at the till, the checklist, the customer club and clock in/out |
-| 📈 **Finances** | Revenue, expenses, wages and margin, payment mix, best sellers and closing the day |
-| 🍰 **Menu and stock** | Items with cost, margin and availability, names in every language, and private categories only staff see; raw materials with recipes, automatic deduction and low-stock alerts |
+| ☕ **Public menu** | Categories, search, filters, favourites, "Spin for me", happy-hour prices, pickup times, ordering and order tracking with a printable receipt, opening hours and events |
+| 📋 **Daily panel** | A live order board (waiting, preparing, ready), a full-screen kitchen display, new orders at the till with options, tips and club rewards, the checklist, the customer club and clock in/out |
+| 📈 **Finances** | Revenue, expenses, wages and margin, payment mix, tips, best sellers, waste and shrinkage, and closing the day |
+| 🍰 **Menu and stock** | Items in your own order with options that change price and recipe, promotions, cost, margin and availability, names in every language, and private categories only staff see; raw materials with recipes, automatic deduction, suppliers, purchase orders and low-stock alerts |
+| 🎟️ **Customer club** | Stamp cards and points, earned on completed orders and spent at the till |
 | 👥 **Staff and shifts** | Team rates, clocked shifts and wages |
 | 🤖 **Telegram bot** | Sales, shift, checklist and low-stock alerts, plus commands to run the café from the chat |
 | ☁️ **One-click deploys** | CHTH Café Cloud deploys and updates a café in the owner's own Cloudflare account |
@@ -170,12 +171,15 @@ To manage the café from the chat, deploy over HTTPS and press **Connect bot com
 | `/orders` | Open orders, with a button to move each one along |
 | `/stock`, `/stock all` | Ingredients at or below their reorder level, or everything |
 | `/restock milk 12` | Record a purchase in the ingredient's own unit |
+| `/reorder` | What to order, grouped by supplier, with a button to draft the purchase orders |
 | `/menu latte`, `/soldout` | Mark menu items sold out or back on |
 | `/staff` | Who is clocked in, and for how long |
 | `/tasks` | Open checklist tasks; tap to complete |
 | `/expense 250 milk` | Log a cash expense for today |
 | `/week`, `/report [YYYY-MM-DD]` | Last 7 days, or a full daily report (yesterday by default) |
 | `/status`, `/alerts` | Open or closed now; turn each alert on or off |
+
+Customers who open their receipt on the order page can press **Get it on Telegram**: the link starts the bot with a signed payload, and the bot replies with the receipt in that private chat.
 
 The cron runs hourly. After midnight café time it sends yesterday's report, and from 09:00 it sends a low-stock check. Each runs once a day, tracked in KV.
 
